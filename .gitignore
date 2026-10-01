@@ -1,0 +1,21 @@
+# Gradle and build output
+.gradle/
+build/
+**/build/
+local.properties
+
+# IDE metadata
+.idea/
+*.iml
+
+# Packaged apps
+*.apk
+*.aab
+
+# Secrets and machine-specific configuration
+.env
+.env.*
+
+# Operating-system files
+.DS_Store
+Thumbs.db

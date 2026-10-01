@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+
+    <application
+        android:name=".PixelodyApp"
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher_ultraviolet"
+        android:roundIcon="@mipmap/ic_launcher_ultraviolet"
+        android:label="Pixelody"
+        android:usesCleartextTraffic="true"
+        android:theme="@style/Theme.Pixelody">
+        <activity android:name=".modules.WebShopActivity" android:exported="false" />
+        <activity android:name=".modules.ModuleShopActivity" android:exported="false" />
+        <activity
+            android:name=".MainActivity"
+            android:launchMode="singleTop"
+            android:exported="true">
+            <!-- The launcher entry lives on the activity-aliases below, one per
+                 logo colour; BrandIconSwitcher enables exactly one of them. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="pixelody"
+                    android:host="connect" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="pixelody" android:host="home" />
+                <data android:scheme="pixelody" android:host="search" />
+                <data android:scheme="pixelody" android:host="library" />
+                <data android:scheme="pixelody" android:host="create" />
+                <data android:scheme="pixelody" android:host="files" />
+                <data android:scheme="pixelody" android:host="profile" />
+                <data android:scheme="pixelody" android:host="technical" />
+                <data android:scheme="pixelody" android:host="player" />
+                <data android:scheme="pixelody" android:host="queue" />
+            </intent-filter>
+        </activity>
+
+        <activity-alias
+            android:name=".LauncherLogoUltraviolet"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_ultraviolet"
+            android:roundIcon="@mipmap/ic_launcher_ultraviolet"
+            android:label="Pixelody"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".LauncherLogoElectric"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_electric"
+            android:roundIcon="@mipmap/ic_launcher_electric"
+            android:label="Pixelody"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".LauncherLogoIndigo"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_indigo"
+            android:roundIcon="@mipmap/ic_launcher_indigo"
+            android:label="Pixelody"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".LauncherLogoGrape"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_grape"
+            android:roundIcon="@mipmap/ic_launcher_grape"
+            android:label="Pixelody"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".LauncherLogoLavender"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_lavender"
+            android:roundIcon="@mipmap/ic_launcher_lavender"
+            android:label="Pixelody"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <service
+            android:name=".core.playback.PixelodyPlaybackService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+                <action android:name="androidx.media3.session.MediaLibraryService" />
+                <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
+        </service>
+
+        <receiver
+            android:name=".widget.PixelodyWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_pixelody_info" />
+        </receiver>
+
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+
+        <service
+            android:name=".core.hosting.PixelodyHostingService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+    </application>
+</manifest>
