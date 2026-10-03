@@ -67,4 +67,4 @@ internal class QrDecoder {
 }
 
 internal fun String.payloadCandidates(): List<String> =
-    listOf(trim().trim('﻿')).filter { it.isNotBlank() }
+    listOf(trim().trim('\uFEFF')).filter { it.isNotBlank() }
