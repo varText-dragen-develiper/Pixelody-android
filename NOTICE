@@ -8,5 +8,5 @@ LICENSE file for details.
 
 "Pixelody" and the Pixelody logo are not licensed under the GPL; see
 TRADEMARKS.md. Third-party components and bundled assets keep their own
-licenses, recorded in THIRD_PARTY_ASSETS.md (desktop) and the dependency
+licenses, recorded in THIRD_PARTY_ASSETS.md and the dependency
 manifests, with license texts under licenses/ where they are bundled.
