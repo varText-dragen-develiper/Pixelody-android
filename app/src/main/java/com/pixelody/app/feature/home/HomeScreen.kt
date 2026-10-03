@@ -5,6 +5,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +30,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
+import com.pixelody.app.data.model.withCover
 import com.pixelody.app.data.model.CoverBook
 import com.pixelody.app.data.model.albumCoverKey
 import com.pixelody.app.data.model.crateCoverKey
@@ -43,10 +46,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import com.pixelody.app.ui.components.StudioSectionToggle
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -125,6 +131,9 @@ internal fun HomeScreen(
     qrScannerVisible: Boolean,
     qrScannerError: String,
     isConnecting: Boolean,
+    isLoadingMusic: Boolean = false,
+    connectionSetupRequested: Boolean = false,
+    onConnectionSetupShown: () -> Unit = {},
     error: String,
     onCopiedDetailsChange: (String) -> Unit,
     onStartQrScanner: () -> Unit,
@@ -175,6 +184,12 @@ internal fun HomeScreen(
     onShuffleAllFlow: () -> Unit = {}
 ) {
     var manualInviteVisible by remember { mutableStateOf(false) }
+    var showConnectionSetup by remember { mutableStateOf(false) }
+    LaunchedEffect(connectionSetupRequested) {
+        if (connectionSetupRequested) { showConnectionSetup = true; onConnectionSetupShown() }
+    }
+    var showBrowseControls by rememberSaveable { mutableStateOf(false) }
+    var showListeningTools by rememberSaveable { mutableStateOf(false) }
     var smartFilter by remember { mutableStateOf(SmartPocketFilter.All) }
     val hostTracks = snapshot?.tracks.orEmpty()
     val playlists = snapshot?.playlists.orEmpty()
@@ -314,22 +329,14 @@ internal fun HomeScreen(
     }
 
     val displayedPlaylists = remember(playlists) { playlists.take(10) }
+    val startState = homeStartState(playablePool.size, (hostTracks + localTracks).count { !it.missing && it.streamUrl.isNotBlank() }, isLoadingMusic, isConnecting)
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(top = 12.dp, bottom = 36.dp)
     ) {
-        if (surfaceState.showHardwareBanner && surfaceState.hardwareAnchor != null && experienceMode == AppExperienceMode.Studio) {
-            item(key = "hardware_banner", contentType = "hardware_banner") {
-                Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                    HardwarePresencePill(
-                        state = surfaceState.hardwareAnchor,
-                        onClick = onOpenProfile
-                    )
-                }
-            }
-        }
+
         item(key = "hero_header", contentType = "hero_header") {
             Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                 HomeHeroHeader(
@@ -346,7 +353,49 @@ internal fun HomeScreen(
                 )
             }
         }
-        if (experienceMode == AppExperienceMode.Essential) {
+        if (startState != HomeStartState.Ready) {
+            item(key = "music_setup") {
+                HomeMusicSetupCard(state = startState,
+                    onAddMusic = onOpenDevice,
+                    onShowAll = { onSourceScopeChange(SourceScope.All) },
+                    onConnectDesktop = { showConnectionSetup = !showConnectionSetup },
+                    modifier = Modifier.padding(horizontal = 16.dp))
+            }
+        } else if (experienceMode == AppExperienceMode.Essential) {
+            item(key = "music_sources") {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = onOpenDevice, modifier = Modifier.heightIn(min = 48.dp)) { Text("Add music") }
+                    TextButton(onClick = { showConnectionSetup = !showConnectionSetup }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Connect desktop") }
+                }
+            }
+        }
+        if (showConnectionSetup || qrScannerVisible || isConnecting || error.isNotBlank()) {
+        item(key = "pairing_panel", contentType = "pairing_panel") {
+            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                HomePairingPanel(
+                    snapshot = snapshot,
+                    savedHost = savedHost,
+                    liveState = liveState,
+                    copiedDetails = copiedDetails,
+                    qrScannerVisible = qrScannerVisible,
+                    qrScannerError = qrScannerError,
+                    isConnecting = isConnecting,
+                    manualInviteVisible = manualInviteVisible,
+                    onManualInviteVisibleChange = { manualInviteVisible = it },
+                    onCopiedDetailsChange = onCopiedDetailsChange,
+                    onStartQrScanner = onStartQrScanner,
+                    onStopQrScanner = onStopQrScanner,
+                    onQrPayloadScanned = onQrPayloadScanned,
+                    onQrScannerError = onQrScannerError,
+                    onForgetSavedHost = onForgetSavedHost,
+                    onUseCopiedDetails = onUseCopiedDetails,
+                    onPairFixture = onPairFixture,
+                    onOpenSharing = onOpenSharing
+                )
+            }
+        }
+        }
+        if (experienceMode == AppExperienceMode.Essential && startState == HomeStartState.Ready) {
             item(key = "essential_play_row", contentType = "essential_play_row") {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
@@ -481,24 +530,19 @@ internal fun HomeScreen(
                     }
                 }
             }
-        } else {
-        item(key = "contextual_horizon", contentType = "contextual_horizon") {
-            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                ContextualHorizonHero(
-                    surfaceState = surfaceState,
-                    onLaunchHero = {
-                        habitStore.recordAction(HabitActionType.PlaySomething)
-                        playablePool.firstOrNull()?.let(onPlayTrack)
-                    },
-                    onOpenTimeline = onOpenTimeline,
-                    onOpenPlayer = onOpenPlayer,
-                    onOpenQueue = onOpenLibrary,
-                    onOpenTurntable = onOpenPlayer,
-                    onCycleEqualizer = onCycleEqualizerPreset,
-                    onShowDoc = onShowDoc
-                )
-            }
+        } else if (startState == HomeStartState.Ready) {
+        item(key = "studio_listening_lead") {
+            StudioListeningLead(track = (selectedTrack ?: playablePool.firstOrNull())?.withCover(covers), isPlaying = isPlaying,
+                onPlayPause = { if (selectedTrack != null) onTogglePlayback() else playablePool.firstOrNull()?.let(onPlayTrack) },
+                onOpenPlayer = onOpenPlayer, onOpenQueue = onOpenQueue, canOpenPlayer = selectedTrack != null,
+                modifier = Modifier.padding(horizontal = 16.dp))
         }
+        item(key = "studio_browse_controls") {
+            StudioSectionToggle("Browse controls", if (smartFilter == SmartPocketFilter.All) sourceScope.label else "${sourceScope.label} · Picks: ${smartFilter.label}", showBrowseControls,
+                { showBrowseControls = !showBrowseControls }, "studio:home-browse-controls",
+                Modifier.padding(horizontal = 16.dp))
+        }
+        if (showBrowseControls) {
         item(key = "pivot_bar", contentType = "pivot_bar") {
             Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                 TriSourcePivotBar(
@@ -518,14 +562,9 @@ internal fun HomeScreen(
                     jamActive = liveState != null,
                     jamCount = queuedTracks.size,
                     onLongClickScope = onLongClickScope,
-                    onConnectDesktop = onConnectDesktop,
+                    onConnectDesktop = { showConnectionSetup = true },
                     onStartJam = onStartJam
                 )
-            }
-        }
-        item(key = "search_prompt", contentType = "search_prompt") {
-            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                HomeSearchPrompt(onClick = onOpenSearch)
             }
         }
         item(key = "smart_pocket", contentType = "smart_pocket") {
@@ -569,6 +608,83 @@ internal fun HomeScreen(
                 )
             }
         }
+        }
+
+        item(key = "studio_listening_tools") {
+            StudioSectionToggle("Listening tools", "Flow, history and setup", showListeningTools,
+                { showListeningTools = !showListeningTools }, "studio:home-listening-tools",
+                Modifier.padding(horizontal = 16.dp))
+        }
+        if (showListeningTools) {
+        if (surfaceState.showHardwareBanner && surfaceState.hardwareAnchor != null && experienceMode == AppExperienceMode.Studio) {
+            item(key = "hardware_banner", contentType = "hardware_banner") {
+                Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                    HardwarePresencePill(
+                        state = surfaceState.hardwareAnchor,
+                        onClick = onOpenProfile
+                    )
+                }
+            }
+        }
+        item(key = "contextual_horizon", contentType = "contextual_horizon") {
+            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                ContextualHorizonHero(
+                    surfaceState = surfaceState,
+                    onLaunchHero = {
+                        habitStore.recordAction(HabitActionType.PlaySomething)
+                        playablePool.firstOrNull()?.let(onPlayTrack)
+                    },
+                    onOpenTimeline = onOpenTimeline,
+                    onOpenPlayer = onOpenPlayer,
+                    onOpenQueue = onOpenQueue,
+                    onOpenTurntable = onOpenPlayer,
+                    onCycleEqualizer = onCycleEqualizerPreset,
+                    onShowDoc = onShowDoc
+                )
+            }
+        }
+
+        if (losslessTracks.isNotEmpty() || localTracks.isNotEmpty() || playableHostTracks.isNotEmpty()) {
+            item(key = "sources_quality", contentType = "sources_quality") {
+                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                    HomeSectionHeader(title = "Sources And Quality", subtitle = "Local-first choices without the debug wall.")
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        item(contentType = "source_tile") {
+                            SourceChoiceTile(
+                                title = "Lossless",
+                                subtitle = "${losslessTracks.size} tracks",
+                                enabled = losslessTracks.isNotEmpty(),
+                                onClick = { losslessTracks.firstOrNull()?.let(onPlayTrack) }
+                            )
+                        }
+                        item(contentType = "source_tile") {
+                            SourceChoiceTile(
+                                title = "Host",
+                                subtitle = "${playableHostTracks.size} playable",
+                                enabled = playableHostTracks.isNotEmpty(),
+                                onClick = { playableHostTracks.firstOrNull()?.let(onPlayTrack) }
+                            )
+                        }
+                        item(contentType = "source_tile") {
+                            SourceChoiceTile(
+                                title = "Phone",
+                                subtitle = "${localTracks.size} files",
+                                enabled = localTracks.isNotEmpty(),
+                                onClick = { localTracks.firstOrNull()?.let(onPlayTrack) }
+                            )
+                        }
+                        item(contentType = "source_tile") {
+                            SourceChoiceTile(
+                                title = "Add",
+                                subtitle = "files or host",
+                                enabled = true,
+                                onClick = onOpenCreate
+                            )
+                        }
+                    }
+                }
+            }
+        }
         if (curatedCrates.isNotEmpty() || crates.isNotEmpty()) {
             item(key = "discovery_crates", contentType = "discovery_crates") {
                 Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
@@ -587,6 +703,38 @@ internal fun HomeScreen(
                         onOpenSmartCrateBuilder = onOpenSmartCrateBuilder,
                         onShowDoc = onShowDoc
                     )
+                }
+            }
+        }
+        item(key = "action_grid", contentType = "action_grid") {
+            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                HomeActionGrid(
+                    onOpenLibrary = onOpenLibrary,
+                    onOpenSearch = onOpenSearch,
+                    onOpenCreate = onOpenCreate,
+                    onOpenDevice = onOpenDevice,
+                    onOpenProfile = onOpenProfile,
+                    onOpenFlowCabinet = onOpenFlowCabinet
+                )
+            }
+        }
+        }
+        item(key = "search_prompt", contentType = "search_prompt") {
+            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                HomeSearchPrompt(onClick = onOpenSearch)
+            }
+        }
+
+        val filledCrates = crates.filter { it.occupiedCount > 0 }
+        if (filledCrates.isNotEmpty()) {
+            item(key = "studio_crates", contentType = "cover_shelf") {
+                CoverShelf(title = "Your crates") {
+                    items(filledCrates, key = { "crate_${it.id}" }) { crate ->
+                        val key = crateCoverKey(crate.id)
+                        CoverCard(title = crate.name, caption = "${crate.occupiedCount} items", note = covers.noteFor(key),
+                            artworkUrl = covers.imageFor(key, crateArtwork(crate, trackById, playlists)),
+                            onClick = { onOpenCrate(crate.id) }, onLongClick = { onCrateActions(crate.id) })
+                    }
                 }
             }
         }
@@ -629,7 +777,8 @@ internal fun HomeScreen(
                 Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                     AlbumCarouselDeck(
                         albumGroups = albumGroups,
-                        onPlayTrack = onPlayTrack
+                        onPlayTrack = onPlayTrack,
+                        onOpenCollection = onOpenCollection
                     )
                 }
             }
@@ -650,47 +799,7 @@ internal fun HomeScreen(
                 }
             }
         }
-        if (losslessTracks.isNotEmpty() || localTracks.isNotEmpty() || playableHostTracks.isNotEmpty()) {
-            item(key = "sources_quality", contentType = "sources_quality") {
-                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                    HomeSectionHeader(title = "Sources And Quality", subtitle = "Local-first choices without the debug wall.")
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        item(contentType = "source_tile") {
-                            SourceChoiceTile(
-                                title = "Lossless",
-                                subtitle = "${losslessTracks.size} tracks",
-                                enabled = losslessTracks.isNotEmpty(),
-                                onClick = { losslessTracks.firstOrNull()?.let(onPlayTrack) }
-                            )
-                        }
-                        item(contentType = "source_tile") {
-                            SourceChoiceTile(
-                                title = "Host",
-                                subtitle = "${playableHostTracks.size} playable",
-                                enabled = playableHostTracks.isNotEmpty(),
-                                onClick = { playableHostTracks.firstOrNull()?.let(onPlayTrack) }
-                            )
-                        }
-                        item(contentType = "source_tile") {
-                            SourceChoiceTile(
-                                title = "Phone",
-                                subtitle = "${localTracks.size} files",
-                                enabled = localTracks.isNotEmpty(),
-                                onClick = { localTracks.firstOrNull()?.let(onPlayTrack) }
-                            )
-                        }
-                        item(contentType = "source_tile") {
-                            SourceChoiceTile(
-                                title = "Add",
-                                subtitle = "files or host",
-                                enabled = true,
-                                onClick = onOpenCreate
-                            )
-                        }
-                    }
-                }
-            }
-        }
+
         if (jumpBackTracks.isNotEmpty()) {
             item(key = "jump_back", contentType = "jump_back") {
                 Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
@@ -725,42 +834,7 @@ internal fun HomeScreen(
                 }
             }
         }
-        item(key = "action_grid", contentType = "action_grid") {
-            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                HomeActionGrid(
-                    onOpenLibrary = onOpenLibrary,
-                    onOpenSearch = onOpenSearch,
-                    onOpenCreate = onOpenCreate,
-                    onOpenDevice = onOpenDevice,
-                    onOpenProfile = onOpenProfile,
-                    onOpenFlowCabinet = onOpenFlowCabinet
-                )
-            }
-        }
-        item(key = "pairing_panel", contentType = "pairing_panel") {
-            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                HomePairingPanel(
-                    snapshot = snapshot,
-                    savedHost = savedHost,
-                    liveState = liveState,
-                    copiedDetails = copiedDetails,
-                    qrScannerVisible = qrScannerVisible,
-                    qrScannerError = qrScannerError,
-                    isConnecting = isConnecting,
-                    manualInviteVisible = manualInviteVisible,
-                    onManualInviteVisibleChange = { manualInviteVisible = it },
-                    onCopiedDetailsChange = onCopiedDetailsChange,
-                    onStartQrScanner = onStartQrScanner,
-                    onStopQrScanner = onStopQrScanner,
-                    onQrPayloadScanned = onQrPayloadScanned,
-                    onQrScannerError = onQrScannerError,
-                    onForgetSavedHost = onForgetSavedHost,
-                    onUseCopiedDetails = onUseCopiedDetails,
-                    onPairFixture = onPairFixture,
-                    onOpenSharing = onOpenSharing
-                )
-            }
-        }
+
         if (error.isNotBlank()) {
             item(key = "error_notice", contentType = "error_notice") {
                 Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
@@ -806,7 +880,7 @@ internal fun HomeHeroHeader(
                 Text("Your music", style = MaterialTheme.typography.headlineSmall.copy(letterSpacing = 0.sp),
                     fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)
                 Text(
-                    text = if (connectionState == HostConnectionState.Connected && hostName != null) if (hostName == "Local Phone / Standalone") "On this phone" else "Connected to $hostName" else greetingSubtitle,
+                    text = when { connectionState == HostConnectionState.Connected && hostName != null && hostName != "Local Phone / Standalone" -> "Connected to $hostName"; localTrackCount > 0 -> "$localTrackCount songs on this phone"; else -> "Your library starts here" },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onBackground,
                     maxLines = 2, overflow = TextOverflow.Ellipsis
@@ -1312,7 +1386,7 @@ internal fun MiniTrackCard(
 internal fun AlbumCarouselDeck(
     albumGroups: List<Pair<String, List<Track>>>,
     onPlayTrack: (Track) -> Unit,
-    onOpenCollection: (String, String) -> Unit = { _, _ -> },
+    onOpenCollection: (String, String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var isDeckMode by remember { mutableStateOf(true) }
@@ -1479,8 +1553,8 @@ internal fun HomeActionGrid(
     onOpenProfile: () -> Unit,
     onOpenFlowCabinet: () -> Unit = {}
 ) {
-    HomeSectionHeader(title = "Choose Your Next Move", subtitle = "Short paths for different listening moods.")
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        HomeSectionHeader(title = "Choose Your Next Move", subtitle = "Short paths for different listening moods.")
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             HomeActionTile("Library", "Browse saved music", Modifier.weight(1f), onOpenLibrary)
             HomeActionTile("Search", "Find it fast", Modifier.weight(1f), onOpenSearch)
@@ -2002,7 +2076,6 @@ private fun QuadrantArtworkCell(
     }
 }
 
-
 /** The sideways shelf used for every row of covers on Home: one light title, then covers. */
 @Composable
 private fun CoverShelf(
@@ -2067,4 +2140,28 @@ private fun crateArtwork(
         if (!found.isNullOrBlank()) return found
     }
     return null
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun StudioListeningLead(track: Track?, isPlaying: Boolean, onPlayPause: () -> Unit,
+    onOpenPlayer: () -> Unit, onOpenQueue: () -> Unit, canOpenPlayer: Boolean, modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            RemoteArtwork(track?.artworkUrl, track?.title ?: "Your music", Modifier.size(64.dp).clip(RoundedCornerShape(8.dp)))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(track?.title ?: "Choose something to play", style = MaterialTheme.typography.titleLarge,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(track?.artist ?: "Your library is ready", style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = onPlayPause, modifier = Modifier.heightIn(min = 48.dp).testTag("studio:home-play")) {
+                Text(if (isPlaying) "Pause" else "Play")
+            }
+            if (canOpenPlayer) TextButton(onClick = onOpenPlayer, modifier = Modifier.heightIn(min = 48.dp)) { Text("Player") }
+            TextButton(onClick = onOpenQueue, modifier = Modifier.heightIn(min = 48.dp)) { Text("Queue") }
+        }
+    }
 }
