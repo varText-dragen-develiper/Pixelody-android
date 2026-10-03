@@ -1,5 +1,8 @@
 package com.pixelody.app.feature.baselayer
 
+import com.pixelody.app.BuildConfig
+import kotlinx.coroutines.CancellationException
+import com.pixelody.app.data.model.HostConnectionState
 import android.Manifest
 import android.content.ComponentName
 import android.content.pm.PackageManager
@@ -145,7 +148,7 @@ private const val COMPLETION_FRACTION = 0.9f
 @Composable
 fun BasePlaybackHost(
     repository: HostRepository = remember { HostRepository(FakePixelodyHost()) },
-    initialData: BaseLayerData = sampleBaseLayerData(),
+    initialData: BaseLayerData = if (BuildConfig.ENABLE_DEMO_LIBRARY) sampleBaseLayerData() else BaseLayerData(),
     incomingConnectionDetails: HostConnectionDetails? = null,
     onConnectionDetailsConsumed: () -> Unit = {},
     incomingDeepLink: PixelodyTab? = null,
@@ -181,6 +184,10 @@ fun BasePlaybackHost(
     var hostPlaylists by remember { mutableStateOf<List<Playlist>>(emptyList()) }
     var hostBaseUrl by remember { mutableStateOf<String?>(null) }
     var hostReachable by remember { mutableStateOf(true) }
+    var hostConnectionState by remember { mutableStateOf(HostConnectionState.Disconnected) }
+    var hostConnectionError by remember { mutableStateOf("") }
+    var isConnectingHost by remember { mutableStateOf(false) }
+    var isLoadingLocalLibrary by remember { mutableStateOf(true) }
 
     // Phone / Local data state
     var localTracks by remember { mutableStateOf<List<Track>>(emptyList()) }
@@ -291,45 +298,54 @@ fun BasePlaybackHost(
         }
     }
 
-    fun refreshHostLibrary() {
+    fun refreshHostLibrary(details: HostConnectionDetails? = incomingConnectionDetails) {
+        if (isConnectingHost) return
+        val profile = savedHostStore.load()
+        if (details == null && profile == null && !BuildConfig.ENABLE_DEMO_LIBRARY) {
+            hostConnectionState = HostConnectionState.Disconnected
+            hostConnectionError = ""
+            return
+        }
+        if (profile != null) hostBaseUrl = profile.baseUrl
+        isConnectingHost = true
+        hostConnectionState = HostConnectionState.Connecting
+        hostConnectionError = ""
         coroutineScope.launch {
-            if (incomingConnectionDetails != null) {
-                runCatching {
-                    val result = repository.connectHost(incomingConnectionDetails)
-                    savedHostStore.save(repository.savedProfileFor(result, incomingConnectionDetails.baseUrls))
-                    hostBaseUrl = result.snapshot.host.baseUrl
-                    hostTracks = result.snapshot.tracks
-                    hostPlaylists = result.snapshot.playlists
-                    hostReachable = true
-                    onConnectionDetailsConsumed()
-                }.onFailure {
-                    hostReachable = false
-                }
-            } else {
-                val profile = savedHostStore.load()
-                if (profile != null) {
-                    hostBaseUrl = profile.baseUrl
-                    runCatching {
-                        val snapshot = repository.loadHostLibrary(profile.baseUrls, profile.token)
-                        hostTracks = snapshot.tracks
-                        hostPlaylists = snapshot.playlists
-                        hostReachable = true
-                    }.onFailure {
-                        hostReachable = false
-                        if (hostTracks.isEmpty()) {
-                            val fixture = repository.loadFixtureLibrary()
-                            hostTracks = fixture.tracks
-                            hostPlaylists = fixture.playlists
-                        }
+            try {
+                val snapshot = when {
+                    details != null -> {
+                        val result = repository.connectHost(details)
+                        savedHostStore.save(repository.savedProfileFor(result, details.baseUrls))
+                        onConnectionDetailsConsumed()
+                        result.snapshot
                     }
-                } else {
-                    val fixture = repository.loadFixtureLibrary()
-                    hostTracks = fixture.tracks
-                    hostPlaylists = fixture.playlists
-                    hostReachable = true
+                    profile != null -> repository.loadHostLibrary(profile.baseUrls, profile.token)
+                    else -> repository.loadFixtureLibrary()
                 }
+                hostBaseUrl = snapshot.host.baseUrl.takeIf { details != null || profile != null }
+                hostTracks = snapshot.tracks
+                hostPlaylists = snapshot.playlists
+                hostReachable = true
+                hostConnectionState = HostConnectionState.Connected
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                hostReachable = false
+                hostConnectionState = HostConnectionState.Unreachable
+                hostConnectionError = "Couldn't connect to your desktop. Check that Pixelody is open and both devices can reach the same network, then try again. Your phone music is still available."
+            } finally {
+                isConnectingHost = false
             }
         }
+    }
+
+    fun connectHostPayload(payload: String) {
+        val details = HostConnectionDetails.fromText(payload)
+        if (details == null) {
+            hostConnectionError = "That isn't a Pixelody connection invite. Copy a new invite from your desktop, or scan its QR code."
+            return
+        }
+        refreshHostLibrary(details)
     }
 
     // Load Host library on launch or when connection details change
@@ -359,9 +375,12 @@ fun BasePlaybackHost(
                 isScanningDevice = false
                 if (scanned.isNotEmpty()) {
                     localTracks = (localTracks + scanned).distinctBy { it.id }
+                    persistenceRepository.cacheScannedTracks(localTracks)
+                    activeSource = BaseSource.Phone
+                    settingsStore.saveLastSourceScope(activeSource.key)
                     deviceScanNotice = "Indexed ${scanned.size} track${if (scanned.size == 1) "" else "s"} on device."
                 } else {
-                    deviceScanNotice = "No music tracks found on device."
+                    deviceScanNotice = if (mediaStoreAudioRepository.scanStatus.value.startsWith("Scan error:")) "Couldn't read your phone music. Try choosing a folder or specific files." else "No music found. Choose a folder or files if your music is stored elsewhere."
                 }
             }
         }
@@ -373,7 +392,7 @@ fun BasePlaybackHost(
         if (granted) {
             runDeviceScan()
         } else {
-            deviceScanNotice = "Storage/audio permission is needed to scan entire device."
+            deviceScanNotice = "Music access was not granted. You can still choose specific files or a folder below."
         }
     }
 
@@ -390,59 +409,54 @@ fun BasePlaybackHost(
         }
     }
 
-    val localFolderScanner = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocumentTree()
-    ) { treeUri ->
-        if (treeUri != null) {
-            isScanningDevice = true
-            deviceScanNotice = "Scanning music folder..."
-            coroutineScope.launch(Dispatchers.IO) {
-                val scanned = scanFolderForTracks(context, treeUri)
-                withContext(Dispatchers.Main) {
-                    isScanningDevice = false
-                    if (scanned.isNotEmpty()) {
-                        localTracks = (localTracks + scanned).distinctBy { it.id }
-                        deviceScanNotice = "Found ${scanned.size} audio file${if (scanned.size == 1) "" else "s"}."
-                    } else {
-                        deviceScanNotice = "No audio files found in selected folder."
-                    }
+    fun addLocalMusic(readTracks: () -> List<Track>, emptyNotice: String) {
+        isScanningDevice = true
+        deviceScanNotice = "Reading your music..."
+        coroutineScope.launch {
+            try {
+                val imported = withContext(Dispatchers.IO) { readTracks() }
+                if (imported.isNotEmpty()) {
+                    localTracks = (localTracks + imported).distinctBy { it.id }
+                    persistenceRepository.cacheScannedTracks(localTracks)
+                    activeSource = BaseSource.Phone
+                    settingsStore.saveLastSourceScope(activeSource.key)
+                    deviceScanNotice = "${imported.size} song${if (imported.size == 1) "" else "s"} added. Open your library to listen."
+                } else {
+                    deviceScanNotice = emptyNotice
                 }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                deviceScanNotice = "Couldn't read that music. Try another folder or choose specific files."
+            } finally {
+                isScanningDevice = false
             }
         }
     }
 
-    val localAudioPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenMultipleDocuments()
-    ) { uris ->
-        val importedTracks = uris.mapNotNull { uri -> localTrackFromUri(context, uri) }
-        if (importedTracks.isNotEmpty()) {
-            localTracks = (localTracks + importedTracks).distinctBy { it.id }
-            deviceScanNotice = "Added ${importedTracks.size} audio file${if (importedTracks.size == 1) "" else "s"}."
-        }
+    val localFolderScanner = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) addLocalMusic({ scanFolderForTracks(context, uri) }, "No music found in that folder. Choose another folder or specific files.")
+    }
+    val localAudioPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isNotEmpty()) addLocalMusic({ uris.mapNotNull { localTrackFromUri(context, it) } }, "Those files couldn't be read as audio. Try another selection.")
     }
 
-    // Auto-scan local storage on launch: load cache first, then refresh if permission granted
+    // Restore chosen files first, then merge discovered music without dropping chosen folders.
     LaunchedEffect(Unit) {
-        withContext(Dispatchers.IO) {
-            val cached = persistenceRepository.loadCachedScannedTracks()
-            if (cached.isNotEmpty()) {
-                withContext(Dispatchers.Main) {
-                    localTracks = cached
-                }
+        try {
+            localTracks = withContext(Dispatchers.IO) { persistenceRepository.loadCachedScannedTracks() }
+            val permission = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_AUDIO else Manifest.permission.READ_EXTERNAL_STORAGE
+            if (ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED) {
+                val scanned = mediaStoreAudioRepository.scanDeviceStorage()
+                localTracks = (localTracks + scanned).distinctBy { it.id }
+                persistenceRepository.cacheScannedTracks(localTracks)
             }
-        }
-        val audioPermission = if (Build.VERSION.SDK_INT >= 33) {
-            Manifest.permission.READ_MEDIA_AUDIO
-        } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
-        }
-        if (ContextCompat.checkSelfPermission(context, audioPermission) == PackageManager.PERMISSION_GRANTED) {
-            val scanned = mediaStoreAudioRepository.scanDeviceStorage()
-            if (scanned.isNotEmpty()) {
-                withContext(Dispatchers.Main) {
-                    localTracks = scanned
-                }
-            }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            deviceScanNotice = "Couldn't restore all your music. You can choose your files again or retry the phone scan."
+        } finally {
+            isLoadingLocalLibrary = false
         }
     }
 
@@ -1045,7 +1059,11 @@ fun BasePlaybackHost(
         onLensChange = { lens ->
             activeLens = lens
         },
-        onRetryHost = ::refreshHostLibrary,
+        onRetryHost = { refreshHostLibrary() },
+        onConnectHost = ::connectHostPayload,
+        hostConnectionState = hostConnectionState,
+        hostConnectionError = hostConnectionError,
+        isLoadingLocalLibrary = isLoadingLocalLibrary,
         onCratesChange = { newCrates ->
             crateBook = newCrates
             crateStore.save(newCrates)

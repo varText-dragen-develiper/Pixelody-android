@@ -326,16 +326,16 @@ internal fun SearchScreen(
             if (combinedTracks.isEmpty()) {
                 item {
                     SectionCard(
-                        title = "No Music Found",
+                        title = if (hostTracks.isEmpty() && localTracks.isEmpty()) "Add music to start searching" else "No matching music",
                         subtitle = if (hostTracks.isEmpty() && localTracks.isEmpty()) {
-                            "Connect a host or add files from this phone."
+                            "Choose music stored on your phone, or connect your desktop from Home."
                         } else {
                             "Try another title, artist, album, codec, or source."
                         }
                     ) {
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Button(onClick = onOpenHome) { Text("Home") }
-                            OutlinedButton(onClick = onOpenDevice) { Text("Phone Files") }
+                            OutlinedButton(onClick = onOpenDevice) { Text("Add music") }
                         }
                     }
                 }

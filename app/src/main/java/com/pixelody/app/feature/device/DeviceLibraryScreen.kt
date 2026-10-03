@@ -3,6 +3,7 @@ package com.pixelody.app.feature.device
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -59,6 +60,7 @@ internal fun DeviceLibraryScreen(
     onPlayTrack: (Track) -> Unit,
     onOpenPlayer: () -> Unit,
     onOpenQueue: () -> Unit,
+    onOpenLibrary: () -> Unit = {},
     equalizerProfile: EqualizerProfile,
     trackHasEqualizerOverride: Boolean,
     onCycleEqualizerPreset: () -> Unit,
@@ -78,19 +80,21 @@ internal fun DeviceLibraryScreen(
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(bottom = 16.dp)
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp)
     ) {
         item {
             ScreenHeader(
                 title = "On This Phone",
-                subtitle = "Play audio files stored on this Android device."
+                subtitle = "Choose your music. No desktop connection is needed."
             )
         }
         item {
             SectionCard(
-                title = "Device Library",
+                title = "Add your music",
                 subtitle = if (localTracks.isEmpty()) "No local files added yet" else "${localTracks.size} local track${if (localTracks.size == 1) "" else "s"} ready"
             ) {
+                Text("Choose a folder or specific files, or let Pixelody find audio on your phone. Access is requested only when you choose an action.", style = MaterialTheme.typography.bodyMedium)
+                Spacer(Modifier.height(12.dp))
                 Button(
                     onClick = {
                         haptic.performConfirm()
@@ -110,7 +114,7 @@ internal fun DeviceLibraryScreen(
                             color = MaterialTheme.colorScheme.onPrimary,
                             size = 16.dp
                         )
-                        Text(if (isScanningDevice) "Scanning Entire Device..." else "Scan Entire Device")
+                        Text(if (isScanningDevice) "Finding your music..." else "Find music on this phone")
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
@@ -137,7 +141,7 @@ internal fun DeviceLibraryScreen(
                                 color = MaterialTheme.colorScheme.primary,
                                 size = 14.dp
                             )
-                            Text("Pick Folder")
+                            Text("Choose folder")
                         }
                     }
                     OutlinedButton(
@@ -150,20 +154,12 @@ internal fun DeviceLibraryScreen(
                             .weight(1f)
                             .testTag(PixelodyStateTags.ACQUIRE_PICK_FILES)
                     ) {
-                        Text("Pick Files")
+                        Text("Choose files")
                     }
                 }
                 if (localTracks.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedButton(
-                        onClick = {
-                            haptic.performTick()
-                            onClearLocalTracks()
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Clear Local Tracks")
-                    }
+                    Spacer(Modifier.height(8.dp))
+                    Button(onClick = onOpenLibrary, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Open your library") }
                 }
                 if (scanNotice.isNotBlank()) {
                     Spacer(modifier = Modifier.height(8.dp))
@@ -174,14 +170,6 @@ internal fun DeviceLibraryScreen(
                     )
                 }
             }
-        }
-        item {
-            AndroidHostingCard(
-                hostStatus = hostStatus,
-                hasLocalTracks = localTracks.isNotEmpty(),
-                onStartHost = onStartHost,
-                onStopHost = onStopHost
-            )
         }
         if (localTracks.isEmpty()) {
             item { EmptyState(text = "Scan a folder or choose songs to build your device library.") }
@@ -198,9 +186,10 @@ internal fun DeviceLibraryScreen(
                         haptic.performConfirm()
                         filteredTracks.firstOrNull()?.let(onPlayTrack)
                     },
+                    enabled = filteredTracks.isNotEmpty(),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("Play All (${filteredTracks.size})")
+                    Text("Play all (${filteredTracks.size})")
                 }
                 OutlinedButton(
                     onClick = {

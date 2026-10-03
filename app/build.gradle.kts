@@ -14,6 +14,7 @@ android {
         targetSdk = 35
         versionCode = 2
         versionName = "0.2.0"
+        buildConfigField("boolean", "ENABLE_DEMO_LIBRARY", "false")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -21,8 +22,18 @@ android {
     buildTypes {
         debug {
             if (providers.gradleProperty("moduleTestBuild").orNull == "true") {
+                buildConfigField("boolean", "ENABLE_DEMO_LIBRARY", "true")
                 applicationIdSuffix = ".modules"
                 versionNameSuffix = "-module-test"
+            } else if (providers.gradleProperty("studioHierarchyTestBuild").orNull == "true") {
+                buildConfigField("boolean", "ENABLE_DEMO_LIBRARY", "true")
+                applicationIdSuffix = ".studioqa"
+                versionNameSuffix = "-studio-review"
+                resValue("string", "app_name", "Pixelody Studio test")
+            } else if (providers.gradleProperty("firstUseTestBuild").orNull == "true") {
+                applicationIdSuffix = ".firstuse"
+                versionNameSuffix = "-first-use-test"
+                resValue("string", "app_name", "Pixelody setup test")
             }
         }
         release {
@@ -44,6 +55,7 @@ android {
     }
 
     buildFeatures {
+        buildConfig = true
         compose = true
     }
 }
