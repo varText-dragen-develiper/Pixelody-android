@@ -18,3 +18,15 @@ The embedded project URL records provenance supplied by the font; its current av
 ## Dependencies and Pixelody identity
 
 Dependency coordinates are recorded in `app/build.gradle.kts`; this asset note is not a complete transitive dependency license report. Generate and inspect that report for the frozen release candidate. Pixelody's name and logo follow [TRADEMARKS.md](TRADEMARKS.md).
+
+## Original Cartridge Quest vector drawings
+
+The project provenance record identifies the following as original Pixelody vector artwork. Four are manual conversions from the corresponding original desktop SVGs; the empty-state cartridge is an original Android vector illustration. This record does not establish authorship of the separate raster PNG sheets.
+
+- `app/src/main/res/drawable/ic_cartridge_quest_cart.xml`
+- `app/src/main/res/drawable/ic_cq_console_rack.xml`
+- `app/src/main/res/drawable/ic_cq_controller_panel.xml`
+- `app/src/main/res/drawable/ic_cq_pixel_landscape.xml`
+- `app/src/main/res/drawable/iso_cartridge_quest_empty.xml`
+
+These original program assets follow the public project GPL-3.0-only grant. They incorporate no third-party artwork according to the project record.
