@@ -6,10 +6,12 @@ import java.nio.charset.CodingErrorAction
 
 object ModulePackage {
     const val MAX_BYTES = 8192
-    const val SHOP_ENTRY = "https://pixelody-web.pixelody101.workers.dev/shop?embedded=1"
+    // Mirror of SHOP_ORIGIN in https://github.com/varText-dragen-develiper/pixelody/blob/main/src/module-shop/contract.js; https://github.com/varText-dragen-develiper/pixelody/blob/main/scripts/check-module-shop.js keeps them equal.
+    const val SHOP_HOST = "pixelody-web.pixelody101.workers.dev"
+    const val SHOP_ENTRY = "https://$SHOP_HOST/shop?embedded=1"
     fun allowedShopUrl(url: String): Boolean = try {
         val uri = java.net.URI(url)
-        uri.scheme == "https" && uri.host == "pixelody-web.pixelody101.workers.dev" &&
+        uri.scheme == "https" && uri.host == SHOP_HOST &&
             uri.rawUserInfo == null && (uri.port == -1 || uri.port == 443)
     } catch (_: Exception) { false }
     fun parse(bytes: ByteArray): JSONObject {
