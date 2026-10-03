@@ -1,5 +1,7 @@
 package com.pixelody.app.feature.nowplaying
 
+import com.pixelody.app.ui.components.StudioSectionToggle
+
 import com.pixelody.app.data.model.AppExperienceMode
 import com.pixelody.app.ui.components.ExperienceModeQuickChip
 import androidx.compose.animation.AnimatedVisibility
@@ -313,6 +315,7 @@ internal fun NowPlayingScreen(
     val dismissConnection = rememberPlayerDismissConnection(onCollapse)
     val effectivePositionMsProvider = positionMsProvider ?: { positionMs }
     var internalPlayerViewMode by remember(playerViewMode) { mutableStateOf(playerViewMode) }
+    var showSoundTools by rememberSaveable { mutableStateOf(false) }
     var expandedCabinets by rememberSaveable { mutableStateOf(setOf<String>()) }
 
     fun mapModeToCabinet(mode: String): String? = when (mode) {
@@ -334,6 +337,7 @@ internal fun NowPlayingScreen(
         if (playerViewMode.isNotBlank()) {
             internalPlayerViewMode = playerViewMode
             mapModeToCabinet(playerViewMode)?.let { mapped ->
+                showSoundTools = true
                 expandedCabinets = expandedCabinets + mapped
             }
         }
@@ -341,6 +345,7 @@ internal fun NowPlayingScreen(
 
     LaunchedEffect(internalPlayerViewMode) {
         mapModeToCabinet(internalPlayerViewMode)?.let { mapped ->
+            showSoundTools = true
             expandedCabinets = expandedCabinets + mapped
         }
     }
@@ -358,7 +363,7 @@ internal fun NowPlayingScreen(
         }
     }
 
-    val isScopeActive = isPlaying && (expandedCabinets.contains("Scope") || internalPlayerViewMode in listOf("Scope", "Laser"))
+    val isScopeActive = isPlaying && ((showSoundTools && expandedCabinets.contains("Scope")) || internalPlayerViewMode in listOf("Scope", "Laser"))
     LaunchedEffect(isScopeActive) {
         if (isScopeActive) {
             val sessionId = equalizerStore.loadAudioSessionId()
@@ -489,6 +494,16 @@ internal fun NowPlayingScreen(
                         )
                     }
                     if (experienceMode == AppExperienceMode.Studio) {
+                item(key = "studio_sound_tools", contentType = "studio_sound_tools") {
+                    StudioSectionToggle("Sound tools", buildString {
+                        val eq = trackEqualizer ?: globalEqualizer
+                        append(if (useMasteringRack) "${trackMastering?.preset?.displayName ?: globalMastering.preset.displayName} mastering" else if (eq.enabled) "${eq.preset.displayName} EQ" else "EQ off")
+                        if (isTapeSaturationEnabled) append(" · Tape enabled")
+                        if (spatialSettings.isEnabled) append(" · Spatial enabled")
+                    }, showSoundTools, { showSoundTools = !showSoundTools }, "studio:player-sound-tools", Modifier.padding(horizontal = 16.dp))
+                }
+            }
+            if (experienceMode == AppExperienceMode.Studio && showSoundTools) {
                         audiophileCabinetsSection(
                             track = currentTrack,
                             nextTrack = nextTrack,
@@ -710,6 +725,16 @@ internal fun NowPlayingScreen(
                     }
                 }
             if (experienceMode == AppExperienceMode.Studio) {
+                item(key = "studio_sound_tools", contentType = "studio_sound_tools") {
+                    StudioSectionToggle("Sound tools", buildString {
+                        val eq = trackEqualizer ?: globalEqualizer
+                        append(if (useMasteringRack) "${trackMastering?.preset?.displayName ?: globalMastering.preset.displayName} mastering" else if (eq.enabled) "${eq.preset.displayName} EQ" else "EQ off")
+                        if (isTapeSaturationEnabled) append(" · Tape enabled")
+                        if (spatialSettings.isEnabled) append(" · Spatial enabled")
+                    }, showSoundTools, { showSoundTools = !showSoundTools }, "studio:player-sound-tools", Modifier.padding(horizontal = 16.dp))
+                }
+            }
+            if (experienceMode == AppExperienceMode.Studio && showSoundTools) {
                 audiophileCabinetsSection(
                     track = currentTrack,
                     nextTrack = nextTrack,

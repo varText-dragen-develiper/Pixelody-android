@@ -1,5 +1,10 @@
 package com.pixelody.app.feature.baselayer
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -78,8 +83,6 @@ import com.pixelody.app.ui.components.performConfirm
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -158,9 +161,7 @@ import com.pixelody.app.data.storage.DownloadQueueManager
 import com.pixelody.app.data.storage.DownloadQueueState
 import com.pixelody.app.ui.navigation.PixelodyDetailKind
 import com.pixelody.app.ui.navigation.PixelodyDetailRoute
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.rememberCoroutineScope
 import com.pixelody.app.core.playback.JamSessionCoordinator
 import com.pixelody.app.data.model.JamSession
 import com.pixelody.app.data.model.JamSyncStatus
@@ -243,6 +244,10 @@ fun PixelodyBaseShell(
     onPickFolder: () -> Unit = {},
     onPickFiles: () -> Unit = {},
     hostBaseUrl: String? = null,
+    hostConnectionState: HostConnectionState = HostConnectionState.Disconnected,
+    hostConnectionError: String = "",
+    onConnectHost: (String) -> Unit = {},
+    isLoadingLocalLibrary: Boolean = false,
     offlineCacheSizeBytes: Long = 0L,
     onForgetHost: () -> Unit = {},
     onClearCache: () -> Unit = {},
@@ -387,6 +392,12 @@ fun PixelodyBaseShell(
 
     BackHandler(enabled = !state.backLeavesTheApp()) { send(BaseIntent.Back) }
 
+    var connectionSetupRequested by remember { mutableStateOf(false) }
+    fun openConnectionSetup() {
+        connectionSetupRequested = true
+        send(BaseIntent.SelectDestination(BaseDestination.Home))
+    }
+
     val openCollection = (state.pushed.lastOrNull() as? BasePush.Collection)
         ?.let { data.collection(it.collectionId, it.kindKey) }
     val openTrack = (state.pushed.lastOrNull() as? BasePush.TrackDetail)
@@ -397,14 +408,14 @@ fun PixelodyBaseShell(
     val previousTrack: Track? = null
     val queueTracks = data.queue.mapNotNull { resolveTrack(it) }
 
-    val currentHostProfile = remember(hostBaseUrl, data.hostReachable) {
+    val currentHostProfile = remember(hostBaseUrl, hostConnectionState) {
         HostProfile(
             hostId = "pixelody-host-1",
             hostName = if (hostBaseUrl != null) "Studio Workstation" else "Local Phone / Standalone",
             baseUrl = hostBaseUrl ?: "http://127.0.0.1:8080",
             platform = "Android",
             roles = listOf("LibraryHost", "PlaybackDevice"),
-            connectionState = if (data.hostReachable && hostBaseUrl != null) HostConnectionState.Connected else if (hostBaseUrl == null) HostConnectionState.Connected else HostConnectionState.Disconnected
+            connectionState = hostConnectionState
         )
     }
 
@@ -483,6 +494,12 @@ fun PixelodyBaseShell(
     // sessionMinutes was the summed runtime of everything the person owned.
 
     var copiedDetails by remember { mutableStateOf("") }
+    var qrScannerVisible by remember { mutableStateOf(false) }
+    var qrScannerError by remember { mutableStateOf("") }
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        qrScannerVisible = granted
+        qrScannerError = if (granted) "" else "Camera access was not granted. You can paste a desktop invite instead."
+    }
 
     val collectionActions: (@Composable androidx.compose.foundation.layout.RowScope.() -> Unit)? =
         if (openCollection == null) {
@@ -594,7 +611,7 @@ fun PixelodyBaseShell(
                             openTrack != null -> openTrack.title
                             state.pushed.lastOrNull() == BasePush.Acquire -> "Add Music"
                             state.pushed.lastOrNull() == BasePush.Appearance -> "Settings & Themes"
-                            state.pushed.lastOrNull() == BasePush.Technical -> "Device Storage & Scan"
+                            state.pushed.lastOrNull() == BasePush.Technical -> "Add music"
                             state.pushed.lastOrNull() == BasePush.SonicTimeline -> "Daily Sonic Capsule"
                             else -> state.destination.label
                         },
@@ -648,7 +665,7 @@ fun PixelodyBaseShell(
                         },
                         playbackError = playbackError
                     )
-                } else {
+                } else if (data.tracks.isNotEmpty() || data.lastTrackId != null) {
                     ListeningSlot(
                         state = data.listeningSlotState(),
                         onOpenPlayer = { send(BaseIntent.OpenSheet(BaseSheet.Player)) },
@@ -719,15 +736,15 @@ fun PixelodyBaseShell(
                         onToggleFavorite = { track -> onToggleFavorite(track.id) },
                         onPlayBatchNext = { tracks -> onPlayTracks(tracks.map { it.id }) },
                         onAddBatchToQueue = { tracks -> tracks.forEach { onAddToQueue(it.id) } },
-                        onPairFixture = onRetryHost,
+                        onPairFixture = ::openConnectionSetup,
                         activeDetail = PixelodyDetailRoute(detailKind, openCollection.id),
                         onOpenCollection = { route -> send(BaseIntent.Push(BasePush.Collection(route.kind.storageKey, route.id))) },
                         onCloseCollection = { send(BaseIntent.Back) },
-                        connectionState = if (data.hostReachable) HostConnectionState.Connected else HostConnectionState.Disconnected,
+                        connectionState = hostConnectionState,
                         connectionGuidance = if (data.hostReachable) "" else "Desktop host is not responding.",
                         hasSavedHost = hostBaseUrl != null,
                         onRetryHost = onRetryHost,
-                        onOpenPhoneFiles = onScanDevice,
+                        onOpenPhoneFiles = { send(BaseIntent.Push(BasePush.Technical)) },
                         onOpenTechnical = { send(BaseIntent.Push(BasePush.Technical)) },
                         sourceScope = when (data.source) {
                             BaseSource.Phone -> SourceScope.LocalPhone
@@ -801,16 +818,16 @@ fun PixelodyBaseShell(
                             onToggleFavorite = { track -> onToggleFavorite(track.id) },
                             onPlayBatchNext = { tracks -> onPlayTracks(tracks.map { it.id }) },
                             onAddBatchToQueue = { tracks -> tracks.forEach { onAddToQueue(it.id) } },
-                            onPairFixture = onRetryHost,
+                            onPairFixture = ::openConnectionSetup,
                             activeDetail = PixelodyDetailRoute(detailKind, pushed.collectionId),
                             onOpenCollection = { route -> send(BaseIntent.Push(BasePush.Collection(route.kind.storageKey, route.id))) },
                             onCloseCollection = { send(BaseIntent.Back) },
                             onCollectionActions = { kindKey, id -> send(BaseIntent.ShowOverlay(BaseOverlay.CollectionActions(kindKey, id))) },
-                            connectionState = if (data.hostReachable) HostConnectionState.Connected else HostConnectionState.Disconnected,
+                            connectionState = hostConnectionState,
                             connectionGuidance = if (data.hostReachable) "" else "Desktop host is not responding.",
                             hasSavedHost = hostBaseUrl != null,
                             onRetryHost = onRetryHost,
-                            onOpenPhoneFiles = onScanDevice,
+                            onOpenPhoneFiles = { send(BaseIntent.Push(BasePush.Technical)) },
                             onOpenTechnical = { send(BaseIntent.Push(BasePush.Technical)) },
                             sourceScope = when (data.source) {
                                 BaseSource.Phone -> SourceScope.LocalPhone
@@ -839,7 +856,7 @@ fun PixelodyBaseShell(
                         onScanDevice = onScanDevice,
                         onScanFolder = onPickFolder,
                         onPickAudio = onPickFiles,
-                        onOpenPair = onRetryHost,
+                        onOpenPair = ::openConnectionSetup,
                         onOpenProfile = { send(BaseIntent.Push(BasePush.Appearance)) },
                         onOpenTechnical = { send(BaseIntent.Push(BasePush.Technical)) },
                         onStartHost = {},
@@ -851,7 +868,7 @@ fun PixelodyBaseShell(
                         onThemeReset = onResetTheme,
                         snapshot = librarySnapshot,
                         savedHost = savedHostProfile,
-                        connectionState = if (data.hostReachable) HostConnectionState.Connected else HostConnectionState.Disconnected,
+                        connectionState = hostConnectionState,
                         localTrackCount = localTracks.size,
                         cachedTrackCount = data.downloadedTrackIds.size,
                         offlineMediaStore = offlineMediaStore,
@@ -880,6 +897,7 @@ fun PixelodyBaseShell(
                         onPlayTrack = { track -> playFrom(track.id, localTracks.map { it.id }) },
                         onOpenPlayer = { send(BaseIntent.OpenSheet(BaseSheet.Player)) },
                         onOpenQueue = { send(BaseIntent.OpenSheet(BaseSheet.Queue)) },
+                        onOpenLibrary = { onSourceChange(BaseSource.Phone); send(BaseIntent.SelectDestination(BaseDestination.Library)) },
                         equalizerProfile = equalizerProfile,
                         trackHasEqualizerOverride = false,
                         onCycleEqualizerPreset = onCycleEqualizerPreset,
@@ -936,17 +954,17 @@ fun PixelodyBaseShell(
                     onToggleFavorite = { track -> onToggleFavorite(track.id) },
                     onPlayBatchNext = { tracks -> onPlayTracks(tracks.map { it.id }) },
                     onAddBatchToQueue = { tracks -> tracks.forEach { onAddToQueue(it.id) } },
-                    onPairFixture = onRetryHost,
+                    onPairFixture = ::openConnectionSetup,
                     activeDetail = null,
                     onOpenCollection = { detailRoute ->
                         send(BaseIntent.Push(BasePush.Collection(detailRoute.kind.storageKey, detailRoute.id)))
                     },
                     onCollectionActions = { kindKey, id -> send(BaseIntent.ShowOverlay(BaseOverlay.CollectionActions(kindKey, id))) },
-                    connectionState = if (data.hostReachable) HostConnectionState.Connected else HostConnectionState.Disconnected,
+                    connectionState = hostConnectionState,
                     connectionGuidance = if (data.hostReachable) "" else "Desktop host is not responding. Check your Wi-Fi or select Phone source.",
                     hasSavedHost = hostBaseUrl != null,
                     onRetryHost = onRetryHost,
-                    onOpenPhoneFiles = onScanDevice,
+                    onOpenPhoneFiles = { send(BaseIntent.Push(BasePush.Technical)) },
                     onOpenTechnical = { send(BaseIntent.Push(BasePush.Technical)) },
                     sourceScope = when (data.source) {
                         BaseSource.Phone -> SourceScope.LocalPhone
@@ -1016,20 +1034,28 @@ fun PixelodyBaseShell(
                     localTracks = localTracks,
                     localTrackCount = localTracks.size,
                     isPlaying = data.isPlaying,
-                    connectionState = if (data.hostReachable) HostConnectionState.Connected else HostConnectionState.Disconnected,
+                    connectionState = hostConnectionState,
                     savedHost = savedHostProfile,
                     copiedDetails = copiedDetails,
-                    qrScannerVisible = false,
-                    qrScannerError = "",
-                    isConnecting = false,
-                    error = if (data.hostReachable) "" else "Host is not responding",
+                    qrScannerVisible = qrScannerVisible,
+                    qrScannerError = qrScannerError.ifBlank { hostConnectionError },
+                    isConnecting = hostConnectionState in listOf(HostConnectionState.Connecting, HostConnectionState.Reconnecting),
+                    isLoadingMusic = isScanningDevice || isLoadingLocalLibrary,
+                    connectionSetupRequested = connectionSetupRequested,
+                    onConnectionSetupShown = { connectionSetupRequested = false },
+                    error = hostConnectionError,
                     onCopiedDetailsChange = { copiedDetails = it },
-                    onStartQrScanner = {},
-                    onStopQrScanner = {},
-                    onQrPayloadScanned = {},
-                    onQrScannerError = {},
+                    onStartQrScanner = {
+                        qrScannerError = ""
+                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                            qrScannerVisible = true
+                        } else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                    },
+                    onStopQrScanner = { qrScannerVisible = false },
+                    onQrPayloadScanned = { payload -> qrScannerVisible = false; onConnectHost(payload) },
+                    onQrScannerError = { qrScannerError = it },
                     onForgetSavedHost = onForgetHost,
-                    onUseCopiedDetails = {},
+                    onUseCopiedDetails = { onConnectHost(copiedDetails) },
                     onPlayTrack = { track ->
                         if (experienceMode == AppExperienceMode.Essential) {
                             playTrackWithSmartFlow(track.id)
@@ -1117,7 +1143,7 @@ fun PixelodyBaseShell(
                         selectedTrack = currentTrack,
                         isLocalTrack = currentTrack != null && data.phoneTrackIds.contains(currentTrack.id),
                         isPlaying = data.isPlaying,
-                        connectionState = if (data.hostReachable) HostConnectionState.Connected else HostConnectionState.Disconnected,
+                        connectionState = hostConnectionState,
                         playbackError = playbackError,
                         positionMs = positionMs,
                         positionMsProvider = effectivePositionMsProvider,
