@@ -27,9 +27,9 @@ Not available yet: an offline library cache, WebSocket push, and hosting a libra
 You need the Android SDK and a JDK. From this directory:
 
 ```sh
-./gradlew assembleDebug
-./gradlew testDebugUnitTest
-./gradlew lintDebug
+bash ./gradlew assembleDebug
+bash ./gradlew testDebugUnitTest
+bash ./gradlew lintDebug
 ```
 
 Installing on a device or running the instrumented tests also needs a connected device or emulator (`adb devices`). Pairing needs a Pixelody for Windows host on the same network.
