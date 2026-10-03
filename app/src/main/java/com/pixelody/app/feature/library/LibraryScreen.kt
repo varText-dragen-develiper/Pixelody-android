@@ -1,5 +1,7 @@
 package com.pixelody.app.feature.library
 
+import com.pixelody.app.ui.components.StudioSectionToggle
+
 import com.pixelody.app.data.model.CoverBook
 import com.pixelody.app.data.model.collectionCoverKey
 import com.pixelody.app.data.model.trackCoverKey
@@ -413,7 +415,7 @@ internal fun LibraryScreen(
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
-                            text = if (experienceMode == AppExperienceMode.Essential) "Your tracks, playlists, and albums." else "Albums, playlists, and tracks from the paired desktop host.",
+                            text = "Your tracks, playlists, and albums.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
                         )
@@ -425,7 +427,7 @@ internal fun LibraryScreen(
                 }
             }
             if (allTracks.isEmpty()) {
-                item { EmptyState(text = "Scan device files for lossless FLAC/WAV audio, or load demo library.") }
+                item { EmptyState(text = "Your library is ready for music. Add files from this phone or connect your Pixelody desktop.") }
                 item {
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
@@ -436,14 +438,14 @@ internal fun LibraryScreen(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text("SCAN DEVICE STORAGE", fontWeight = FontWeight.Bold)
+                            Text("Add music from this phone", fontWeight = FontWeight.Bold)
                         }
                         OutlinedButton(
                             onClick = onPairFixture,
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text("Load Demo Library")
+                            Text("Connect desktop")
                         }
                     }
                 }
@@ -500,16 +502,25 @@ internal fun LibraryScreen(
                         )
                     }
                 }
-                if (snapshot != null && experienceMode == AppExperienceMode.Studio) {
+            if (experienceMode == AppExperienceMode.Studio) item {
+                StudioSectionToggle("Library controls", buildString {
+                    append("${filteredTracks.size} tracks · ${sourceScope.label}")
+                    if (smartFilter != SmartPocketFilter.All) append(" · ${smartFilter.label}")
+                    selectedGenreFilter?.let { append(" · $it") }
+                    if (sortMode != TrackSortMode.Default) append(" · ${sortMode.label}")
+                    harmonicBaseKey?.let { append(" · Key ${it.code}") }
+                }, showLibraryTools, { showLibraryTools = !showLibraryTools }, "studio:library-controls", Modifier.padding(horizontal = 16.dp))
+            }
+                if (snapshot != null && experienceMode == AppExperienceMode.Studio && showLibraryTools) {
                 item { HostStatusCard(snapshot = snapshot) }
             }
-            if (experienceMode == AppExperienceMode.Studio) {
+            if (experienceMode == AppExperienceMode.Studio && showLibraryTools) {
                 item {
                     TriSourcePivotBar(
                         selectedScope = sourceScope,
                         onSelectScope = onSourceScopeChange,
                         localCount = localTracks.size,
-                        hostConnected = snapshot != null,
+                        hostConnected = connectionState == HostConnectionState.Connected,
                         hostCount = snapshot?.tracks?.size ?: 0,
                         jamActive = snapshot?.queue != null,
                         jamCount = queuedTracks.size,
@@ -528,14 +539,14 @@ internal fun LibraryScreen(
                     singleLine = true
                 )
             }
-            if (experienceMode == AppExperienceMode.Studio || showLibraryTools) item {
+            if (showLibraryTools) item {
                 SmartPocketRow(
                     selectedFilter = smartFilter,
                     onSelectFilter = { smartFilter = it },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
-            if (experienceMode == AppExperienceMode.Studio) {
+            if (experienceMode == AppExperienceMode.Studio && showLibraryTools) {
                 item {
                     HarmonicDiggingRingLens(
                         currentTrack = selectedTrack,
@@ -548,7 +559,7 @@ internal fun LibraryScreen(
                     )
                 }
             }
-            if (experienceMode == AppExperienceMode.Studio) item {
+            if (experienceMode == AppExperienceMode.Studio && showLibraryTools) item {
                 LibraryQuickActionShelf(
                     playableTracks = playableTracks,
                     favoriteTracks = favoriteTracks,
@@ -611,7 +622,7 @@ internal fun LibraryScreen(
                 }
             }
 
-            if ((experienceMode == AppExperienceMode.Studio || showLibraryTools) && availableGenresWithCounts.isNotEmpty() && browseMode != "Genres") {
+            if (showLibraryTools && availableGenresWithCounts.isNotEmpty() && browseMode != "Genres") {
                 item {
                     LazyRow(
                         modifier = Modifier
@@ -663,7 +674,7 @@ internal fun LibraryScreen(
                 }
             }
 
-            if (experienceMode == AppExperienceMode.Studio || showLibraryTools) item {
+            if (showLibraryTools) item {
                 LazyRow(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -871,7 +882,7 @@ internal fun LibraryScreen(
                     }
                 }
             }
-            if (experienceMode == AppExperienceMode.Studio) item {
+            if (experienceMode == AppExperienceMode.Studio && showLibraryTools) item {
                 LibraryScopeSummary(
                     browseMode = browseMode,
                     selectedCollectionTitle = selectedCollectionTitle,

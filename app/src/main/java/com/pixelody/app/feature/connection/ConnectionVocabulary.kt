@@ -556,14 +556,14 @@ internal fun HomePairingPanel(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.24f))
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Text(text = "Connect", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(text = "Connect your desktop", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             Text(
-                text = snapshot?.host?.baseUrl
+                text = snapshot?.host?.baseUrl?.takeIf { savedHost != null }
                     ?: savedHost?.let { "Saved host: ${it.hostName}" }
-                    ?: "Scan, paste, or try the demo library.",
+                    ?: "Open Pixelody on your desktop and create a connection invite. Scan its QR code or paste the invite below.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
-                maxLines = 2,
+                maxLines = if (savedHost != null) 2 else 4,
                 overflow = TextOverflow.Ellipsis
             )
             Spacer(modifier = Modifier.height(10.dp))
@@ -573,7 +573,7 @@ internal fun HomePairingPanel(
                     onClick = onStartQrScanner,
                     modifier = Modifier.weight(1f)
                 ) { Text(if (isConnecting) "Connecting" else "Scan QR") }
-                OutlinedButton(onClick = onPairFixture, modifier = Modifier.weight(1f)) { Text("Demo") }
+                if (savedHost != null) OutlinedButton(onClick = onPairFixture, enabled = !isConnecting, modifier = Modifier.weight(1f)) { Text("Reconnect") }
             }
             if (qrScannerVisible) {
                 Spacer(modifier = Modifier.height(10.dp))
@@ -587,7 +587,7 @@ internal fun HomePairingPanel(
                     onClick = { onManualInviteVisibleChange(!manualInviteVisible) },
                     modifier = Modifier.weight(1f)
                 ) { Text(if (manualInviteVisible) "Hide Paste" else "Paste Invite") }
-                TextButton(onClick = onOpenSharing, modifier = Modifier.weight(1f)) { Text("Advanced") }
+
             }
             if (manualInviteVisible) {
                 OutlinedTextField(
@@ -608,7 +608,7 @@ internal fun HomePairingPanel(
             if (savedHost != null) {
                 TextButton(onClick = onForgetSavedHost, modifier = Modifier.fillMaxWidth()) { Text("Forget Saved Host") }
             }
-            if (liveState != null) {
+            if (liveState != null && savedHost != null) {
                 Text(
                     text = "Live ${liveState.revision} / ${liveState.visibility}",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
