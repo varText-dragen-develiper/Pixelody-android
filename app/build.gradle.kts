@@ -37,7 +37,10 @@ android {
             }
         }
         release {
-            isMinifyEnabled = false
+            // Off by default; `-PminifyRelease=true` runs the R8-minified release gate.
+            val minifyRelease = providers.gradleProperty("minifyRelease").orNull == "true"
+            isMinifyEnabled = minifyRelease
+            isShrinkResources = minifyRelease
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

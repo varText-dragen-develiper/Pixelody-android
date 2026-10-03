@@ -157,6 +157,36 @@ class PixelodyPlaybackService : MediaLibraryService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         val libraryCallback = object : MediaLibrarySession.Callback {
+            override fun onAddMediaItems(
+                session: MediaSession,
+                controller: MediaSession.ControllerInfo,
+                mediaItems: List<MediaItem>
+            ): ListenableFuture<List<MediaItem>> {
+                val queued = List(exoPlayer.mediaItemCount) { exoPlayer.getMediaItemAt(it) }
+                val queuedText = queued.map { item ->
+                    QueuedMediaSearchText(
+                        title = item.mediaMetadata.title?.toString().orEmpty(),
+                        artist = item.mediaMetadata.artist?.toString().orEmpty(),
+                        album = item.mediaMetadata.albumTitle?.toString().orEmpty(),
+                    )
+                }
+                val resolved = mutableListOf<MediaItem>()
+                for (requested in mediaItems) {
+                    val query = requested.requestMetadata.searchQuery
+                    val matches = when {
+                        query != null -> queuedMediaSearchIndexes(query, queuedText).map(queued::get)
+                        requested.localConfiguration != null -> listOf(requested)
+                        else -> queued.filter { it.mediaId == requested.mediaId }
+                    }
+                    if (matches.isEmpty()) {
+                        // Reject before Media3 changes the queue; do not invent a stream URL.
+                        return Futures.immediateFailedFuture(IllegalArgumentException("No queued music matches this request."))
+                    }
+                    resolved.addAll(matches)
+                }
+                return Futures.immediateFuture(resolved)
+            }
+
             override fun onGetLibraryRoot(
                 session: MediaLibrarySession,
                 browser: MediaSession.ControllerInfo,

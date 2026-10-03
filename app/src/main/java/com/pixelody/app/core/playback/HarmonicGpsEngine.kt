@@ -44,6 +44,17 @@ data class HarmonicGpsRoute(
  */
 object HarmonicGpsEngine {
 
+    // Keep this recursive Comparable type denotable for Kotlin UAST/lint.
+    private data class NodeState(
+        val trackId: String,
+        val gCost: Float,
+        val fCost: Float,
+        val hopCount: Int,
+        val path: List<String>
+    ) : Comparable<NodeState> {
+        override fun compareTo(other: NodeState): Int = fCost.compareTo(other.fCost)
+    }
+
     /**
      * Finds the most harmonic multi-track path from [origin] to [destination] using candidate [pool].
      */
@@ -79,16 +90,6 @@ object HarmonicGpsEngine {
         val destTelemetry = telemetryCache[destination.id] ?: HarmonicKeyEngine.estimateTrackTelemetry(destination)
 
         // A* graph search
-        data class NodeState(
-            val trackId: String,
-            val gCost: Float,
-            val fCost: Float,
-            val hopCount: Int,
-            val path: List<String>
-        ) : Comparable<NodeState> {
-            override fun compareTo(other: NodeState): Int = fCost.compareTo(other.fCost)
-        }
-
         val pq = PriorityQueue<NodeState>()
         val minCostToNode = mutableMapOf<String, Float>()
 

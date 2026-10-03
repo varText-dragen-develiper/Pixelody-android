@@ -47,7 +47,11 @@ jobs:
       - name: Run unit tests
         run: bash ./gradlew testDebugUnitTest --stacktrace
 
+      - name: Build minified release (unsigned)
+        run: bash ./gradlew assembleRelease -PminifyRelease=true --stacktrace
+
       - name: Run lint
+        timeout-minutes: 15
         run: bash ./gradlew lintDebug --stacktrace
 
       - name: Upload test reports
