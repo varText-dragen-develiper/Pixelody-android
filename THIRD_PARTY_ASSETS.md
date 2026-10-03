@@ -30,3 +30,7 @@ The project provenance record identifies the following as original Pixelody vect
 - `app/src/main/res/drawable/iso_cartridge_quest_empty.xml`
 
 These original program assets follow the public project GPL-3.0-only grant. They incorporate no third-party artwork according to the project record.
+
+## Explicit original artwork grant
+
+Copyright (C) 2026 Hikari. The five original Cartridge Quest vector drawings listed above are licensed GPL-3.0-only, including copying, modification and commercial redistribution under that license, without warranty. Their editable source is the listed vector XML. The complete license is in [licenses/Pixelody-Art-GPL-3.0.txt](licenses/Pixelody-Art-GPL-3.0.txt). This grant excludes unconfirmed raster sheets and third-party material and grants no trademark rights. Other assets and earlier grants are unchanged.
