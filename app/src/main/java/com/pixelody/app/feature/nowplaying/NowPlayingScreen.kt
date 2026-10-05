@@ -293,6 +293,9 @@ internal fun NowPlayingScreen(
     onSetOscilloscopeSensitivity: (Float) -> Unit = {},
     onUpdateOscilloscope3DRotation: (Float, Float) -> Unit = { _, _ -> },
     onSetOscilloscopePhaseRotation: (Float) -> Unit = {},
+    dailyCapsule: com.pixelody.app.data.model.DailySonicCapsule = com.pixelody.app.data.model.DailySonicCapsule(),
+    onPlayHistoryTrack: (String) -> Unit = {},
+    onListeningDetails: () -> Unit = {},
     playerViewMode: String = "Classic",
     onPlayerViewModeChange: (String) -> Unit = {},
     onOpenPlayerViews: () -> Unit = {},
@@ -492,6 +495,9 @@ internal fun NowPlayingScreen(
                             onToggleRepeat = onToggleRepeat,
                             onOpenQueue = onOpenQueue
                         )
+                    }
+                    item(key = "listening_history") {
+                        ListeningHistorySection(dailyCapsule, onPlayHistoryTrack, onListeningDetails)
                     }
                     if (experienceMode == AppExperienceMode.Studio) {
                 item(key = "studio_sound_tools", contentType = "studio_sound_tools") {
@@ -724,6 +730,9 @@ internal fun NowPlayingScreen(
                         )
                     }
                 }
+            item(key = "listening_history") {
+                Box(Modifier.padding(horizontal = 16.dp)) { ListeningHistorySection(dailyCapsule, onPlayHistoryTrack, onListeningDetails) }
+            }
             if (experienceMode == AppExperienceMode.Studio) {
                 item(key = "studio_sound_tools", contentType = "studio_sound_tools") {
                     StudioSectionToggle("Sound tools", buildString {

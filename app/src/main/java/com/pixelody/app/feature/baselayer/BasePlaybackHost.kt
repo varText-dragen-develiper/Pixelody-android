@@ -45,6 +45,7 @@ import com.pixelody.app.core.playback.SleepTimerController
 import com.pixelody.app.core.playback.SleepTimerMode
 import com.pixelody.app.core.playback.SleepTimerState
 import com.pixelody.app.data.fixtures.FakePixelodyHost
+import com.pixelody.app.data.model.addingToFirstEmpty
 import com.pixelody.app.data.model.CrateBook
 import com.pixelody.app.data.model.CrateStarters
 import com.pixelody.app.data.model.HostConnectionDetails
@@ -66,6 +67,9 @@ import com.pixelody.app.data.storage.localTrackFromUri
 import com.pixelody.app.core.playback.mediaMimeType
 import com.pixelody.app.core.playback.rebaseRemoteMediaUrl
 import com.pixelody.app.core.playback.FlowShuffleMode
+import com.pixelody.app.core.playback.FlowShuffleEngine
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import com.pixelody.app.data.model.EqualizerPreset
 import com.pixelody.app.data.model.EqualizerProfile
 import com.pixelody.app.data.model.MasteringProfile
@@ -240,13 +244,15 @@ fun BasePlaybackHost(
     var autoDjSettings by remember { mutableStateOf(AutoDjSettings()) }
     var audioHapticSettings by remember { mutableStateOf(AudioHapticSettings()) }
     var hiResSettings by remember { mutableStateOf(HiResLosslessSettings()) }
-    var shuffleEnabled by remember { mutableStateOf(settingsStore.loadShuffleEnabled()) }
     var shuffleMode by remember {
         mutableStateOf(
             FlowShuffleMode.values().firstOrNull { it.name == settingsStore.loadShuffleMode() }
-                ?: FlowShuffleMode.Off
+                ?: if (settingsStore.loadShuffleEnabled()) FlowShuffleMode.SmartFlow else FlowShuffleMode.Off
         )
     }
+    val shuffleEnabled = shuffleMode != FlowShuffleMode.Off
+    var queuePlanningJob by remember { mutableStateOf<Job?>(null) }
+    var pendingPlayback by remember { mutableStateOf<Pair<List<String>, Long>?>(null) }
     var repeatMode by remember {
         mutableStateOf(RepeatMode.values().getOrElse(settingsStore.loadRepeatMode()) { RepeatMode.Off })
     }
@@ -543,7 +549,8 @@ fun BasePlaybackHost(
             }
         }
         activePlayer.addListener(listener)
-        activePlayer.shuffleModeEnabled = shuffleEnabled
+        // Flow owns the linear queue order, including notification/headset Next.
+        activePlayer.shuffleModeEnabled = false
         activePlayer.repeatMode = playerRepeatModeFor(repeatMode)
         val activeMediaId = activePlayer.currentMediaItem?.mediaId
         isPlaying = activePlayer.isPlaying
@@ -589,9 +596,11 @@ fun BasePlaybackHost(
      */
     val cacheSizeBytes = remember(cachedTrackIds) { offlineMediaStore.totalCacheSizeBytes() }
 
+    val activeCrates = if (crateBook.crates.isNotEmpty()) crateBook else initialData.crates
+    val musicCollections = remember(currentCollections, activeCrates) { listeningCollections(currentCollections, activeCrates) }
     val baseData = BaseLayerData(
         tracks = currentTracks,
-        collections = currentCollections,
+        collections = musicCollections,
         crates = if (crateBook.crates.isNotEmpty()) crateBook else initialData.crates,
         covers = coverBook,
         phoneTrackIds = phoneTrackIds,
@@ -714,25 +723,38 @@ fun BasePlaybackHost(
             ?: initialData.track(id)
     }
 
-    fun startPlayback(trackIds: List<String>, startPositionMs: Long) {
+    fun startPlayback(trackIds: List<String>, startPositionMs: Long, mode: FlowShuffleMode = shuffleMode) {
         val activePlayer = player ?: return
         if (trackIds.isEmpty()) return
         val tracksToPlay = trackIds.mapNotNull { resolveTrack(it) }
         if (tracksToPlay.isEmpty()) return
 
-        val mediaItems = tracksToPlay.map { baseMediaItemFor(it, offlineMediaStore, hostBaseUrl) }
-        activePlayer.setMediaItems(mediaItems, 0, startPositionMs.coerceAtLeast(0L))
-        activePlayer.prepare()
-        activePlayer.playWhenReady = true
+        queuePlanningJob?.cancel()
+        pendingPlayback = trackIds to startPositionMs
+        queuePlanningJob = coroutineScope.launch {
+            val ordered = withContext(Dispatchers.Default) {
+                if (mode == FlowShuffleMode.Off) return@withContext tracksToPlay
+                val anchor = tracksToPlay.first()
+                listOf(anchor) + FlowShuffleEngine.planQueue(anchor, tracksToPlay, mode, tracksToPlay.size,
+                    checkActive = { ensureActive() }).map { it.track }
+            }
+            if (player !== activePlayer) return@launch
+            activePlayer.shuffleModeEnabled = false
+            val mediaItems = ordered.map { baseMediaItemFor(it, offlineMediaStore, hostBaseUrl) }
+            activePlayer.setMediaItems(mediaItems, 0, startPositionMs.coerceAtLeast(0L))
+            activePlayer.prepare()
+            activePlayer.playWhenReady = true
 
-        val firstTrack = tracksToPlay.first()
-        currentTrackId = firstTrack.id
-        lastTrackId = firstTrack.id
-        isPlaying = true
-        queue = tracksToPlay.drop(1).map { it.id }
-        playbackPositionState.longValue = startPositionMs.coerceAtLeast(0L)
-        settingsStore.saveLastTrackId(firstTrack.id)
-        settingsStore.saveLastTrackPositionMs(startPositionMs.coerceAtLeast(0L))
+            val firstTrack = ordered.first()
+            currentTrackId = firstTrack.id
+            lastTrackId = firstTrack.id
+            isPlaying = true
+            queue = ordered.drop(1).map { it.id }
+            playbackPositionState.longValue = startPositionMs.coerceAtLeast(0L)
+            settingsStore.saveLastTrackId(firstTrack.id)
+            settingsStore.saveLastTrackPositionMs(startPositionMs.coerceAtLeast(0L))
+            pendingPlayback = null
+        }
     }
 
     /** Choosing something new to play starts it at the beginning. */
@@ -826,18 +848,45 @@ fun BasePlaybackHost(
     }
 
     /**
-     * These two set the player as well as the state now. `MobileSettingsStore` grew
-     * shuffle and repeat keys on 2026-09-17 and they were wired into the shell that was
-     * deleted the next day - the store kept its six functions and nothing called them,
-     * so both toggles lit up and changed no audio and forgot themselves on every launch.
+     * Replan only upcoming music. Keep the current item, position, pause state, and
+     * played history intact. Off freezes the current order; new plays use source order.
      */
     fun toggleShuffle() {
         val nextMode = shuffleMode.next()
         shuffleMode = nextMode
-        shuffleEnabled = nextMode != FlowShuffleMode.Off
-        player?.let { it.shuffleModeEnabled = shuffleEnabled }
+        queuePlanningJob?.cancel()
+        val activePlayer = player
+        val requested = pendingPlayback
+        if (requested != null) {
+            // Changing mode during a large-library plan must retain the Play request.
+            startPlayback(requested.first, requested.second, nextMode)
+        } else if (nextMode != FlowShuffleMode.Off && activePlayer != null && activePlayer.currentMediaItemIndex >= 0) {
+            activePlayer.shuffleModeEnabled = false
+            val start = activePlayer.currentMediaItemIndex + 1
+            val items = (start until activePlayer.mediaItemCount).map { activePlayer.getMediaItemAt(it) }
+            val anchorId = activePlayer.currentMediaItem?.mediaId
+            val anchor = resolveTrack(anchorId)
+            val tracks = items.mapNotNull { resolveTrack(it.mediaId) }
+            queuePlanningJob = coroutineScope.launch {
+                val planned = withContext(Dispatchers.Default) {
+                    FlowShuffleEngine.planQueue(anchor, tracks, nextMode, tracks.size,
+                        checkActive = { ensureActive() }).map { it.track.id }
+                }
+                // A skip, queue edit, or external controller invalidates this snapshot.
+                if (player !== activePlayer || activePlayer.currentMediaItem?.mediaId != anchorId ||
+                    activePlayer.currentMediaItemIndex + 1 != start ||
+                    (start until activePlayer.mediaItemCount).map { activePlayer.getMediaItemAt(it) } != items) return@launch
+                val byId = items.associateBy { it.mediaId }
+                // Keep unresolved items (e.g. an external media controller's track).
+                val plannedIds = planned.toSet()
+                val reordered = planned.mapNotNull { byId[it] } + items.filter { it.mediaId !in plannedIds }
+                activePlayer.removeMediaItems(start, activePlayer.mediaItemCount)
+                activePlayer.addMediaItems(reordered)
+                syncQueueFromPlayer()
+            }
+        }
         settingsStore.saveShuffleMode(nextMode.name)
-        settingsStore.saveShuffleEnabled(shuffleEnabled)
+        settingsStore.saveShuffleEnabled(nextMode != FlowShuffleMode.Off)
     }
 
     fun toggleRepeat() {
@@ -947,6 +996,19 @@ fun BasePlaybackHost(
     }
 
     fun addToPlaylist(playlistId: String, trackId: String) {
+        if (playlistId.startsWith("crate:")) {
+            val crate = crateBook.crates.firstOrNull { "crate:${it.id}" == playlistId } ?: return
+            val slot = com.pixelody.app.data.model.CrateSlot.SingleTrack(trackId)
+            if (crate.holds(slot) || musicCollections.firstOrNull { it.id == playlistId }?.trackIds?.contains(trackId) == true) return
+            val updated = crate.addingToFirstEmpty(slot)
+            if (updated == null) {
+                android.widget.Toast.makeText(context, "This collection is full. Organize it to make room.", android.widget.Toast.LENGTH_LONG).show()
+            } else {
+                crateBook = crateBook.replacing(updated)
+                crateStore.save(crateBook)
+            }
+            return
+        }
         playlistStore.addTrackToPlaylist(playlistId, trackId)
         userPlaylists = playlistStore.load()
     }
@@ -981,6 +1043,13 @@ fun BasePlaybackHost(
     }
 
     PixelodyBaseShell(
+        onShuffleTracks = { ids ->
+            val mode = shuffleMode.takeUnless { it == FlowShuffleMode.Off } ?: FlowShuffleMode.SmartFlow
+            shuffleMode = mode
+            settingsStore.saveShuffleMode(mode.name)
+            settingsStore.saveShuffleEnabled(true)
+            startPlayback(ids, 0L, mode)
+        },
         data = baseData,
         localTracks = localTracks,
         sessionInsights = sessionInsights,

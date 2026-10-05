@@ -3,6 +3,7 @@ package com.pixelody.app.modules
 import android.content.Intent
 import android.net.Uri
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
@@ -57,30 +58,20 @@ class StudioHierarchyRuntimeTest {
         return node ?: error("Missing $value")
     }
     private fun tap(value: String) {
-        find(value)
-        device.waitForIdle()
-        assertEquals(context.packageName, device.currentPackageName)
-        fun clickableTarget(): UiObject2 {
-            var target = device.findObject(By.textContains(value)) ?: find(value)
-            while (!target.isClickable && target.parent != null) target = target.parent
-            assertTrue("Clickable target for $value", target.isClickable)
-            return target
-        }
-        var target = clickableTarget()
-        repeat(4) {
-            val bounds = target.visibleBounds
-            if (((value.endsWith("tools") || value.endsWith("controls")) && bounds.height() < 48 * context.resources.displayMetrics.density) ||
-                (value.startsWith("STUDIO MASTERING") && bounds.centerY() > device.displayHeight * 2 / 3)) {
-                device.swipe(pageScrollX, device.displayHeight * 3 / 4, pageScrollX, device.displayHeight / 2, 60)
-                device.waitForIdle()
-                Thread.sleep(700) // Wait for Compose list flings before reading tap bounds.
-                target = clickableTarget()
+        repeat(3) { attempt ->
+            try {
+                val bounds = find(value).visibleBounds
+                assertEquals(context.packageName, device.currentPackageName)
+                // Tap the label inside its control; walking mutable Compose ancestors
+                // can return stale nodes or a larger unrelated clickable container.
+                device.click(bounds.centerX(), bounds.centerY())
+                device.waitForIdle(); Thread.sleep(500)
+                return
+            } catch (stale: StaleObjectException) {
+                if (attempt == 2) throw stale
+                device.waitForIdle(); Thread.sleep(300)
             }
         }
-        val textBounds = (device.findObject(By.textContains(value)) ?: find(value)).visibleBounds
-        if (value.startsWith("STUDIO MASTERING")) device.click(textBounds.centerX(), textBounds.centerY()) else target.click()
-        device.waitForIdle()
-        Thread.sleep(500) // Compose disclosure animations settle after accessibility idle.
     }
     private fun capture(name: String) {
         assertEquals(context.packageName, device.currentPackageName)
@@ -94,7 +85,7 @@ class StudioHierarchyRuntimeTest {
         capture("home-quiet")
         tap("Listening tools")
         capture("home-tools-after-open")
-        find("Choose Your Next Move")
+        assertFalse(device.hasObject(By.textContains("Choose Your Next Move")))
         capture("home-tools")
         open("home")
         tap("Browse controls")

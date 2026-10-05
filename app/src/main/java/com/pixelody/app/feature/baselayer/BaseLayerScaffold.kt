@@ -83,6 +83,7 @@ fun BaseLayerScaffold(
     paneLayoutOverride: PixelodyPaneLayout? = null,
     sidePane: (@Composable () -> Unit)? = null,
     railDestinations: (@Composable ColumnScope.() -> Unit)? = null,
+    contentModifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
     val listeningHeight = BaseLayerBands.ListeningSlot + (40f * (LocalDensity.current.fontScale - 1f).coerceAtLeast(0f)).dp
@@ -147,6 +148,7 @@ fun BaseLayerScaffold(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f)
+                            .then(contentModifier)
                     ) {
                         content()
                     }
@@ -213,6 +215,7 @@ fun BaseLayerScaffold(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
+                        .then(contentModifier)
                 ) {
                     content()
                     if (identity == null) {

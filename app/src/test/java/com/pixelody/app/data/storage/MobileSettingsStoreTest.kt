@@ -239,6 +239,29 @@ class MobileSettingsStoreTest {
         assertEquals(AppExperienceMode.Essential, store.loadExperienceMode())
     }
 
+    @Test fun appearanceSurvivesStoreRecreationAndResetPreservesOtherSettings() {
+        val appearance = com.pixelody.app.ui.theme.AppearanceSettings(
+            palette = com.pixelody.app.ui.theme.StylePalette.Custom, primary = "#ffaa66",
+            secondary = "66DDCC", base = "101219", textPercent = 130,
+            typeface = com.pixelody.app.ui.theme.StyleTypeface.Serif, highContrast = true)
+        store.saveTheme(PixelodyMobileTheme.Obsession)
+        store.saveDownloadWifiOnly(true)
+        store.saveAppearance(appearance)
+        val reopened = MobileSettingsStore(fakePrefs)
+        assertEquals(appearance.normalized(), reopened.loadAppearance())
+        reopened.resetAppearance()
+        assertEquals(com.pixelody.app.ui.theme.AppearanceSettings(), reopened.loadAppearance())
+        assertEquals(PixelodyMobileTheme.Obsession, reopened.loadTheme())
+        assertTrue(reopened.loadDownloadWifiOnly())
+    }
+
+    @Test fun corruptAppearanceValuesFallBackToReadableDefaults() {
+        fakePrefs.edit().putString("style_palette", "missing")
+            .putString("style_primary", "garbage").putString("style_base", "FFFFFF")
+            .putInt("style_text_percent", 999).putString("style_typeface", "missing").apply()
+        assertEquals(com.pixelody.app.ui.theme.AppearanceSettings(), store.loadAppearance())
+    }
+
     private class FakeSharedPreferences : SharedPreferences {
         private val map = mutableMapOf<String, Any?>()
 

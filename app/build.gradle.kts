@@ -19,6 +19,28 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Release signing comes only from the environment (CI secrets). Without
+    // all four variables the release build stays unsigned; no key is stored in
+    // the repository. PIXELODY_ANDROID_KEYSTORE is a path to the decoded keystore.
+    val releaseKeystore = System.getenv("PIXELODY_ANDROID_KEYSTORE")
+    val releaseKeystorePassword = System.getenv("PIXELODY_ANDROID_KEYSTORE_PASSWORD")
+    val releaseKeyAlias = System.getenv("PIXELODY_ANDROID_KEY_ALIAS")
+    val releaseKeyPassword = System.getenv("PIXELODY_ANDROID_KEY_PASSWORD")
+    val canSignRelease = listOf(
+        releaseKeystore, releaseKeystorePassword, releaseKeyAlias, releaseKeyPassword
+    ).all { !it.isNullOrBlank() }
+
+    signingConfigs {
+        if (canSignRelease) {
+            create("release") {
+                storeFile = file(releaseKeystore!!)
+                storePassword = releaseKeystorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         debug {
             if (providers.gradleProperty("moduleTestBuild").orNull == "true") {
@@ -41,6 +63,9 @@ android {
             val minifyRelease = providers.gradleProperty("minifyRelease").orNull == "true"
             isMinifyEnabled = minifyRelease
             isShrinkResources = minifyRelease
+            if (canSignRelease) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

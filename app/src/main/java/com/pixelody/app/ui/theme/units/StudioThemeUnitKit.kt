@@ -43,18 +43,12 @@ import com.pixelody.app.ui.components.PixelodyTransportGlyph
 import com.pixelody.app.ui.components.RemoteArtwork
 import com.pixelody.app.ui.components.performTick
 import com.pixelody.app.ui.theme.LocalPixelodyThemeVariant
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
-import com.pixelody.app.R
 
 /**
  * Baseline ThemeUnitKit implementation for Pixelody Studio.
- * Follows the AK3 audio hardware direction: precision technical ground, two-tier ink, and high contrast.
+ * Shared rounded surfaces and restrained accents follow the current desktop Studio.
  */
 object StudioThemeUnitKit : ThemeUnitKit {
     override val themeId: String = "studio"
@@ -237,38 +231,11 @@ object StudioThemeUnitKit : ThemeUnitKit {
         Box(
             modifier = modifier
                 .fillMaxWidth()
-                .shadow(elevation = 2.dp, shape = RoundedCornerShape(8.dp))
-                .clip(RoundedCornerShape(8.dp))
+                .clip(MaterialTheme.shapes.medium)
                 .background(MaterialTheme.colorScheme.surface)
-                .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.28f)), RoundedCornerShape(8.dp))
+                .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.28f)), MaterialTheme.shapes.medium)
                 .padding(14.dp)
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.ic_corner_bracket),
-                contentDescription = null,
-                modifier = Modifier
-                    .size(12.dp)
-                    .align(Alignment.TopStart),
-                alpha = 0.6f
-            )
-            Image(
-                painter = painterResource(id = R.drawable.ic_corner_bracket),
-                contentDescription = null,
-                modifier = Modifier
-                    .size(12.dp)
-                    .align(Alignment.TopEnd),
-                alpha = 0.6f
-            )
-            Image(
-                painter = painterResource(id = R.drawable.ic_technical_sigil),
-                contentDescription = null,
-                modifier = Modifier
-                    .size(54.dp)
-                    .align(Alignment.BottomEnd)
-                    .padding(bottom = 4.dp, end = 4.dp),
-                alpha = 0.09f
-            )
-
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -298,14 +265,6 @@ object StudioThemeUnitKit : ThemeUnitKit {
                     }
                 }
                 Spacer(modifier = Modifier.height(4.dp))
-                Image(
-                    painter = painterResource(id = R.drawable.ic_circuit_divider),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(4.dp),
-                    alpha = 0.35f
-                )
                 if (data.subtitle.isNotBlank()) {
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(

@@ -21,46 +21,28 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.platform.LocalDensity
 
-/**
- * Pixelody Mobile Themes.
- *
- * Each theme faithfully emulates an authoritative desktop theme from the
- * Pixelody desktop catalog:
- * - [Studio]: The core AK3 audio hardware direction (60/25/15, Xerox cyan).
- * - [CartridgeQuest]: 8/16-bit console adventure, cartridge library, RPG commands.
- * - [ObsidianGlass]: Smoked dark acrylic, floating glass pills, prism refractions.
- * - [LoFiCafe]: Rainy walnut nook, dark wood structure, paper-soft content planes.
- * - [BulkheadTerminal]: Industrial sci-fi terminal, phosphor ink, framed geometry.
- * - [Obsession]: Restrained thriller poster, bone type, crimson held back for state.
- *
- * Every value each theme uses comes from its [PixelodyThemeSpec], so none of
- * them can invent a mid-grey, miss the ink tier or ship an illegible on-colour
- * without a direction conformance check catching it. Six
- * hand-written `darkColorScheme` blocks would be the same shape as the five
- * variants deleted on 2026-09-15; the spec is why that cannot happen again here.
- */
+/** Mobile theme identities. Shared Studio surfaces follow the current desktop;
+ * other themes retain their authored kits. AppearanceSettings applies device-local
+ * overrides with explicit contrast checks rather than changing the source specs. */
 enum class PixelodyMobileTheme(
     val id: String,
     val displayName: String,
     val badge: String,
     val summary: String,
     val spec: PixelodyThemeSpec,
-    /**
-     * Geometry is authored per theme, but the ANGLE is never negotiable: every
-     * plate cuts one corner at 35.3 degrees from vertical, and a theme varies
-     * only how deep that cut runs. Material's shape slots take a
-     * CornerBasedShape and so cannot hold this - components adopt it directly.
-     */
+    /** Authored geometry, including the current desktop Studio's rounded windows. */
     val plate: Shape
 ) {
     Studio(
         id = "studio",
         displayName = "Pixelody Studio",
         badge = "STUDIO",
-        summary = "Technical ground, two-tier ink, bounded light. 60/25/15.",
+        summary = "Quiet rounded windows, periwinkle controls, cyan accents.",
         spec = PixelodyThemeSpecs.Studio,
-        plate = PixelodyDirection.Plate
+        plate = RoundedCornerShape(16.dp)
     ),
     CartridgeQuest(
         id = "cartridge-quest",
@@ -112,27 +94,20 @@ enum class PixelodyMobileTheme(
     );
 
     /** Read by the settings picker's accent chip. One source of truth. */
-    val accentColor: Color get() = spec.primary
+    val accentColor: Color get() = AppearanceSettings().specFor(this).primary
 }
 
 /** Provides the active [PixelodyMobileTheme] down the Compose tree. */
+val LocalPixelodyStyleSpec = staticCompositionLocalOf { AppearanceSettings().specFor(PixelodyMobileTheme.Studio) }
+
 val LocalPixelodyThemeVariant = staticCompositionLocalOf { PixelodyMobileTheme.Studio }
 
 // ---------------------------------------------------------------------------
 // Colour schemes, generated from the spec
 // ---------------------------------------------------------------------------
 
-/**
- * Material asks for 21 colour roles. Three of them - onSurfaceVariant, outline
- * and outlineVariant - are mid-greys by construction, and the middle band
- * luma 60-240 is exactly what this direction keeps empty. So the roles are not
- * filled with Material's idea of them; they are mapped onto the two ink tiers,
- * and every one resolves to ground, trace, ink, or a colour sampled from the
- * theme's own source.
- *
- * The ground itself is painted by [pixelodyGround], because the ground is a ramp
- * and a ColorScheme slot can only hold one value.
- */
+/** Map effective theme tokens to every Material role, including container defaults.
+ * Appearance overrides are validated before reaching this mapping. */
 private fun schemeFor(s: PixelodyThemeSpec): ColorScheme = darkColorScheme(
     primary = s.primary,
     onPrimary = s.onPrimary,
@@ -314,24 +289,37 @@ fun PixelodyMobileTheme.groundColors(): List<Color> = listOf(spec.groundTop, spe
  * Paints the viewport ground ramp according to the selected theme.
  * Always bind to the viewport height, never to scrolling content height.
  */
-fun Modifier.pixelodyGround(theme: PixelodyMobileTheme = PixelodyMobileTheme.Studio): Modifier = this.background(
-    Brush.verticalGradient(theme.groundColors())
+@Composable
+fun Modifier.pixelodyGround(): Modifier = this.background(
+    Brush.verticalGradient(LocalPixelodyStyleSpec.current.let { listOf(it.groundTop, it.groundBottom) })
 )
 
 @Composable
 fun PixelodyTheme(
     variant: PixelodyMobileTheme = PixelodyMobileTheme.Studio,
+    appearance: AppearanceSettings = AppearanceSettings(),
     content: @Composable () -> Unit
 ) {
-    val typography = when (variant) {
-        PixelodyMobileTheme.CartridgeQuest -> CartridgeQuestTypography
-        PixelodyMobileTheme.BulkheadTerminal -> BulkheadTerminalTypography
-        PixelodyMobileTheme.LoFiCafe -> LoFiCafeTypography
-        else -> PixelodyTypography
+    val style = appearance.normalized()
+    val spec = style.specFor(variant)
+    val density = LocalDensity.current
+    val typography = when (style.typeface) {
+        StyleTypeface.Sans -> typographyOf(FontFamily.SansSerif)
+        StyleTypeface.Serif -> typographyOf(FontFamily.Serif)
+        StyleTypeface.Mono -> typographyOf(FontFamily.Monospace)
+        StyleTypeface.Theme -> when (variant) {
+            PixelodyMobileTheme.CartridgeQuest -> CartridgeQuestTypography
+            PixelodyMobileTheme.BulkheadTerminal -> BulkheadTerminalTypography
+            PixelodyMobileTheme.LoFiCafe -> LoFiCafeTypography
+            else -> PixelodyTypography
+        }
     }
 
     val shapes = when (variant) {
-        PixelodyMobileTheme.Studio -> PixelodyShapes
+        PixelodyMobileTheme.Studio -> Shapes(
+            RoundedCornerShape(6.dp), RoundedCornerShape(10.dp), RoundedCornerShape(16.dp),
+            RoundedCornerShape(20.dp), RoundedCornerShape(24.dp)
+        )
         PixelodyMobileTheme.CartridgeQuest -> CartridgeQuestShapes
         PixelodyMobileTheme.ObsidianGlass -> ObsidianGlassShapes
         PixelodyMobileTheme.LoFiCafe -> LoFiCafeShapes
@@ -345,10 +333,12 @@ fun PixelodyTheme(
         LocalIndication provides PixelodyPressIndication,
         LocalPixelodyThemeVariant provides variant,
         LocalThemeUnitKit provides unitKit,
-        LocalContentColor provides variant.spec.ink
+        LocalPixelodyStyleSpec provides spec,
+        LocalDensity provides Density(density.density, density.fontScale * style.textPercent / 100f),
+        LocalContentColor provides spec.ink
     ) {
         MaterialTheme(
-            colorScheme = schemeFor(variant.spec),
+            colorScheme = schemeFor(spec),
             typography = typography,
             shapes = shapes,
             content = content

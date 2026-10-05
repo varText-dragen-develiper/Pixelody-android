@@ -56,4 +56,30 @@ class CoverModelsTest {
         assertEquals("genre:Jazz", collectionCoverKey("genre:Jazz"))
         assertEquals("playlist:p1", collectionCoverKey("p1"))
     }
+    @Test fun screenBackgroundsSurviveRestartAndResetIndependently() {
+        val original = CoverBook().withImage(playlistCoverKey("p1"), "file:///playlist.jpg")
+            .withImage(ScreenBackground.Home.key, "file:///home.jpg")
+            .withImage(ScreenBackground.Library.key, "file:///library.jpg")
+        val restored = CoverCodec.decode(CoverCodec.encode(original))
+        assertEquals(original, restored)
+        val reset = restored.withImage(ScreenBackground.Home.key, null)
+        assertNull(reset.imageFor(ScreenBackground.Home.key, null))
+        assertEquals("file:///library.jpg", reset.imageFor(ScreenBackground.Library.key, null))
+        assertEquals("file:///playlist.jpg", reset.imageFor(playlistCoverKey("p1"), null))
+    }
+
+    @Test fun collectionMenuKeysMatchShelfKeys() {
+        assertEquals(playlistCoverKey("p1"), collectionCoverKey("p1"))
+        assertEquals(playlistCoverKey("p1"), collectionCoverKey("playlist:p1"))
+    }
+
+    @Test fun previousMenuPicturesMigrateAndCanonicalChoiceWins() {
+        val restored = CoverCodec.decode("v1\nplaylists:p1|file:///old.jpg|note\nalbums:album:Blue|file:///album.jpg|\nplaylist:p1|file:///new.jpg|")
+        assertEquals("file:///new.jpg", restored.imageFor(playlistCoverKey("p1"), null))
+        assertEquals("file:///album.jpg", restored.imageFor(albumCoverKey("Blue"), null))
+        assertFalse(restored.entries.containsKey("playlists:p1"))
+        val onlyOld = CoverCodec.decode("v1\nplaylists:p2|file:///old.jpg|kept")
+        assertEquals("kept", onlyOld.noteFor(playlistCoverKey("p2")))
+        assertEquals("file:///old.jpg", onlyOld.imageFor(playlistCoverKey("p2"), null))
+    }
 }

@@ -28,12 +28,14 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import com.pixelody.app.data.model.withCover
 import com.pixelody.app.data.model.CoverBook
 import com.pixelody.app.data.model.albumCoverKey
 import com.pixelody.app.data.model.crateCoverKey
+import com.pixelody.app.data.model.collectionCoverKey
 import com.pixelody.app.data.model.playlistCoverKey
 import com.pixelody.app.data.model.trackCoverKey
 import com.pixelody.app.ui.components.CoverCard
@@ -233,8 +235,9 @@ internal fun HomeScreen(
             .sortedWith(compareByDescending<Pair<String, List<Track>>> { it.second.size }.thenBy { it.first })
             .take(10)
     }
-    val jumpBackTracks = remember(selectedTrack, queuedTracks, favoriteTracks, scopedLocalTracks, scopedHostTracks) {
-        (listOfNotNull(selectedTrack) + queuedTracks + favoriteTracks + scopedLocalTracks + scopedHostTracks)
+    val recentListenIds = dailyCapsule?.memoryTimeline.orEmpty().sortedByDescending { it.timestampMs }.map { it.trackId }.distinct()
+    val jumpBackTracks = remember(selectedTrack, queuedTracks, favoriteTracks, scopedLocalTracks, scopedHostTracks, recentListenIds) {
+        (listOfNotNull(selectedTrack) + recentListenIds.mapNotNull { trackById[it] } + queuedTracks + favoriteTracks + scopedLocalTracks + scopedHostTracks)
             .distinctBy { it.id }
             .take(10)
     }
@@ -438,28 +441,11 @@ internal fun HomeScreen(
                     )
                 }
             }
-            if (crates.isNotEmpty()) {
-                item(key = "essential_crates", contentType = "cover_shelf") {
-                    CoverShelf(title = "Your crates") {
-                        items(crates, key = { "crate_${it.id}" }) { crate ->
-                            val key = crateCoverKey(crate.id)
-                            CoverCard(
-                                title = crate.name,
-                                caption = "${crate.occupiedCount} items",
-                                note = covers.noteFor(key),
-                                artworkUrl = covers.imageFor(key, crateArtwork(crate, trackById, playlists)),
-                                onClick = { onOpenCrate(crate.id) },
-                                onLongClick = { onCrateActions(crate.id) }
-                            )
-                        }
-                    }
-                }
-            }
             if (playlists.isNotEmpty()) {
                 item(key = "essential_playlists", contentType = "cover_shelf") {
                     CoverShelf(title = "Your playlists") {
                         items(displayedPlaylists, key = { "playlist_${it.id}" }) { playlist ->
-                            val key = playlistCoverKey(playlist.id)
+                            val key = collectionCoverKey(playlist.id)
                             val firstTrack = playlist.trackIds.firstOrNull()?.let { trackById[it] }
                             CoverCard(
                                 title = playlist.name,
@@ -685,17 +671,16 @@ internal fun HomeScreen(
                 }
             }
         }
-        if (curatedCrates.isNotEmpty() || crates.isNotEmpty()) {
+        if (curatedCrates.isNotEmpty()) {
             item(key = "discovery_crates", contentType = "discovery_crates") {
                 Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                     DiscoveryCrateShelf(
                         curatedCrates = curatedCrates,
-                        userCrates = crates,
+                        userCrates = emptyList(),
                         trackById = trackById,
                         onPlayCrate = { tracks ->
                             if (tracks.isNotEmpty()) {
                                 onPlayBatchTracks(tracks)
-                                onPlayTrack(tracks.first())
                             }
                         },
                         onOpenCrate = onOpenCrate,
@@ -706,18 +691,6 @@ internal fun HomeScreen(
                 }
             }
         }
-        item(key = "action_grid", contentType = "action_grid") {
-            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                HomeActionGrid(
-                    onOpenLibrary = onOpenLibrary,
-                    onOpenSearch = onOpenSearch,
-                    onOpenCreate = onOpenCreate,
-                    onOpenDevice = onOpenDevice,
-                    onOpenProfile = onOpenProfile,
-                    onOpenFlowCabinet = onOpenFlowCabinet
-                )
-            }
-        }
         }
         item(key = "search_prompt", contentType = "search_prompt") {
             Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
@@ -725,33 +698,16 @@ internal fun HomeScreen(
             }
         }
 
-        val filledCrates = crates.filter { it.occupiedCount > 0 }
-        if (filledCrates.isNotEmpty()) {
-            item(key = "studio_crates", contentType = "cover_shelf") {
-                CoverShelf(title = "Your crates") {
-                    items(filledCrates, key = { "crate_${it.id}" }) { crate ->
-                        val key = crateCoverKey(crate.id)
-                        CoverCard(title = crate.name, caption = "${crate.occupiedCount} items", note = covers.noteFor(key),
-                            artworkUrl = covers.imageFor(key, crateArtwork(crate, trackById, playlists)),
-                            onClick = { onOpenCrate(crate.id) }, onLongClick = { onCrateActions(crate.id) })
-                    }
-                }
-            }
-        }
         if (playlists.isNotEmpty()) {
-            item(key = "playlists", contentType = "playlists") {
-                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                    HomeSectionHeader(title = "Your Playlists", subtitle = "Small shortcuts for fast starts.")
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        items(displayedPlaylists, key = { it.id }, contentType = { "playlist_card" }) { playlist ->
-                            val firstTrack = playlist.trackIds.firstOrNull()?.let { trackById[it] }
-                            PlaylistShortcutCard(
-                                name = playlist.name,
-                                trackCount = playlist.trackIds.size,
-                                artworkUrl = playlist.artworkUrl ?: firstTrack?.artworkUrl,
-                                onClick = { onOpenCollection("playlist", playlist.id) }
-                            )
-                        }
+            item(key = "playlists", contentType = "cover_shelf") {
+                CoverShelf(title = "Your playlists") {
+                    items(displayedPlaylists, key = { it.id }) { playlist ->
+                        val key = collectionCoverKey(playlist.id)
+                        val firstTrack = playlist.trackIds.firstOrNull()?.let { trackById[it] }
+                        CoverCard(title = playlist.name, caption = "${playlist.trackIds.size} songs",
+                            note = covers.noteFor(key), artworkUrl = covers.imageFor(key, playlist.artworkUrl ?: firstTrack?.artworkUrl),
+                            onClick = { onOpenCollection("playlist", playlist.id) },
+                            onLongClick = { onCoverActions(key, playlist.name) })
                     }
                 }
             }
@@ -1690,126 +1646,18 @@ internal fun DiscoveryCrateShelf(
     modifier: Modifier = Modifier,
     onShowDoc: ((String) -> Unit)? = null
 ) {
-    val haptic = LocalHapticFeedback.current
-
-    Column(modifier = modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            HomeSectionHeader(
-                title = "Discovery & Smart Crates",
-                subtitle = "Curatorial digging shelves & 9-slot tactile arrangements"
-            )
-            if (onShowDoc != null) {
-                CabinetDocButton(
-                    onClick = { onShowDoc("smart_crates") },
-                    contentDescription = "Smart Crates documentation"
-                )
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        HomeSectionHeader(title = "Made for you", subtitle = "Suggestions from your music")
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            items(curatedCrates, key = { it.id }) { collection ->
+                CoverCard(title = collection.title, caption = "${collection.tracks.size} songs",
+                    artworkUrl = collection.tracks.firstOrNull()?.artworkUrl,
+                    onClick = { onPlayCrate(collection.tracks) },
+                    onLongClick = { onShowDoc?.invoke("smart_crates") })
             }
         }
-        Spacer(modifier = Modifier.height(6.dp))
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(horizontal = 4.dp)
-        ) {
-            // Build Smart Crate Trigger Card
-            item(contentType = "build_crate_trigger") {
-                Surface(
-                    modifier = Modifier
-                        .width(150.dp)
-                        .height(205.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .combinedClickable(
-                            onClick = {
-                                haptic.performTick()
-                                onOpenSmartCrateBuilder()
-                            },
-                            onLongClick = onShowDoc?.let { callback ->
-                                {
-                                    haptic.performTick()
-                                    callback("smart_crates")
-                                }
-                            }
-                        ),
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(14.dp),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                            modifier = Modifier.size(44.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                PixelodyTransportGlyph(
-                                    glyph = TransportGlyphType.DiamondLossless,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    sizeDp = 22
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = "+ BUILD CRATE",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Black,
-                            letterSpacing = 1.sp,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Parametric FLAC & BPM rules",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontSize = 10.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
-                    }
-                }
-            }
-
-            // User Crates
-            items(userCrates, key = { it.id }, contentType = { "crate_card" }) { userCrate ->
-                val userTracks = userCrate.slots.mapNotNull { slot ->
-                    when (slot) {
-                        is CrateSlot.SingleTrack -> trackById[slot.trackId]
-                        else -> null
-                    }
-                }
-                CuratedCrateCard(
-                    crate = CuratedSmartCrate(
-                        id = userCrate.id,
-                        title = userCrate.name,
-                        subtitle = "${userCrate.occupiedCount} items arranged",
-                        tag = "CRATE",
-                        glyphType = TransportGlyphType.DiamondLossless,
-                        tracks = userTracks,
-                        moodColorHex = 0xFF8B5CF6
-                    ),
-                    onPlay = { onPlayCrate(userTracks) },
-                    onInspect = { onOpenCrate(userCrate.id) },
-                    onShowDoc = onShowDoc
-                )
-            }
-
-            // Curated Discovery Crates
-            items(curatedCrates, key = { it.id }, contentType = { "crate_card" }) { crate ->
-                CuratedCrateCard(
-                    crate = crate,
-                    onPlay = { onPlayCrate(crate.tracks) },
-                    onInspect = { onOpenCrate(crate.id) },
-                    onShowDoc = onShowDoc
-                )
-            }
+        OutlinedButton(onClick = onOpenSmartCrateBuilder, modifier = Modifier.heightIn(min = 48.dp)) {
+            Text("Create smart playlist")
         }
     }
 }

@@ -68,6 +68,9 @@ import java.util.Locale
 
 @Composable
 internal fun ProfileScreen(
+    covers: com.pixelody.app.data.model.CoverBook = com.pixelody.app.data.model.CoverBook(),
+    coverStore: com.pixelody.app.data.storage.CoverStore? = null,
+    onCoversChange: (com.pixelody.app.data.model.CoverBook) -> Unit = {},
     activeTheme: PixelodyMobileTheme,
     onThemeChange: (PixelodyMobileTheme) -> Unit,
     onThemeReset: () -> Unit,
@@ -123,6 +126,8 @@ internal fun ProfileScreen(
         item {
             Button(onClick = { moduleContext.startActivity(android.content.Intent(moduleContext, com.pixelody.app.modules.ModuleShopActivity::class.java)) }, modifier = Modifier.fillMaxWidth()) { Text("Modules — import or manage") }
         }
+        item { AppearanceSection(settingsStore) }
+        item { BackgroundSection(covers, coverStore, onCoversChange) }
         item {
             SectionCard(
                 title = "Themes",
