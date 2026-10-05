@@ -209,13 +209,13 @@ fun SmartCrateRuleBuilderDialog(
 
                         Column {
                             Text(
-                                text = "PARAMETRIC SMART CRATE",
+                                text = "Smart playlist",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 1.sp
                             )
                             Text(
-                                text = "Rule-based dynamic 9-slot crate generator",
+                                text = "Choose rules to collect songs from your library",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -256,7 +256,7 @@ fun SmartCrateRuleBuilderDialog(
                 OutlinedTextField(
                     value = crateName,
                     onValueChange = { crateName = it },
-                    label = { Text("Smart Crate Name") },
+                    label = { Text("Playlist name") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -491,7 +491,7 @@ fun SmartCrateRuleBuilderDialog(
                             haptic.performConfirm()
                             val newCrate = Crate(
                                 id = "smart-${UUID.randomUUID().toString().take(8)}",
-                                name = crateName.ifBlank { "Smart Crate" },
+                                name = crateName.ifBlank { "Smart playlist" },
                                 slots = previewSlots
                             )
                             onSaveCrate(newCrate)
@@ -503,7 +503,7 @@ fun SmartCrateRuleBuilderDialog(
                             containerColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
-                        Text("SAVE SMART CRATE", fontWeight = FontWeight.Bold)
+                        Text("Save playlist", fontWeight = FontWeight.Bold)
                     }
                 }
             }

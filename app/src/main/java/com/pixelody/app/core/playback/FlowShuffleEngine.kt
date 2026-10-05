@@ -2,9 +2,11 @@ package com.pixelody.app.core.playback
 
 import com.pixelody.app.core.genre.GenreTaxonomyEngine
 import com.pixelody.app.data.model.Track
+import com.pixelody.app.data.model.CamelotKey
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.random.Random
 
 /**
  * Operating modes for Pixelody's Flow Shuffle Engine.
@@ -38,17 +40,14 @@ data class ShuffledTrackEntry(
 
 /**
  * Pure Kotlin implementation of the Pixelody Flow Shuffle Algorithm.
- * Balances serendipity, harmonic flow, energy trajectories, and strict anti-clumping.
+ * Balances variety and known metadata. Unknown keys contribute no harmonic score.
  */
 object FlowShuffleEngine {
 
     private fun normalize(text: String?): String =
-        text?.lowercase(Locale.US)?.replace(Regex("[^a-z0-9]+"), " ")?.trim().orEmpty()
+        text?.lowercase(Locale.US)?.replace(Regex("[^\\p{L}\\p{N}]+"), " ")?.trim().orEmpty()
 
-    private fun keyCompatibilityScore(left: Track?, right: Track): Int {
-        if (left == null) return 0
-        val leftKey = HarmonicKeyEngine.parseKey(left.format) ?: HarmonicKeyEngine.parseKey(left.title)
-        val rightKey = HarmonicKeyEngine.parseKey(right.format) ?: HarmonicKeyEngine.parseKey(right.title)
+    private fun keyCompatibilityScore(leftKey: CamelotKey?, rightKey: CamelotKey?): Int {
         if (leftKey != null && rightKey != null) {
             val relation = HarmonicKeyEngine.calculateHarmonicRelation(leftKey, rightKey)
             return when (relation) {
@@ -61,27 +60,16 @@ object FlowShuffleEngine {
                 com.pixelody.app.data.model.HarmonicRelation.DissonantClash -> -3
             }
         }
-        val leftTelemetry = HarmonicKeyEngine.estimateTrackTelemetry(left)
-        val rightTelemetry = HarmonicKeyEngine.estimateTrackTelemetry(right)
-        val relation = HarmonicKeyEngine.calculateHarmonicRelation(leftTelemetry.key, rightTelemetry.key)
-        return when (relation) {
-            com.pixelody.app.data.model.HarmonicRelation.ExactMatch -> 4
-            com.pixelody.app.data.model.HarmonicRelation.RelativeMajorMinor -> 3
-            com.pixelody.app.data.model.HarmonicRelation.AdjacentStep -> 2
-            com.pixelody.app.data.model.HarmonicRelation.DiagonalStep -> 1
-            com.pixelody.app.data.model.HarmonicRelation.EnergyBoost -> 1
-            com.pixelody.app.data.model.HarmonicRelation.EnergyDrop -> 0
-            com.pixelody.app.data.model.HarmonicRelation.DissonantClash -> -2
-        }
+        return 0
     }
 
-    private fun diversityPenalty(sequence: List<Track>, candidate: Track, windowSize: Int = 4): Pair<Int, String?> {
-        val candidateArtist = normalize(candidate.artist)
-        val candidateAlbum = normalize(candidate.album)
+    private fun diversityPenalty(sequence: List<Track>, candidate: Track, normalized: (String?) -> String, windowSize: Int = 4): Pair<Int, String?> {
+        val candidateArtist = normalized(candidate.artist)
+        val candidateAlbum = normalized(candidate.album)
         val recent = sequence.takeLast(max(1, windowSize))
 
-        val artistRepeat = candidateArtist.isNotBlank() && recent.any { normalize(it.artist) == candidateArtist }
-        val albumRepeat = candidateAlbum.isNotBlank() && recent.any { normalize(it.album) == candidateAlbum }
+        val artistRepeat = candidateArtist.isNotBlank() && recent.any { normalized(it.artist) == candidateArtist }
+        val albumRepeat = candidateAlbum.isNotBlank() && recent.any { normalized(it.album) == candidateAlbum }
 
         return when {
             artistRepeat -> -50 to "Artist repeat"
@@ -109,18 +97,22 @@ object FlowShuffleEngine {
         currentTrack: Track?,
         pool: List<Track>,
         mode: FlowShuffleMode,
-        horizon: Int = 50
+        horizon: Int = 50,
+        random: Random = Random.Default,
+        checkActive: () -> Unit = {}
     ): List<ShuffledTrackEntry> {
-        val candidates = pool.filterNot { it.missing || it.streamUrl.isBlank() }
+        if (horizon <= 0) return emptyList()
+        val candidates = pool.filterNot { it.missing || it.streamUrl.isBlank() || it.id == currentTrack?.id }
+            .distinctBy { it.id }
         if (candidates.isEmpty()) return emptyList()
 
         return when (mode) {
             FlowShuffleMode.Off -> {
-                candidates.map { ShuffledTrackEntry(it) }
+                candidates.take(horizon).map { ShuffledTrackEntry(it) }
             }
 
             FlowShuffleMode.PureRandom -> {
-                val shuffled = candidates.filterNot { it.id == currentTrack?.id }.shuffled()
+                val shuffled = candidates.shuffled(random).take(horizon)
                 shuffled.mapIndexed { index, track ->
                     val cue = if (index % 5 == 0) TransitionCue("Surprise", "Pure random draw") else null
                     ShuffledTrackEntry(track, cue)
@@ -128,8 +120,12 @@ object FlowShuffleEngine {
             }
 
             FlowShuffleMode.AlbumPreserving -> {
-                val remaining = candidates.filterNot { it.id == currentTrack?.id }
-                val groups = groupAlbumUnits(remaining).shuffled()
+                val groups = groupAlbumUnits(candidates).shuffled(random).toMutableList()
+                // Finish the current album before switching to a randomly chosen album.
+                val currentGroup = groups.indexOfFirst { group -> currentTrack != null &&
+                    currentTrack.album.isNotBlank() && normalize(group.first().album) == normalize(currentTrack.album) &&
+                    normalize(group.first().artist) == normalize(currentTrack.artist) }
+                if (currentGroup >= 0) groups.add(0, groups.removeAt(currentGroup))
                 val result = mutableListOf<ShuffledTrackEntry>()
                 groups.forEach { albumTracks ->
                     albumTracks.forEachIndexed { i, track ->
@@ -143,27 +139,37 @@ object FlowShuffleEngine {
             }
 
             FlowShuffleMode.SmartFlow -> {
-                val available = candidates.filterNot { it.id == currentTrack?.id }.toMutableList()
+                val available = candidates.shuffled(random).toMutableList()
                 val sequence = mutableListOf<Track>()
                 val result = mutableListOf<ShuffledTrackEntry>()
                 var previous = currentTrack
+                val normalizedText = mutableMapOf<String?, String>()
+                val normalized: (String?) -> String = { normalizedText.getOrPut(it) { normalize(it) } }
+                val keys = (listOfNotNull(currentTrack) + candidates).associate { it.id to
+                    (HarmonicKeyEngine.parseKey(it.format) ?: HarmonicKeyEngine.parseKey(it.title)) }
+                val genreScores = mutableMapOf<Pair<String?, String>, Int>()
 
                 var step = 0
                 while (available.isNotEmpty() && result.size < horizon) {
+                    checkActive()
                     step++
                     var bestCandidateIndex = 0
                     var bestScore = Int.MIN_VALUE
                     var bestCue: TransitionCue? = null
 
-                    val history = (listOfNotNull(currentTrack) + sequence)
+                    val history = listOfNotNull(currentTrack) + sequence.takeLast(4)
 
-                    for (i in available.indices) {
+                    // Bounded randomized sampling keeps full-library planning responsive.
+                    // Small queues still compare every candidate.
+                    for (i in 0 until min(64, available.size)) {
                         val cand = available[i]
-                        val (divPoints, divLabel) = diversityPenalty(history, cand, windowSize = min(4, available.size))
-                        val keyPoints = keyCompatibilityScore(previous, cand)
-                        val genrePoints = GenreTaxonomyEngine.genreAffinityScore(previous?.genre, cand.genre)
+                        val (divPoints, divLabel) = diversityPenalty(history, cand, normalized)
+                        val keyPoints = keyCompatibilityScore(keys[previous?.id], keys[cand.id])
+                        val genrePoints = genreScores.getOrPut(previous?.genre to cand.genre) {
+                            GenreTaxonomyEngine.genreAffinityScore(previous?.genre, cand.genre)
+                        }
                         val qualityPoints = if (cand.lossless) 3 else 0
-                        val randomJitter = (0..3).random()
+                        val randomJitter = random.nextInt(4)
 
                         val totalScore = divPoints + keyPoints + genrePoints + qualityPoints + randomJitter
 
@@ -171,17 +177,15 @@ object FlowShuffleEngine {
                             bestScore = totalScore
                             bestCandidateIndex = i
                             val badge = when {
-                                cand.lossless && step % 4 == 0 -> "Hi-Res Flow"
+                                cand.lossless && step % 4 == 0 -> "Lossless Flow"
                                 genrePoints >= 6 -> "Genre Match (${GenreTaxonomyEngine.canonicalize(cand.genre)})"
                                 keyPoints > 0 -> {
-                                    val key = HarmonicKeyEngine.parseKey(cand.format)
-                                        ?: HarmonicKeyEngine.parseKey(cand.title)
-                                        ?: HarmonicKeyEngine.estimateTrackTelemetry(cand).key
-                                    "Harmonic Key (${key.code})"
+                                    val key = keys[cand.id]
+                                    "Harmonic Key (${key?.code})"
                                 }
                                 genrePoints >= 4 -> "Genre Blend (${GenreTaxonomyEngine.canonicalize(cand.genre)})"
                                 divLabel != null && divPoints > 0 -> divLabel
-                                else -> "Energy Match"
+                                else -> "Variety"
                             }
                             bestCue = TransitionCue(badge, "Flow match after ${previous?.artist ?: "now playing"}")
                         }

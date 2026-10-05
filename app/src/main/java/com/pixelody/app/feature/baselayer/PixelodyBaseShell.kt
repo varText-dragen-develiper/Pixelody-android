@@ -65,6 +65,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.OutlinedTextField
+import com.pixelody.app.data.model.collectionCoverKey
+import com.pixelody.app.data.model.ScreenBackground
+import com.pixelody.app.ui.components.ScreenImageBackground
+import androidx.compose.runtime.rememberUpdatedState
 import com.pixelody.app.data.model.CoverBook
 import com.pixelody.app.data.model.crateCoverKey
 import com.pixelody.app.data.model.trackCoverKey
@@ -105,7 +109,6 @@ import com.pixelody.app.core.playback.AudioDeviceRoute
 import com.pixelody.app.core.playback.AudioRouteState
 import com.pixelody.app.core.playback.EqualizerRuntimeState
 import com.pixelody.app.core.playback.FlowShuffleMode
-import com.pixelody.app.core.playback.FlowShuffleEngine
 import com.pixelody.app.data.model.AppExperienceMode
 import com.pixelody.app.core.playback.QueueUndoManager
 import com.pixelody.app.core.playback.HarmonicKeyEngine
@@ -229,6 +232,7 @@ fun PixelodyBaseShell(
     shuffleMode: FlowShuffleMode = FlowShuffleMode.Off,
     onResume: () -> Unit = {},
     onToggleShuffle: () -> Unit = {},
+    onShuffleTracks: (List<String>) -> Unit = onPlayTracks,
     repeatMode: RepeatMode = RepeatMode.Off,
     onToggleRepeat: () -> Unit = {},
     onSourceChange: (BaseSource) -> Unit,
@@ -309,8 +313,16 @@ fun PixelodyBaseShell(
     var isTapeSaturationEnabled by rememberSaveable { mutableStateOf(false) }
     var currentAudioRoute by rememberSaveable { mutableStateOf(AudioDeviceRoute.Speaker) }
 
+    var listeningDetailsFromPlayer by rememberSaveable { mutableStateOf(false) }
     fun send(intent: BaseIntent) {
+        val returnToPlayer = intent == BaseIntent.Back && listeningDetailsFromPlayer &&
+            state.overlays.isEmpty() && state.sheet == null && state.pushed.lastOrNull() == BasePush.SonicTimeline
         state = reduceBaseLayer(state, intent)
+        if (returnToPlayer) {
+            state = reduceBaseLayer(state, BaseIntent.OpenSheet(BaseSheet.Player))
+            listeningDetailsFromPlayer = false
+        }
+        if (intent is BaseIntent.SelectDestination) listeningDetailsFromPlayer = false
     }
 
     /**
@@ -327,34 +339,26 @@ fun PixelodyBaseShell(
     fun playFrom(trackId: String, pool: List<String>) {
         val effectivePool = if (pool.contains(trackId)) pool else (listOf(trackId) + pool)
         val index = effectivePool.indexOf(trackId)
-        if (index >= 0) onPlayTracks(effectivePool.drop(index)) else onPlayTracks(listOf(trackId))
+        val ids = if (shuffleMode == FlowShuffleMode.Off) effectivePool.drop(index.coerceAtLeast(0))
+            else listOf(trackId) + effectivePool.filterNot { it == trackId }
+        onPlayTracks(ids)
     }
 
     var experienceMode by rememberSaveable { mutableStateOf(settingsStore.loadExperienceMode()) }
 
-    fun playTrackWithSmartFlow(trackId: String, pool: List<Track> = data.visibleTracks()) {
+    fun playLibraryTrack(trackId: String, pool: List<Track> = data.visibleTracks()) {
         val effectivePool = if (pool.isNotEmpty()) pool else (data.tracks.ifEmpty { localTracks })
         val playablePool = effectivePool.filter { data.isPlayable(it.id) || localTracks.any { lt -> lt.id == it.id } }
         val current = playablePool.firstOrNull { it.id == trackId } ?: resolveTrack(trackId)
-        if (current != null) {
-            val plannedQueue = FlowShuffleEngine.planQueue(
-                currentTrack = current,
-                pool = if (playablePool.any { it.id == current.id }) playablePool else (playablePool + current),
-                mode = FlowShuffleMode.SmartFlow,
-                horizon = 15
-            )
-            val queueTrackIds = listOf(current.id) + plannedQueue.map { it.track.id }.filterNot { it == current.id }
-            onPlayTracks(queueTrackIds)
-        } else {
-            onPlayTracks(listOf(trackId))
-        }
+        if (current != null) playFrom(current.id, playablePool.map { it.id })
+        else onPlayTracks(listOf(trackId))
     }
 
     fun shuffleAllFlow() {
         val playablePool = data.visibleTracks().filter { data.isPlayable(it.id) }
         if (playablePool.isNotEmpty()) {
             val seed = playablePool.random()
-            playTrackWithSmartFlow(seed.id, playablePool)
+            onShuffleTracks(listOf(seed.id) + playablePool.map { it.id }.filterNot { it == seed.id })
         }
     }
 
@@ -522,7 +526,7 @@ fun PixelodyBaseShell(
             }
         }
 
-    Box(modifier = modifier.fillMaxSize().pixelodyGround(activeTheme)) {
+    Box(modifier = modifier.fillMaxSize().pixelodyGround()) {
         when (activeTheme) {
             PixelodyMobileTheme.CartridgeQuest -> {
                 ScanlineOverlay(
@@ -584,7 +588,21 @@ fun PixelodyBaseShell(
             }
             PixelodyMobileTheme.Studio -> Unit // Keep the ground quiet behind music and controls.
         }
+        val backgroundScreen = when {
+            state.pushed.lastOrNull() == BasePush.Appearance -> ScreenBackground.Settings
+            state.pushed.lastOrNull() is BasePush.Collection -> ScreenBackground.Library
+            state.pushed.isNotEmpty() -> null
+            state.destination == BaseDestination.Home -> ScreenBackground.Home
+            state.destination == BaseDestination.Library -> ScreenBackground.Library
+            else -> ScreenBackground.Search
+        }
+        ScreenImageBackground(backgroundScreen?.let { data.covers.imageFor(it.key, null) })
         BaseLayerScaffold(
+            contentModifier = destinationSwipeModifier(
+                enabled = state.pushed.isEmpty() && state.sheet == null && state.overlays.isEmpty() && state.rearrangingCrate == null,
+                destination = state.destination,
+                onNavigate = { send(BaseIntent.SelectDestination(it)) }
+            ),
             identity = if (state.pushed.isNotEmpty() || openCollection != null || openTrack != null) {
                 {
                     TextButton(onClick = { send(BaseIntent.Back) }) {
@@ -612,7 +630,7 @@ fun PixelodyBaseShell(
                             state.pushed.lastOrNull() == BasePush.Acquire -> "Add Music"
                             state.pushed.lastOrNull() == BasePush.Appearance -> "Settings & Themes"
                             state.pushed.lastOrNull() == BasePush.Technical -> "Add music"
-                            state.pushed.lastOrNull() == BasePush.SonicTimeline -> "Daily Sonic Capsule"
+                            state.pushed.lastOrNull() == BasePush.SonicTimeline -> "Listening details"
                             else -> state.destination.label
                         },
                         style = MaterialTheme.typography.titleMedium,
@@ -719,6 +737,7 @@ fun PixelodyBaseShell(
                         else -> PixelodyDetailKind.Playlist
                     }
                     LibraryScreen(
+                        recentTrackIds = dailyCapsule.memoryTimeline.sortedByDescending { it.timestampMs }.map { it.trackId },
                         covers = data.covers,
                         onCoverActions = { key, title -> send(BaseIntent.ShowOverlay(BaseOverlay.CoverActions(key, title))) },
                         snapshot = librarySnapshot,
@@ -798,6 +817,7 @@ fun PixelodyBaseShell(
                             else -> PixelodyDetailKind.Playlist
                         }
                         LibraryScreen(
+                            recentTrackIds = dailyCapsule.memoryTimeline.sortedByDescending { it.timestampMs }.map { it.trackId },
                             covers = data.covers,
                             onCoverActions = { key, title -> send(BaseIntent.ShowOverlay(BaseOverlay.CoverActions(key, title))) },
                             snapshot = librarySnapshot,
@@ -863,6 +883,7 @@ fun PixelodyBaseShell(
                         onStopHost = {}
                     )
                     BasePush.Appearance -> ProfileScreen(
+                        covers = data.covers, coverStore = coverStore, onCoversChange = onCoversChange,
                         activeTheme = activeTheme,
                         onThemeChange = onThemeChange,
                         onThemeReset = onResetTheme,
@@ -925,6 +946,7 @@ fun PixelodyBaseShell(
                 }
 
                 state.destination == BaseDestination.Library -> LibraryScreen(
+                    recentTrackIds = dailyCapsule.memoryTimeline.sortedByDescending { it.timestampMs }.map { it.trackId },
                     covers = data.covers,
                     onCoverActions = { key, title -> send(BaseIntent.ShowOverlay(BaseOverlay.CoverActions(key, title))) },
                     snapshot = librarySnapshot,
@@ -933,7 +955,7 @@ fun PixelodyBaseShell(
                     cachedTrackIds = data.downloadedTrackIds,
                     onPlayTrack = { track ->
                         if (experienceMode == AppExperienceMode.Essential) {
-                            playTrackWithSmartFlow(track.id)
+                            playLibraryTrack(track.id)
                         } else {
                             playFrom(track.id, data.visibleTracks().map { it.id })
                         }
@@ -1058,7 +1080,7 @@ fun PixelodyBaseShell(
                     onUseCopiedDetails = { onConnectHost(copiedDetails) },
                     onPlayTrack = { track ->
                         if (experienceMode == AppExperienceMode.Essential) {
-                            playTrackWithSmartFlow(track.id)
+                            playLibraryTrack(track.id)
                         } else {
                             playFrom(track.id, data.visibleTracks().map { it.id })
                         }
@@ -1068,7 +1090,7 @@ fun PixelodyBaseShell(
                         experienceMode = newMode
                         settingsStore.saveExperienceMode(newMode)
                     },
-                    onPlayTrackWithSmartFlow = { trackId -> playTrackWithSmartFlow(trackId) },
+                    onPlayTrackWithSmartFlow = { trackId -> playLibraryTrack(trackId) },
                     onShuffleAllFlow = { shuffleAllFlow() },
                     onTogglePlayback = onTogglePlay,
                     onOpenLibrary = { send(BaseIntent.SelectDestination(BaseDestination.Library)) },
@@ -1139,6 +1161,9 @@ fun PixelodyBaseShell(
             when (sheet) {
                 BaseSheet.Player -> {
                     NowPlayingScreen(
+                        dailyCapsule = dailyCapsule,
+                        onPlayHistoryTrack = { id -> playFrom(id, dailyCapsule.memoryTimeline.sortedByDescending { it.timestampMs }.map { it.trackId }.distinct().filter { data.isPlayable(it) }) },
+                        onListeningDetails = { listeningDetailsFromPlayer = true; send(BaseIntent.Back); send(BaseIntent.Push(BasePush.SonicTimeline)) },
                         snapshot = librarySnapshot,
                         selectedTrack = currentTrack,
                         isLocalTrack = currentTrack != null && data.phoneTrackIds.contains(currentTrack.id),
@@ -1690,7 +1715,8 @@ private fun BaseOverlayHost(
     // Picking a picture for a crate, playlist, album or track. The key of whatever asked
     // is held here while the system picker is open, because the picker returns later.
     val coverScope = rememberCoroutineScope()
-    var pendingCoverKey by remember { mutableStateOf<String?>(null) }
+    val currentCovers by rememberUpdatedState(data.covers)
+    var pendingCoverKey by rememberSaveable { mutableStateOf<String?>(null) }
     val coverPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         val key = pendingCoverKey
         pendingCoverKey = null
@@ -1699,7 +1725,8 @@ private fun BaseOverlayHost(
                 val saved = withContext(Dispatchers.IO) {
                     coverStore.importImage(overlayContext.applicationContext, uri)
                 }
-                if (saved != null) onCoversChange(data.covers.withImage(key, saved))
+                if (saved != null) onCoversChange(currentCovers.withImage(key, saved))
+                else android.widget.Toast.makeText(overlayContext, "Couldn't read this image. Try another photo.", android.widget.Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -1781,18 +1808,21 @@ private fun BaseOverlayHost(
                             onOpenCollection(overlay.kindKey, overlay.collectionId)
                         }
                         BaseOverlayItem(
-                            label = "Picture and note",
-                            subtitle = "choose your own cover",
+                            label = "Customize cover",
+                            subtitle = "Choose a photo or add a note",
                             trailing = "›"
                         ) {
                             openCoverActions(
-                                "${overlay.kindKey}:${overlay.collectionId}",
+                                collectionCoverKey(overlay.collectionId),
                                 collection?.name ?: "Collection"
                             )
                         }
-                        val isPlaylist = overlay.kindKey == BaseBrowseShape.Playlists.kindKey ||
-                            overlay.kindKey == "playlists" ||
-                            overlay.collectionId.startsWith("user-pl-")
+                        val organizer = data.crates.crates.firstOrNull { "crate:${it.id}" == overlay.collectionId }
+                        if (organizer != null) BaseOverlayItem("Organize collection", subtitle = "Folders, saved tools and arrangement") {
+                            send(BaseIntent.ShowOverlay(BaseOverlay.CrateActions(organizer.id)))
+                        }
+                        val isPlaylist = organizer == null && (overlay.kindKey == BaseBrowseShape.Playlists.kindKey ||
+                            overlay.kindKey == "playlists" || overlay.collectionId.startsWith("user-pl-"))
                         if (isPlaylist) {
                             BaseOverlayItem(
                                 label = "Export playlist (M3U8)",

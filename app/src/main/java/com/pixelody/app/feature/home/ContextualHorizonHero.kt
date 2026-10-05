@@ -52,17 +52,7 @@ fun ContextualHorizonHero(
                     )
                 }
             }
-            else -> {
-                if (surfaceState.capsule != null) {
-                    SessionCapsuleCard(
-                        insights = surfaceState.sessionInsights ?: SessionSoundInsights(),
-                        onDailySoundCheck = onLaunchHero,
-                        dailyCapsule = surfaceState.capsule,
-                        onOpenTimeline = onOpenTimeline,
-                        onShowDoc = onShowDoc
-                    )
-                }
-            }
+            else -> Unit // Listening history is part of the player; Home already has Play/Resume.
         }
     }
 }

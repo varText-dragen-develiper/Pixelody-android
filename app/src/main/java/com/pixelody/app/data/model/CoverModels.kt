@@ -74,7 +74,14 @@ object CoverCodec {
                 note = unescape(fields[2])
             ).takeUnless { it.isEmpty }
         }
-        return CoverBook(entries.associateBy { it.key })
+        // Earlier collection menus wrote plural prefixes; shelves use canonical singular keys.
+        // Prefer an explicit canonical entry if both versions survived in saved data.
+        val canonical = entries.filter { it.key == normalizedCollectionCoverKey(it.key) }.associateBy { it.key }
+        val migrated = entries.associate { entry ->
+            val key = normalizedCollectionCoverKey(entry.key)
+            key to entry.copy(key = key)
+        }
+        return CoverBook(migrated + canonical)
     }
 
     private fun escape(value: String): String = buildString(value.length) {
@@ -101,7 +108,7 @@ fun albumCoverKey(album: String) = "album:$album"
 
 /** Albums, artists and genres carry their own prefix; anything else is a playlist id. */
 fun collectionCoverKey(collectionId: String): String =
-    if (collectionId.startsWith("album:") || collectionId.startsWith("artist:") || collectionId.startsWith("genre:")) {
+    if (collectionId.startsWith("crate:") || collectionId.startsWith("playlist:") || collectionId.startsWith("album:") || collectionId.startsWith("artist:") || collectionId.startsWith("genre:")) {
         collectionId
     } else {
         playlistCoverKey(collectionId)
@@ -111,4 +118,20 @@ fun collectionCoverKey(collectionId: String): String =
 fun Track.withCover(covers: CoverBook): Track {
     val chosen = covers.imageFor(trackCoverKey(id), artworkUrl)
     return if (chosen == artworkUrl) this else copy(artworkUrl = chosen)
+}
+
+/** Independent background choices; cover and note resets cannot affect these keys. */
+enum class ScreenBackground(val route: String, val label: String) {
+    Home("home", "Home"), Library("library", "Library"), Search("search", "Search"),
+    Settings("settings", "Settings");
+    val key: String get() = "background:$route"
+}
+
+private fun normalizedCollectionCoverKey(key: String): String {
+    val prefix = key.substringBefore(':')
+    return if (prefix in setOf("playlists", "albums", "artists", "genres")) {
+        val id = key.substringAfter(':')
+        if (id.startsWith("$prefix:")) key else if (id.startsWith("album:") || id.startsWith("artist:") || id.startsWith("genre:") || id.startsWith("playlist:")) id
+        else "${prefix.removeSuffix("s")}:$id"
+    } else key
 }

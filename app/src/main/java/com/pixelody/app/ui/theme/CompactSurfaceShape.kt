@@ -10,5 +10,5 @@ internal fun PixelodyMobileTheme.compactSurfaceShape(): Shape = when (this) {
     PixelodyMobileTheme.LoFiCafe -> RoundedCornerShape(6.dp)
     PixelodyMobileTheme.BulkheadTerminal -> RoundedCornerShape(2.dp)
     PixelodyMobileTheme.Obsession -> ChamferedPlate(PlateCorner.TopEnd, depthRatio = 0.08f)
-    PixelodyMobileTheme.Studio -> ChamferedPlate(depthRatio = 0.08f)
+    PixelodyMobileTheme.Studio -> RoundedCornerShape(16.dp)
 }

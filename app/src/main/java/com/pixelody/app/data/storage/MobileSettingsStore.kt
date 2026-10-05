@@ -5,9 +5,45 @@ import android.content.SharedPreferences
 import com.pixelody.app.data.model.AppExperienceMode
 import com.pixelody.app.ui.brand.PixelodyLogoColor
 import com.pixelody.app.ui.theme.PixelodyMobileTheme
+import com.pixelody.app.ui.theme.AppearanceSettings
+import com.pixelody.app.ui.theme.StylePalette
+import com.pixelody.app.ui.theme.StyleTypeface
 
 class MobileSettingsStore(private val prefs: SharedPreferences) {
     constructor(context: Context) : this(context.getSharedPreferences("pixelody_mobile_settings", Context.MODE_PRIVATE))
+
+    fun loadAppearance(): AppearanceSettings = AppearanceSettings(
+        palette = StylePalette.values().firstOrNull { it.name == prefs.getString("style_palette", null) } ?: StylePalette.Theme,
+        primary = prefs.getString("style_primary", "91A7FF") ?: "91A7FF",
+        secondary = prefs.getString("style_secondary", "6ED8DD") ?: "6ED8DD",
+        base = prefs.getString("style_base", "0B0D12") ?: "0B0D12",
+        textPercent = prefs.getInt("style_text_percent", 100),
+        typeface = StyleTypeface.values().firstOrNull { it.name == prefs.getString("style_typeface", null) } ?: StyleTypeface.Theme,
+        highContrast = prefs.getBoolean("style_high_contrast", false)
+    ).normalized()
+
+    fun saveAppearance(value: AppearanceSettings) {
+        val style = value.normalized()
+        prefs.edit().putString("style_palette", style.palette.name)
+            .putString("style_primary", style.primary).putString("style_secondary", style.secondary)
+            .putString("style_base", style.base).putInt("style_text_percent", style.textPercent)
+            .putString("style_typeface", style.typeface.name).putBoolean("style_high_contrast", style.highContrast).apply()
+    }
+
+    fun resetAppearance() {
+        val editor = prefs.edit()
+        listOf("palette", "primary", "secondary", "base", "text_percent", "typeface", "high_contrast")
+            .forEach { editor.remove("style_$it") }
+        editor.apply()
+    }
+
+    fun observeAppearance(onChange: (AppearanceSettings) -> Unit): () -> Unit {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == null || key.startsWith("style_")) onChange(loadAppearance())
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        return { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
 
     fun loadTheme(): PixelodyMobileTheme {
         val rawTheme = prefs.getString(KEY_THEME, null).orEmpty()

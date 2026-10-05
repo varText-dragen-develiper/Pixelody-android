@@ -10,7 +10,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import com.pixelody.app.data.model.Track
 import com.pixelody.app.ui.theme.LocalPixelodyThemeVariant
-import com.pixelody.app.ui.theme.groundColors
+import com.pixelody.app.ui.theme.LocalPixelodyStyleSpec
 import com.pixelody.app.ui.theme.PixelodyDirection
 import com.pixelody.app.ui.theme.PixelodyMobileTheme
 import com.pixelody.app.ui.theme.ObsessionPalette
@@ -111,7 +111,8 @@ fun ProgressiveDepthHorizon(
     // content height - a ramp that follows content becomes a moving gradient
     // under scroll, which is a different asset with a different meaning.
     val theme = LocalPixelodyThemeVariant.current
-    val groundRamp = theme.groundColors()
+    val styleSpec = LocalPixelodyStyleSpec.current
+    val groundRamp = listOf(styleSpec.groundTop, styleSpec.groundBottom)
 
     Box(modifier = modifier.fillMaxSize()) {
         Canvas(modifier = Modifier.fillMaxSize()) {

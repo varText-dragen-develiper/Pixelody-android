@@ -7,8 +7,66 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.random.Random
+import java.util.concurrent.CancellationException
 
 class FlowShuffleEngineTest {
+    @Test
+    fun everyModeHonorsBoundsAndFiltersDuplicateOrUnavailableTracks() {
+        val current = mockTrack("current")
+        val valid = (1..12).map { mockTrack("$it") }
+        val pool = listOf(current) + valid + valid + listOf(
+            mockTrack("missing").copy(missing = true), mockTrack("blank").copy(streamUrl = ""))
+        FlowShuffleMode.values().forEach { mode ->
+            assertTrue(FlowShuffleEngine.planQueue(current, pool, mode, 0).isEmpty())
+            assertTrue(FlowShuffleEngine.planQueue(current, pool, mode, -1).isEmpty())
+            val ids = FlowShuffleEngine.planQueue(current, pool, mode, 5, Random(7)).map { it.track.id }
+            assertEquals(mode.name, 5, ids.size)
+            assertEquals(ids.size, ids.distinct().size)
+            assertTrue(ids.all { id -> valid.any { it.id == id } })
+        }
+    }
+
+    @Test
+    fun knownSeedReproducesEachShuffleMode() {
+        val pool = (1..100).map { mockTrack("$it", artist = "Artist ${it % 12}", album = "Album ${it % 6}") }
+        FlowShuffleMode.values().forEach { mode ->
+            assertEquals(FlowShuffleEngine.planQueue(pool[0], pool, mode, 100, Random(42)),
+                FlowShuffleEngine.planQueue(pool[0], pool, mode, 100, Random(42)))
+        }
+    }
+
+    @Test
+    fun albumModeFinishesCurrentAlbumAndKeepsItsSourceOrder() {
+        val pool = listOf(mockTrack("1", artist = "A", album = "First"),
+            mockTrack("2", artist = "B", album = "Other"),
+            mockTrack("3", artist = "A", album = "First"),
+            mockTrack("4", artist = "A", album = "First"))
+        val ids = FlowShuffleEngine.planQueue(pool[0], pool, FlowShuffleMode.AlbumPreserving, random = Random(9)).map { it.track.id }
+        assertEquals(listOf("3", "4", "2"), ids)
+    }
+
+    @Test
+    fun unknownKeysNeverProduceAHarmonicOrEnergyClaim() {
+        val tracks = (1..20).map { mockTrack("$it", lossless = false) }
+        val entries = FlowShuffleEngine.planQueue(tracks[0], tracks, FlowShuffleMode.SmartFlow)
+        assertTrue(entries.none { it.cue?.badge?.contains("Harmonic") == true || it.cue?.badge?.contains("Energy") == true })
+    }
+
+    @Test
+    fun nonLatinArtistsAreSpacedWhenAlternativesExist() {
+        val current = mockTrack("1", artist = "東京")
+        val repeat = mockTrack("2", artist = "東京")
+        val other = mockTrack("3", artist = "大阪")
+        assertEquals(other.id, FlowShuffleEngine.planQueue(current, listOf(current, repeat, other),
+            FlowShuffleMode.SmartFlow, random = Random(4)).first().track.id)
+    }
+
+    @Test(expected = CancellationException::class)
+    fun replacedPlanningRequestCanBeCancelled() {
+        FlowShuffleEngine.planQueue(null, listOf(mockTrack("1")), FlowShuffleMode.SmartFlow,
+            checkActive = { throw CancellationException() })
+    }
 
     private fun mockTrack(
         id: String,

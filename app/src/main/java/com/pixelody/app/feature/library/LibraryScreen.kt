@@ -161,6 +161,7 @@ internal fun LibraryScreen(
     sourceScope: SourceScope = SourceScope.All,
     onSourceScopeChange: (SourceScope) -> Unit = {},
     onCollectionActions: (String, String) -> Unit = { _, _ -> },
+    recentTrackIds: List<String> = emptyList(),
     covers: CoverBook = CoverBook(),
     onCoverActions: (String, String) -> Unit = { _, _ -> },
     onShowDoc: ((String) -> Unit)? = null,
@@ -354,7 +355,7 @@ internal fun LibraryScreen(
     val pocketFilteredTracks = when (smartFilter) {
         SmartPocketFilter.HiRes -> genreFilteredTracks.filter { it.lossless }
         SmartPocketFilter.HeavyRotation -> genreFilteredTracks.filter { it.id in favoriteIds || it.favorite }
-        SmartPocketFilter.Recent -> genreFilteredTracks.reversed()
+        SmartPocketFilter.Recent -> recentTrackIds.distinct().mapNotNull { id -> genreFilteredTracks.firstOrNull { it.id == id } }
         else -> genreFilteredTracks
     }
 

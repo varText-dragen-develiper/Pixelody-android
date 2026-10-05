@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,7 +37,12 @@ class MainActivity : ComponentActivity() {
             val deepLinkSearchQuery by incomingSearchQuery
             var mobileTheme by remember { mutableStateOf(settingsStore.loadTheme()) }
 
-            PixelodyTheme(variant = mobileTheme) {
+            var appearance by remember { mutableStateOf(settingsStore.loadAppearance()) }
+            DisposableEffect(settingsStore) {
+                val unsubscribe = settingsStore.observeAppearance { appearance = it }
+                onDispose { unsubscribe() }
+            }
+            PixelodyTheme(variant = mobileTheme, appearance = appearance) {
                 BasePlaybackHost(
                     repository = repository,
                     incomingConnectionDetails = connectionDetails,
