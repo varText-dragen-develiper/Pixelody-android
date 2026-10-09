@@ -7,6 +7,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SessionCapsuleEngineTest {
+    @Test fun resetRemovesOldListensAndStartsANewSession() {
+        val engine = SessionCapsuleEngine()
+        engine.recordTrackPlay(flacTrack)
+        engine.updateSessionTime(50)
+        engine.resetSession()
+        assertEquals(0, engine.insights.value.tracksPlayed)
+        assertEquals(0, engine.insights.value.sessionMinutes)
+        engine.recordTrackPlay(mp3Track)
+        assertEquals(1, engine.insights.value.tracksPlayed)
+        assertEquals(0f, engine.insights.value.losslessRatio)
+    }
+
 
     private val flacTrack = Track(
         id = "flac_1",

@@ -105,16 +105,16 @@ data class BaseLayerState(
     val pushed: List<BasePush> = emptyList(),
     val sheet: BaseSheet? = null,
     val overlays: List<BaseOverlay> = emptyList(),
-    val rearrangingCrate: String? = null
+    val rearrangingCrate: String? = null,
+    val queueReturnsToPlayer: Boolean = true
 ) {
     val overlay: BaseOverlay? get() = overlays.lastOrNull()
 
     /**
      * How many layers sit above the chosen destination.
      *
-     * Queue counts as two because the registry makes it a child of Player, so
-     * collapsing the queue removes one layer rather than none. Getting this wrong is
-     * how a Back that quietly does nothing passes for a Back that works.
+     * Queue adds one layer to its actual entry point. Direct entry covers the
+     * destination; entry from Player covers Player plus the destination.
      */
     val depth: Int get() = pushed.size + sheetDepth + overlays.size
 
@@ -122,7 +122,7 @@ data class BaseLayerState(
         get() = when (sheet) {
             null -> 0
             BaseSheet.Player -> 1
-            BaseSheet.Queue -> 2
+            BaseSheet.Queue -> if (queueReturnsToPlayer) 2 else 1
         }
 }
 
@@ -158,7 +158,8 @@ sealed class BackTarget {
 
 fun BaseLayerState.backTarget(): BackTarget = when {
     overlays.isNotEmpty() -> BackTarget.DismissOverlay
-    sheet == BaseSheet.Queue -> BackTarget.CollapseQueueToPlayer
+    sheet == BaseSheet.Queue && queueReturnsToPlayer -> BackTarget.CollapseQueueToPlayer
+    sheet == BaseSheet.Queue -> BackTarget.CloseListeningSheet
     sheet == BaseSheet.Player -> BackTarget.CloseListeningSheet
     pushed.size > 1 -> BackTarget.PopTo(labelOf(pushed[pushed.size - 2]))
     pushed.size == 1 -> BackTarget.PopTo(destination.label)
@@ -196,6 +197,9 @@ fun reduceBaseLayer(state: BaseLayerState, intent: BaseIntent): BaseLayerState =
 
     is BaseIntent.OpenSheet -> state.copy(
         sheet = intent.sheet,
+        queueReturnsToPlayer = if (intent.sheet == BaseSheet.Queue) {
+            if (state.sheet == BaseSheet.Queue) state.queueReturnsToPlayer else state.sheet == BaseSheet.Player
+        } else true,
         overlays = emptyList(),
         rearrangingCrate = null
     )
@@ -209,7 +213,10 @@ fun reduceBaseLayer(state: BaseLayerState, intent: BaseIntent): BaseLayerState =
             overlays = state.overlays.dropLast(1),
             rearrangingCrate = null
         )
-        state.sheet == BaseSheet.Queue -> state.copy(sheet = BaseSheet.Player)
+        state.sheet == BaseSheet.Queue -> state.copy(
+            sheet = if (state.queueReturnsToPlayer) BaseSheet.Player else null,
+            queueReturnsToPlayer = true
+        )
         state.sheet == BaseSheet.Player -> state.copy(sheet = null)
         state.pushed.isNotEmpty() -> state.copy(pushed = state.pushed.dropLast(1))
         else -> state

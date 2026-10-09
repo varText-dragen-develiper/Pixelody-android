@@ -39,13 +39,17 @@ internal class DestinationSwipe(private val threshold: Float) {
 
     fun cancel() { cancelled = true }
 
-    fun finish(expectedGeneration: Long = generation): Int? {
+    val displacement: Float get() = if (abs(unusedX) > abs(directX)) unusedX else directX
+
+    fun finish(expectedGeneration: Long = generation, velocity: Float = 0f): Int? {
         if (!active || expectedGeneration != generation) return null
         active = false
         if (cancelled) return null
         // Both input paths may observe the same motion. Do not count it twice.
-        val x = if (abs(unusedX) > abs(directX)) unusedX else directX
-        if (abs(x) < threshold || abs(directY) > abs(x) * 0.8f) return null
+        val x = displacement
+        if (abs(velocity) >= 650f && x * velocity < 0f) return null
+        val purposefulFlick = abs(x) >= threshold / 4f && abs(velocity) >= 650f && x * velocity > 0f
+        if ((abs(x) < threshold && !purposefulFlick) || abs(directY) > abs(x) * 0.8f) return null
         return if (x < 0f) 1 else -1
     }
 }

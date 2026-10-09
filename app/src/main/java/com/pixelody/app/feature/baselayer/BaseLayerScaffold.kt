@@ -17,6 +17,9 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.animation.core.animateFloatAsState
@@ -91,14 +94,17 @@ fun BaseLayerScaffold(
     contentModifier: Modifier = Modifier,
     backdropOpacity: Float = 1f,
     selectedDestination: BaseDestination = BaseDestination.Home,
+    pagePositionProvider: (() -> Float)? = null,
     content: @Composable () -> Unit
 ) {
     // Lives above destination content, so disposing a page cannot reset its marker animation.
-    val pagePosition = animateFloatAsState(
+    val selectedPagePosition = animateFloatAsState(
         targetValue = when (selectedDestination) { BaseDestination.Home -> 0f; BaseDestination.Search -> 1f; BaseDestination.Library -> 2f },
         animationSpec = tween(280, easing = FastOutSlowInEasing),
         label = "Page position"
     )
+    val livePosition = rememberUpdatedState(pagePositionProvider)
+    val pagePosition = remember { derivedStateOf { livePosition.value?.invoke() ?: selectedPagePosition.value } }
     val listeningHeight = BaseLayerBands.ListeningSlot + (40f * (LocalDensity.current.fontScale - 1f).coerceAtLeast(0f)).dp
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val paneLayout = paneLayoutOverride ?: PixelodyAdaptivePolicy.forWindow(

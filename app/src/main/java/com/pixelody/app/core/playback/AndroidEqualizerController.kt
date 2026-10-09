@@ -1,6 +1,9 @@
 package com.pixelody.app.core.playback
 
 import android.media.audiofx.BassBoost
+import android.os.Build
+import android.media.audiofx.DynamicsProcessing
+import androidx.annotation.RequiresApi
 import android.media.audiofx.Equalizer
 import android.media.audiofx.PresetReverb
 import android.media.audiofx.Virtualizer
@@ -20,11 +23,14 @@ data class EqualizerRuntimeState(
     val platformBandCount: Int = 0,
     val isMasteringActive: Boolean = false,
     val isSpatialActive: Boolean = false,
+    val engine: String = "",
+    val appliedGainsDb: List<Float> = emptyList(),
     val message: String = "Waiting for playback"
 )
 
 class AndroidEqualizerController {
     private var equalizer: Equalizer? = null
+    private var dynamics: DynamicsProcessing? = null
     private var bassBoost: BassBoost? = null
     private var virtualizer: Virtualizer? = null
     private var presetReverb: PresetReverb? = null
@@ -42,13 +48,19 @@ class AndroidEqualizerController {
             return EqualizerRuntimeState(message = "Start playback to attach Audio Effects")
         }
 
+        if (Build.VERSION.SDK_INT >= 28 && dynamics != null && sessionId == audioSessionId) {
+            return applyDynamics(audioSessionId, eqProfile, masteringProfile, useMastering, spatialSettings)
+        }
         val activeEqualizer = equalizerFor(audioSessionId)
-            ?: return EqualizerRuntimeState(
-                audioSessionId = audioSessionId,
-                message = "Android AudioFX unavailable on this output"
-            )
+        if (activeEqualizer == null) {
+            return if (Build.VERSION.SDK_INT >= 28) {
+                applyDynamics(audioSessionId, eqProfile, masteringProfile, useMastering, spatialSettings)
+            } else EqualizerRuntimeState(audioSessionId = audioSessionId,
+                message = "Equalizer unavailable on this output")
+        }
 
         return runCatching {
+            check(activeEqualizer.hasControl()) { "Another app controls this equalizer" }
             val isEqEnabled = if (useMastering) masteringProfile.enabled else eqProfile.enabled
             val isSpatialEnabled = spatialSettings.isEnabled && spatialSettings.dryWetMix > 0.05f
 
@@ -85,6 +97,10 @@ class AndroidEqualizerController {
 
             EqualizerRuntimeState(
                 active = isEqEnabled || isSpatialEnabled,
+                engine = "Equalizer",
+                appliedGainsDb = (0 until activeEqualizer.numberOfBands.toInt()).map {
+                    activeEqualizer.getBandLevel(it.toShort()) / 100f
+                },
                 audioSessionId = audioSessionId,
                 platformBandCount = activeEqualizer.numberOfBands.toInt(),
                 isMasteringActive = useMastering && masteringProfile.enabled,
@@ -92,10 +108,55 @@ class AndroidEqualizerController {
                 message = statusMessage
             )
         }.getOrElse { error ->
+            runCatching { activeEqualizer.enabled = false }
             EqualizerRuntimeState(
                 audioSessionId = audioSessionId,
-                message = error.message ?: "Audio Effects active (Software fallback)"
+                message = error.message ?: "Equalizer could not be applied"
             )
+        }
+    }
+
+    @RequiresApi(28)
+    private fun applyDynamics(audioSessionId: Int, eqProfile: EqualizerProfile,
+        masteringProfile: MasteringProfile, useMastering: Boolean,
+        spatialSettings: SpatialChamberSettings): EqualizerRuntimeState {
+        return runCatching {
+            val effect = dynamics ?: DynamicsProcessing(1000, audioSessionId,
+                DynamicsProcessing.Config.Builder(DynamicsProcessing.VARIANT_FAVOR_FREQUENCY_RESOLUTION,
+                    2, true, 5, false, 0, false, 0, false).build()).also {
+                dynamics = it; sessionId = audioSessionId
+            }
+            check(effect.hasControl()) { "Another app controls this equalizer" }
+            val eqEnabled = if (useMastering) masteringProfile.enabled else eqProfile.enabled
+            val spatialEnabled = spatialSettings.isEnabled && spatialSettings.dryWetMix > 0.05f
+            val base = if (!eqEnabled) List(5) { 0f } else if (useMastering)
+                masteringProfile.normalized().eqGainsDb else eqProfile.normalized().gainsDb
+            val gains = if (spatialEnabled) applyWallDampingToGains(base, spatialSettings.wallDamping) else base
+            // Contiguous frequency regions around the five existing EQ centers.
+            val cutoffs = listOf(117f, 457f, 1810f, 7100f, 22000f)
+            gains.forEachIndexed { band, gain ->
+                effect.setPreEqBandAllChannelsTo(band, DynamicsProcessing.EqBand(true, cutoffs[band], gain))
+                for (channel in 0 until effect.channelCount) {
+                    check(abs(effect.getPreEqBandByChannelIndex(channel, band).gain - gain) < 0.01f) {
+                        "Android did not apply equalizer band ${band + 1}"
+                    }
+                }
+            }
+            effect.enabled = eqEnabled || spatialEnabled
+            attachBassBoost(audioSessionId, eqEnabled || spatialEnabled,
+                if (useMastering && masteringProfile.enabled) masteringProfile.subBassBoostDb else 0f)
+            attachVirtualizer(audioSessionId, useMastering, masteringProfile, spatialSettings)
+            attachPresetReverb(audioSessionId, spatialSettings)
+            EqualizerRuntimeState(active = effect.enabled, audioSessionId = audioSessionId,
+                platformBandCount = 5, engine = "DynamicsProcessing",
+                appliedGainsDb = (0 until 5).map { effect.getPreEqBandByChannelIndex(0, it).gain },
+                isMasteringActive = useMastering && masteringProfile.enabled,
+                isSpatialActive = spatialEnabled,
+                message = buildStatusMessage(useMastering, masteringProfile, eqProfile, spatialSettings))
+        }.getOrElse { error ->
+            runCatching { dynamics?.enabled = false }
+            EqualizerRuntimeState(audioSessionId = audioSessionId,
+                message = error.message ?: "Equalizer unavailable on this output")
         }
     }
 
@@ -131,10 +192,12 @@ class AndroidEqualizerController {
 
     fun release() {
         runCatching { equalizer?.release() }
+        if (Build.VERSION.SDK_INT >= 28) runCatching { dynamics?.release() }
         runCatching { bassBoost?.release() }
         runCatching { virtualizer?.release() }
         runCatching { presetReverb?.release() }
         equalizer = null
+        dynamics = null
         bassBoost = null
         virtualizer = null
         presetReverb = null
@@ -151,11 +214,6 @@ class AndroidEqualizerController {
             }
         }.recoverCatching {
             Equalizer(0, audioSessionId).also {
-                equalizer = it
-                sessionId = audioSessionId
-            }
-        }.recoverCatching {
-            Equalizer(0, 0).also {
                 equalizer = it
                 sessionId = audioSessionId
             }
@@ -315,8 +373,9 @@ class AndroidEqualizerController {
                 .roundToInt()
                 .coerceIn(minLevel, maxLevel)
                 .toShort()
-            runCatching {
-                equalizer.setBandLevel(band, levelMb)
+            equalizer.setBandLevel(band, levelMb)
+            check(abs(equalizer.getBandLevel(band).toInt() - levelMb.toInt()) <= 1) {
+                "Android did not apply equalizer band ${bandIndex + 1}"
             }
         }
     }

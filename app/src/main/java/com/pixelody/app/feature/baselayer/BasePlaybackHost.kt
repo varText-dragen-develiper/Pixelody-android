@@ -5,6 +5,12 @@ import kotlinx.coroutines.CancellationException
 import com.pixelody.app.data.model.HostConnectionState
 import com.pixelody.app.data.network.connectionStateFor
 import com.pixelody.app.data.network.hostConnectionFailureMessage
+import com.pixelody.app.data.network.endsHostAccess
+import com.pixelody.app.core.playback.JamSessionCoordinator
+import com.pixelody.app.core.playback.removeRemoteHostMedia
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import android.Manifest
 import android.content.ComponentName
 import android.content.pm.PackageManager
@@ -195,6 +201,8 @@ fun BasePlaybackHost(
     var hostConnectionError by remember { mutableStateOf("") }
     var isConnectingHost by remember { mutableStateOf(false) }
     var isLoadingLocalLibrary by remember { mutableStateOf(true) }
+    val jamCoordinator = remember { JamSessionCoordinator() }
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     // Phone / Local data state
     var localTracks by remember { mutableStateOf<List<Track>>(emptyList()) }
@@ -238,6 +246,15 @@ fun BasePlaybackHost(
     var queue by remember { mutableStateOf(initialData.queue) }
 
     // Hardware DSP, Mastering, Equalizer & Console state
+    var equalizerRuntime by remember { mutableStateOf(com.pixelody.app.core.playback.EqualizerRuntimeState()) }
+    DisposableEffect(context) {
+        val prefs = context.getSharedPreferences(MobileEqualizerStore.PREFERENCES_NAME, android.content.Context.MODE_PRIVATE)
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == MobileEqualizerStore.KEY_EQ_RUNTIME) equalizerRuntime = equalizerStore.loadRuntimeState()
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
     var globalEqualizer by remember { mutableStateOf(equalizerStore.loadGlobalProfile()) }
     var trackEqualizers by remember { mutableStateOf(equalizerStore.loadTrackProfiles()) }
     var useMasteringRack by remember { mutableStateOf(equalizerStore.loadUseMasteringRack()) }
@@ -309,11 +326,34 @@ fun BasePlaybackHost(
         }
     }
 
+    fun recoverHostConnection(state: HostConnectionState, message: String) {
+        hostReachable = false
+        hostConnectionState = state
+        hostConnectionError = "$message Phone music is available. Reconnect when you're ready."
+        jamCoordinator.leaveSession()
+        activeSource = sourceAfterConnectionLoss(activeSource)
+        settingsStore.saveLastSourceScope(activeSource.key)
+        player?.let { activePlayer ->
+            removeRemoteHostMedia(activePlayer)
+            currentTrackId = activePlayer.currentMediaItem?.mediaId
+            lastTrackId = currentTrackId
+            playbackPositionState.longValue = activePlayer.currentPosition.coerceAtLeast(0L)
+            playbackDurationMs = activePlayer.duration.coerceAtLeast(0L)
+        }
+        if (player == null && lastTrackId in hostTracks.map { it.id } && lastTrackId !in cachedTrackIds) {
+            lastTrackId = null
+        }
+        if (state.endsHostAccess()) {
+            savedHostStore.clear()
+            hostBaseUrl = null
+        }
+    }
+
     fun refreshHostLibrary(details: HostConnectionDetails? = incomingConnectionDetails) {
         if (isConnectingHost) return
         val profile = savedHostStore.load()
         if (details == null && profile == null && !BuildConfig.ENABLE_DEMO_LIBRARY) {
-            hostConnectionState = HostConnectionState.Disconnected
+            recoverHostConnection(HostConnectionState.Disconnected, "Desktop disconnected.")
             hostConnectionError = ""
             return
         }
@@ -341,11 +381,39 @@ fun BasePlaybackHost(
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
-                hostReachable = false
-                hostConnectionState = connectionStateFor(error)
-                hostConnectionError = hostConnectionFailureMessage(error)
+                recoverHostConnection(connectionStateFor(error), hostConnectionFailureMessage(error))
             } finally {
                 isConnectingHost = false
+            }
+        }
+    }
+
+    // Foreground-only liveness: failed polls leave a usable local app, not a half-live session.
+    // Recovery is explicit, so a returning PC cannot steal playback or navigation.
+    LaunchedEffect(hostBaseUrl, hostConnectionState, lifecycleOwner) {
+        val baseUrl = hostBaseUrl ?: return@LaunchedEffect
+        if (hostConnectionState != HostConnectionState.Connected) return@LaunchedEffect
+        val profile = savedHostStore.load() ?: return@LaunchedEffect
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            var revision = -1L
+            while (true) {
+                try {
+                    val live = repository.fetchLiveState(baseUrl, profile.token, revision)
+                    revision = live.revision
+                    if (!live.unchanged && jamCoordinator.session.value.active) {
+                        jamCoordinator.updateFromLiveState(live.state?.jamSession)
+                        if (!jamCoordinator.session.value.active && activeSource == BaseSource.Jam) {
+                            activeSource = BaseSource.Phone
+                            settingsStore.saveLastSourceScope(activeSource.key)
+                        }
+                    }
+                    delay(live.pollAfterMs.coerceIn(1_000L, 10_000L))
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    recoverHostConnection(connectionStateFor(error), hostConnectionFailureMessage(error))
+                    break
+                }
             }
         }
     }
@@ -492,7 +560,8 @@ fun BasePlaybackHost(
         val sessionToken = SessionToken(context, ComponentName(context, PixelodyPlaybackService::class.java))
         val controllerFuture = MediaController.Builder(context, sessionToken).buildAsync()
         controllerFuture.addListener(
-            { player = runCatching { controllerFuture.get() }.getOrNull() },
+            { player = runCatching { controllerFuture.get() }.getOrNull()
+                equalizerRuntime = equalizerStore.loadRuntimeState() },
             ContextCompat.getMainExecutor(context)
         )
         onDispose {
@@ -549,7 +618,7 @@ fun BasePlaybackHost(
                     hostBaseUrl = null
                 }
                 if (failure.connectionState != null) {
-                    hostReachable = false
+                    recoverHostConnection(failure.connectionState, failure.message)
                 }
             }
         }
@@ -625,6 +694,7 @@ fun BasePlaybackHost(
         onDataChanged(baseData)
     }
 
+    var analyticsResetEpoch by remember { mutableStateOf(0L) }
     val sessionInsights by sessionCapsuleEngine.insights.collectAsState()
     val dailyCapsule by sonicTimelineEngine.dailyCapsule.collectAsState()
     val weeklyTrend by sonicTimelineEngine.weeklyTrend.collectAsState()
@@ -642,7 +712,8 @@ fun BasePlaybackHost(
      * so a track change, a stop, or this host leaving composition all record the
      * listen that just happened.
      */
-    LaunchedEffect(currentTrackId) {
+    LaunchedEffect(currentTrackId, analyticsResetEpoch) {
+        val epoch = analyticsResetEpoch
         val id = currentTrackId ?: return@LaunchedEffect
         var playedMs = 0L
         try {
@@ -651,7 +722,7 @@ fun BasePlaybackHost(
                 if (isPlaying) playedMs += LISTEN_TICK_MS
             }
         } finally {
-            if (playedMs >= MIN_RECORDED_LISTEN_MS) {
+            if (epoch == analyticsResetEpoch && playedMs >= MIN_RECORDED_LISTEN_MS) {
                 val played = currentTracks.firstOrNull { it.id == id }
                 if (played != null) {
                     val seconds = (playedMs / 1000L).toInt()
@@ -1062,6 +1133,27 @@ fun BasePlaybackHost(
     }
 
     PixelodyBaseShell(
+        onResetDeveloperData = { includeTrackEdits ->
+            val resetPlayer = checkNotNull(player) { "Playback is still connecting; try again" }
+            // Invalidate the old listen BEFORE stopping; its finally block must not refill history.
+            analyticsResetEpoch++
+            queuePlanningJob?.cancel()
+            pendingPlayback = null
+            resetPlayer.pause()
+            resetPlayer.stop()
+            resetPlayer.clearMediaItems()
+            currentTrackId = null
+            queue = emptyList()
+            playbackPositionState.longValue = 0L
+            lastTrackId = null
+            settingsStore.saveLastTrackId(null)
+            settingsStore.saveLastTrackPositionMs(0L)
+            sessionCapsuleEngine.resetSession()
+            sonicTimelineEngine.clearTimeline()
+            com.pixelody.app.core.playback.HarmonicKeyEngine.clearCache()
+            persistenceRepository.clearListeningArchives()
+            if (includeTrackEdits) metadataStore.clearAllOverrides()
+        },
         onShuffleTracks = { ids ->
             val mode = shuffleMode.takeUnless { it == FlowShuffleMode.Off } ?: FlowShuffleMode.SmartFlow
             shuffleMode = mode
@@ -1106,6 +1198,7 @@ fun BasePlaybackHost(
         onRemoveQueueItem = ::removeQueueItem,
         onRemoveQueueItemAt = ::removeQueueItemAt,
         onClearQueue = ::clearQueue,
+        equalizerRuntimeState = equalizerRuntime,
         equalizerProfile = globalEqualizer,
         onEqualizerChange = { eq ->
             globalEqualizer = eq
@@ -1164,6 +1257,7 @@ fun BasePlaybackHost(
         onConnectHost = ::connectHostPayload,
         hostConnectionState = hostConnectionState,
         hostConnectionError = hostConnectionError,
+        jamCoordinator = jamCoordinator,
         isLoadingLocalLibrary = isLoadingLocalLibrary,
         onCratesChange = { newCrates ->
             crateBook = newCrates

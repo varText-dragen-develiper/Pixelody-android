@@ -29,6 +29,7 @@ class BaseLayerStateTest {
         val withSheets = bases.flatMap { base ->
             listOf(
                 base,
+                reduceBaseLayer(base, BaseIntent.OpenSheet(BaseSheet.Queue)),
                 reduceBaseLayer(base, BaseIntent.OpenSheet(BaseSheet.Player)),
                 reduceBaseLayer(
                     reduceBaseLayer(base, BaseIntent.OpenSheet(BaseSheet.Player)),
@@ -118,6 +119,41 @@ class BaseLayerStateTest {
         val again = reduceBaseLayer(back, BaseIntent.Back)
         assertNull(again.sheet)
         assertEquals(listOf(collection), again.pushed)
+    }
+
+    @Test
+    fun directQueueReturnsToItsDestinationOrCollectionAndRepeatedOpenKeepsOrigin() {
+        for (destination in BaseDestination.values()) {
+            for (pushes in listOf(emptyList(), listOf(collection))) {
+                val base = BaseLayerState(destination = destination, pushed = pushes)
+                val queue = reduceBaseLayer(base, BaseIntent.OpenSheet(BaseSheet.Queue))
+                assertEquals(base.depth + 1, queue.depth)
+                assertEquals(BackTarget.CloseListeningSheet, queue.backTarget())
+                val reopened = reduceBaseLayer(queue, BaseIntent.OpenSheet(BaseSheet.Queue))
+                assertFalse(reopened.queueReturnsToPlayer)
+                assertEquals(base, reduceBaseLayer(reopened, BaseIntent.Back))
+            }
+        }
+    }
+
+    @Test
+    fun queueEntryPointSurvivesSavedStateAndOldStatesKeepTheirExistingBackPath() {
+        for (fromPlayer in listOf(false, true)) {
+            val base = BaseLayerState(destination = BaseDestination.Library, pushed = listOf(collection),
+                sheet = if (fromPlayer) BaseSheet.Player else null)
+            val queue = reduceBaseLayer(base, BaseIntent.OpenSheet(BaseSheet.Queue))
+            val saved = with(BaseLayerStateSaver) {
+                with(object : androidx.compose.runtime.saveable.SaverScope {
+                    override fun canBeSaved(value: Any) = true
+                }) { save(queue) }
+            }!!
+            val restored = BaseLayerStateSaver.restore(saved)!!
+            assertEquals(queue, restored)
+            assertEquals(base, reduceBaseLayer(restored, BaseIntent.Back))
+            val legacy = BaseLayerStateSaver.restore((saved as List<Any>).dropLast(1))!!
+            assertTrue(legacy.queueReturnsToPlayer)
+            assertEquals(BaseSheet.Player, reduceBaseLayer(legacy, BaseIntent.Back).sheet)
+        }
     }
 
     @Test

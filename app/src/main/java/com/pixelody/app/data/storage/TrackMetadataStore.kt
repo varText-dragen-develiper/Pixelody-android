@@ -69,6 +69,11 @@ class TrackMetadataStore(private val prefs: SharedPreferences) {
         return map
     }
 
+    fun clearAllOverrides() {
+        check(prefs.edit().clear().commit()) { "Track edits could not be cleared" }
+        _overridesFlow.value = emptyMap()
+    }
+
     fun getOverride(trackId: String): TrackMetadataOverride? {
         return _overridesFlow.value[trackId] ?: prefs.getString(trackId, null)?.let { TrackMetadataOverride.fromJson(it) }
     }

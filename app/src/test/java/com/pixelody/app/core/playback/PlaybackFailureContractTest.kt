@@ -40,7 +40,8 @@ class PlaybackFailureContractTest {
 
         assertFalse(missing.clearCredential)
         assertTrue(missing.message.contains("missing", ignoreCase = true))
-        assertTrue(network.message.contains("Wi-Fi"))
+        assertEquals(HostConnectionState.HostUnavailable, network.connectionState)
+        assertFalse(network.clearCredential)
     }
 
     @Test

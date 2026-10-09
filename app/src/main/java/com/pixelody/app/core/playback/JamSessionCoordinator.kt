@@ -174,11 +174,10 @@ class JamSessionCoordinator(
             }
             return
         }
-        if (jamSession == null) {
+        if (jamSession == null || !jamSession.active) {
             if (_session.value.active && !isHost) {
                 // Remote session ended
-                _session.update { it.copy(active = false, status = "disconnected") }
-                clockSyncEngine.setMode(JamSyncMode.Standalone)
+                leaveSession()
             }
             return
         }

@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.LazyListScope
@@ -48,6 +49,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -324,7 +327,16 @@ internal fun HomeScreen(
     val displayedPlaylists = remember(playlists) { playlists.take(10) }
     val startState = homeStartState(playablePool.size, (hostTracks + localTracks).count { !it.missing && it.streamUrl.isNotBlank() }, isLoadingMusic, isConnecting)
 
+    val homeScrollState = rememberLazyListState()
+    val navigationScope = rememberCoroutineScope()
+    LaunchedEffect(showConnectionSetup) {
+        if (showConnectionSetup) {
+            // A pairing action must reveal its controls, including on an empty library.
+            homeScrollState.scrollToItem(if (startState == HomeStartState.Ready) 2 else 3)
+        }
+    }
     LazyColumn(
+        state = homeScrollState,
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(top = 12.dp, bottom = 36.dp)
@@ -515,8 +527,17 @@ internal fun HomeScreen(
                 modifier = Modifier.padding(horizontal = 16.dp))
         }
         item(key = "studio_browse_controls") {
-            StudioSectionToggle("Browse controls", if (smartFilter == SmartPocketFilter.All) sourceScope.label else "${sourceScope.label} · Picks: ${smartFilter.label}", showBrowseControls,
-                { showBrowseControls = !showBrowseControls }, "studio:home-browse-controls",
+            StudioSectionToggle("Browse filters", if (smartFilter == SmartPocketFilter.All) sourceScope.label else "${sourceScope.label} · Picks: ${smartFilter.label}", showBrowseControls,
+                {
+                    val headerIndex = homeScrollState.layoutInfo.visibleItemsInfo
+                        .firstOrNull { it.key == "studio_browse_controls" }?.index
+                    showBrowseControls = !showBrowseControls
+                    if (showBrowseControls && headerIndex != null) navigationScope.launch {
+                        // Opening a section is navigation: reveal its controls even
+                        // when its header was just above the persistent player dock.
+                        homeScrollState.animateScrollToItem(headerIndex)
+                    }
+                }, "studio:home-browse-controls",
                 Modifier.padding(horizontal = 16.dp))
         }
         if (showBrowseControls) {

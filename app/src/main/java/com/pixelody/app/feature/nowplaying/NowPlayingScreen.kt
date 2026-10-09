@@ -11,6 +11,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
@@ -259,279 +267,126 @@ internal fun NowPlayingScreen(
         connectionState = connectionState
     )
 
-    var quickEqualizerVisible by rememberSaveable { mutableStateOf(false) }
-    if (quickEqualizerVisible && currentTrack != null) {
-        QuickEqualizerSheet(currentTrack.id, globalEqualizer, trackEqualizer, useMasteringRack,
+    var advancedEqualizerVisible by rememberSaveable { mutableStateOf(false) }
+    if (advancedEqualizerVisible) {
+        QuickEqualizerSheet(currentTrack?.id.orEmpty(), globalEqualizer, trackEqualizer, useMasteringRack,
             onToggleMasteringRack, onGlobalEqualizerChange, onTrackEqualizerChange,
-            onDismiss = { quickEqualizerVisible = false },
+            onDismiss = { advancedEqualizerVisible = false },
+            runtimeState = equalizerRuntimeState,
             roomEffectActive = spatialSettings.isEnabled,
             onDisableRoomEffect = { onSpatialSettingsChange(spatialSettings.copy(isEnabled = false)) })
     }
 
-    if (expandedLayout && currentTrack != null) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .nestedScroll(dismissConnection)
-                .statusBarsPadding()
-                .navigationBarsPadding()
-        ) {
-            NowPlayingHeader(
-                sourceStatus = sourceStatus,
-                activeViewMode = internalPlayerViewMode,
-                onOpenPlayerViews = onOpenPlayerViews,
-                sleepTimerActive = sleepTimerActive,
-                sleepTimerRemaining = sleepTimerRemaining,
-                onOpenSleepTimer = onOpenSleepTimer,
-                playbackSpeed = playbackSpeed,
-                pitchLocked = pitchLocked,
-                onOpenPitchAndSpeed = onOpenPitchAndSpeed,
-                lyricsAvailable = lyricsDocument.hasLyrics,
-                onOpenLyrics = onOpenLyrics ?: {
-                    internalPlayerViewMode = if (internalPlayerViewMode == "Lyrics") "Classic" else "Lyrics"
-                    onPlayerViewModeChange(internalPlayerViewMode)
-                },
-                experienceMode = experienceMode,
-                onExperienceModeChange = onExperienceModeChange,
-                onOpenEqualizer = if (currentTrack != null) ({ quickEqualizerVisible = true }) else null,
-                onCollapse = onCollapse
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(22.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .weight(0.94f)
-                        .fillMaxHeight(),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    if (internalPlayerViewMode == "Lyrics") {
-                        LyricsView(
-                            lyricsDocument = lyricsDocument,
-                            positionMs = effectivePositionMsProvider(),
-                            onSeek = onSeek,
-                            currentTrack = currentTrack,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f)
-                                .clip(RoundedCornerShape(14.dp))
-                        )
-                    } else {
-                        RemoteArtwork(
-                            artworkUrl = currentTrack.artworkUrl,
-                            title = currentTrack.title,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(1f)
-                                .playerTrackSwipe(onPrevious, onNext)
-                                .testTag("player:swipe-artwork")
-                                .clip(RoundedCornerShape(14.dp))
-                        )
-                        PlayerGestureCue()
-                        MetadataPanel(track = currentTrack)
-                    }
-                }
-                LazyColumn(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight(),
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
-                    contentPadding = PaddingValues(bottom = 24.dp)
-                ) {
-                    item(key = "track_identity", contentType = "track_identity") {
-                        NowPlayingTrackIdentity(
-                            track = currentTrack,
-                            isPlaying = isPlaying,
-                            modifier = Modifier.playerTrackSwipe(onPrevious, onNext),
-                            onToggleFavorite = onToggleFavorite?.let { cb -> { cb(currentTrack.id) } },
-                            onAddToPlaylist = onAddToPlaylist?.let { cb -> { cb(currentTrack.id) } },
-                            onTrackActions = onTrackActions?.let { cb -> { cb(currentTrack.id) } }
-                        )
-                    }
-                    item(key = "track_progress", contentType = "track_progress") {
-                        NowPlayingProgress(
-                            positionMs = positionMs,
-                            durationMs = durationMs,
-                            trackDurationSeconds = currentTrack.durationSeconds,
-                            onSeek = onSeek,
-                            positionMsProvider = effectivePositionMsProvider
-                        )
-                    }
-                    item(key = "transport_controls", contentType = "transport_controls") {
-                        NowPlayingTransportControls(
-                            track = currentTrack,
-                            isPlaying = isPlaying,
-                            onPrevious = onPrevious,
-                            onPlayPause = onPlayPause,
-                            onNext = onNext
-                        )
-                    }
-                    item(key = "mode_chips", contentType = "mode_chips") {
-                        NowPlayingModeChips(
-                            shuffleEnabled = shuffleEnabled,
-                            shuffleMode = shuffleMode,
-                            repeatMode = repeatMode,
-                            onToggleShuffle = onToggleShuffle,
-                            onToggleRepeat = onToggleRepeat,
-                            onOpenQueue = onOpenQueue
-                        )
-                    }
-                    item(key = "listening_history") {
-                        ListeningHistorySection(dailyCapsule, onPlayHistoryTrack, onListeningDetails)
-                    }
-                    if (playbackError.isNotBlank()) {
-                        item(key = "playback_error", contentType = "playback_error") {
-                            Text(
-                                text = playbackError,
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                    }
-                }
-            }
-        }
-        return
-    }
-
-    val haptic = LocalHapticFeedback.current
-
     ProgressiveDepthHorizon(
-        track = currentTrack,
-        isPlaying = isPlaying,
-        modifier = Modifier
-            .fillMaxSize()
-            .nestedScroll(dismissConnection)
-            .statusBarsPadding()
-            .navigationBarsPadding()
+        track = currentTrack, isPlaying = isPlaying,
+        modifier = Modifier.fillMaxSize().nestedScroll(dismissConnection)
+            .statusBarsPadding().navigationBarsPadding()
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
-                tonalElevation = 3.dp,
-                border = BorderStroke(
-                    0.5.dp,
-                    MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)
-                )
-            ) {
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            // The dock reserves real layout space. Short windows can scroll the dock
+            // independently; artwork and lyrics never paint over its hit targets.
+            val dockLimit = maxHeight * 0.60f
+            val wide = maxWidth >= 640.dp && maxHeight >= 400.dp
+            Column(Modifier.fillMaxSize()) {
                 NowPlayingHeader(
-                    sourceStatus = sourceStatus,
-                    activeViewMode = internalPlayerViewMode,
-                    onOpenPlayerViews = onOpenPlayerViews,
-                    sleepTimerActive = sleepTimerActive,
-                    sleepTimerRemaining = sleepTimerRemaining,
-                    onOpenSleepTimer = onOpenSleepTimer,
-                    playbackSpeed = playbackSpeed,
-                    pitchLocked = pitchLocked,
-                    onOpenPitchAndSpeed = onOpenPitchAndSpeed,
-                    lyricsAvailable = lyricsDocument.hasLyrics,
+                    sourceStatus = sourceStatus, activeViewMode = internalPlayerViewMode,
+                    sleepTimerActive = sleepTimerActive, sleepTimerRemaining = sleepTimerRemaining,
+                    onOpenSleepTimer = onOpenSleepTimer, playbackSpeed = playbackSpeed,
+                    pitchLocked = pitchLocked, onOpenPitchAndSpeed = onOpenPitchAndSpeed,
                     onOpenLyrics = onOpenLyrics ?: {
                         internalPlayerViewMode = if (internalPlayerViewMode == "Lyrics") "Classic" else "Lyrics"
                         onPlayerViewModeChange(internalPlayerViewMode)
                     },
-                    experienceMode = experienceMode,
-                    onExperienceModeChange = onExperienceModeChange,
-                    onOpenEqualizer = if (currentTrack != null) ({ quickEqualizerVisible = true }) else null,
-                    onCollapse = onCollapse
+                    experienceMode = experienceMode, onExperienceModeChange = onExperienceModeChange,
+                    onOpenEqualizer = { advancedEqualizerVisible = true }, onCollapse = onCollapse,
+                    dailyCapsule = dailyCapsule, onPlayHistoryTrack = onPlayHistoryTrack,
+                    onListeningDetails = onListeningDetails
                 )
-            }
-
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-                contentPadding = PaddingValues(top = 12.dp, bottom = 80.dp)
-            ) {
-                if (currentTrack == null) {
-                    item(key = "empty_state", contentType = "empty_state") { EmptyState(text = "No current track.") }
-                    return@LazyColumn
-                }
-                item(key = "hero_console_${currentTrack.id}", contentType = "hero_console") {
-                    if (internalPlayerViewMode == "Lyrics") {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(14.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(440.dp)
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f))
-                            ) {
-                                LyricsView(
-                                    lyricsDocument = lyricsDocument,
-                                    positionMs = effectivePositionMsProvider(),
-                                    onSeek = onSeek,
-                                    currentTrack = currentTrack,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            }
-                            NowPlayingProgress(
-                                positionMs = positionMs,
-                                durationMs = durationMs,
-                                trackDurationSeconds = currentTrack.durationSeconds,
-                                onSeek = onSeek,
-                                positionMsProvider = effectivePositionMsProvider
-                            )
-                            NowPlayingTransportControls(
-                                track = currentTrack,
-                                isPlaying = isPlaying,
-                                onPrevious = onPrevious,
-                                onPlayPause = onPlayPause,
-                                onNext = onNext
-                            )
-                        }
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().weight(1f).clipToBounds().testTag("player:content"),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    if (currentTrack == null) {
+                        item { EmptyState(text = "No current track.") }
                     } else {
-                        NowPlayingHeroConsole(
-                            track = currentTrack,
-                            isPlaying = isPlaying,
-                            positionMs = positionMs,
-                            durationMs = durationMs,
-                            positionMsProvider = effectivePositionMsProvider,
-                            shuffleEnabled = shuffleEnabled,
-                            shuffleMode = shuffleMode,
-                            repeatMode = repeatMode,
-                            onSeek = onSeek,
-                            onPrevious = onPrevious,
-                            onPlayPause = onPlayPause,
-                            onNext = onNext,
-                            onToggleShuffle = onToggleShuffle,
-                            onToggleRepeat = onToggleRepeat,
-                            onOpenQueue = onOpenQueue,
-                            audioRouteState = audioRouteState,
-                            onCycleAudioRoute = onCycleAudioRoute,
-                            onToggleFavorite = onToggleFavorite?.let { cb -> { cb(currentTrack.id) } },
-                            onAddToPlaylist = onAddToPlaylist?.let { cb -> { cb(currentTrack.id) } },
-                            onTrackActions = onTrackActions?.let { cb -> { cb(currentTrack.id) } }
-                        )
+                        item(key = "player_identity") {
+                            if (wide) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                                    RemoteArtwork(currentTrack.artworkUrl, currentTrack.title,
+                                        Modifier.weight(1f).aspectRatio(1f).clip(RoundedCornerShape(16.dp))
+                                            .playerTrackSwipe(onPrevious, onNext).testTag("player:swipe-artwork"))
+                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        NowPlayingTrackIdentity(currentTrack, isPlaying,
+                                            onToggleFavorite?.let { cb -> { cb(currentTrack.id) } },
+                                            onAddToPlaylist?.let { cb -> { cb(currentTrack.id) } },
+                                            onTrackActions?.let { cb -> { cb(currentTrack.id) } },
+                                            Modifier.playerTrackSwipe(onPrevious, onNext))
+                                        PlayerGestureCue()
+                                    }
+                                }
+                            } else {
+                                if (internalPlayerViewMode != "Lyrics") {
+                                    NowPlayingHeroConsole(
+                                        track = currentTrack, isPlaying = isPlaying, durationMs = durationMs,
+                                        shuffleEnabled = shuffleEnabled, shuffleMode = shuffleMode, repeatMode = repeatMode,
+                                        onSeek = onSeek, onPrevious = onPrevious, onPlayPause = onPlayPause, onNext = onNext,
+                                        onToggleShuffle = onToggleShuffle, onToggleRepeat = onToggleRepeat, onOpenQueue = onOpenQueue,
+                                        onToggleFavorite = onToggleFavorite?.let { cb -> { cb(currentTrack.id) } },
+                                        onAddToPlaylist = onAddToPlaylist?.let { cb -> { cb(currentTrack.id) } },
+                                        onTrackActions = onTrackActions?.let { cb -> { cb(currentTrack.id) } },
+                                        modifier = Modifier.fillMaxWidth(), showTransportControls = false, showProgress = false,
+                                        showPlaybackChoices = false
+                                    )
+                                } else {
+                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    NowPlayingTrackIdentity(currentTrack, isPlaying,
+                                        onToggleFavorite?.let { cb -> { cb(currentTrack.id) } },
+                                        onAddToPlaylist?.let { cb -> { cb(currentTrack.id) } },
+                                        onTrackActions?.let { cb -> { cb(currentTrack.id) } },
+                                        Modifier.playerTrackSwipe(onPrevious, onNext))
+                                }
+                                }
+                            }
+                        }
+                        if (internalPlayerViewMode == "Lyrics") item(key = "lyrics") {
+                            LyricsView(lyricsDocument = lyricsDocument,
+                                positionMs = effectivePositionMsProvider(), onSeek = onSeek,
+                                currentTrack = currentTrack,
+                                modifier = Modifier.fillMaxWidth().height(360.dp).clip(RoundedCornerShape(16.dp)))
+                        }
+                        item(key = "playback_choices") {
+                            NowPlayingModeChips(shuffleEnabled, shuffleMode, repeatMode,
+                                onToggleShuffle, onToggleRepeat, onOpenQueue)
+                        }
+                    }
+                    if (playbackError.isNotBlank()) item(key = "playback_error") {
+                        Text(playbackError, color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall)
                     }
                 }
-            item(key = "listening_history") {
-                Box(Modifier.padding(horizontal = 16.dp)) { ListeningHistorySection(dailyCapsule, onPlayHistoryTrack, onListeningDetails) }
-            }
-            if (playbackError.isNotBlank()) {
-                item(key = "playback_error") {
-                    Text(
-                        text = playbackError,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall
-                    )
+                Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 3.dp,
+                    modifier = Modifier.fillMaxWidth().heightIn(max = dockLimit)
+                        .clipToBounds().testTag("player:dock")) {
+                    Column(Modifier.verticalScroll(rememberScrollState())) {
+                        currentTrack?.let { track ->
+                            Box(Modifier.padding(horizontal = 16.dp).testTag("player:progress")) {
+                                NowPlayingProgress(positionMs, durationMs, track.durationSeconds, onSeek,
+                                    effectivePositionMsProvider)
+                            }
+                            NowPlayingTransportControls(track, isPlaying, onPrevious, onPlayPause, onNext)
+                        }
+                        BasicEqualizerControls(globalEqualizer, trackEqualizer, useMasteringRack,
+                            onToggleMasteringRack, onGlobalEqualizerChange, onTrackEqualizerChange,
+                            onResetEffects = { onSpatialSettingsChange(spatialSettings.copy(isEnabled = false)) })
+                    }
                 }
             }
         }
     }
 }
-}
 
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun NowPlayingHeader(
     sourceStatus: String,
@@ -548,185 +403,72 @@ internal fun NowPlayingHeader(
     experienceMode: AppExperienceMode = AppExperienceMode.Essential,
     onExperienceModeChange: (AppExperienceMode) -> Unit = {},
     onOpenEqualizer: (() -> Unit)? = null,
+    dailyCapsule: com.pixelody.app.data.model.DailySonicCapsule = com.pixelody.app.data.model.DailySonicCapsule(),
+    onPlayHistoryTrack: (String) -> Unit = {},
+    onListeningDetails: () -> Unit = {},
     onCollapse: () -> Unit
 ) {
-    val haptic = LocalHapticFeedback.current
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .playerSheetDrag(upward = false, onComplete = onCollapse)
-            .padding(horizontal = 14.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        // Dedicated utility row: Never crowds or skews, optimal vertical breathing space
-        Row(
-            modifier = Modifier
-                .weight(1f)
-                .horizontalScroll(rememberScrollState()),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            ExperienceModeQuickChip(
-                mode = experienceMode,
-                onToggle = { onExperienceModeChange(experienceMode.toggle()) }
-            )
-
-            if (onOpenEqualizer != null) {
-                Surface(onClick = onOpenEqualizer, shape = RoundedCornerShape(10.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.widthIn(min = 48.dp).heightIn(min = 48.dp).testTag("player:quick-equalizer")
-                        .semantics { contentDescription = "Open equalizer" }) {
-                    Box(Modifier.padding(horizontal = 14.dp), contentAlignment = Alignment.Center) {
-                        Text("EQ", style = MaterialTheme.typography.labelLarge)
-                    }
-                }
+    var drawer by rememberSaveable { mutableStateOf<String?>(null) }
+    Surface(color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)) {
+        Row(Modifier.fillMaxWidth().playerSheetDrag(upward = false, onComplete = onCollapse)
+            .padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (onOpenEqualizer != null) TextButton(onClick = onOpenEqualizer,
+                    modifier = Modifier.heightIn(min = 48.dp).testTag("player:quick-equalizer")
+                        .semantics { contentDescription = "Open advanced equalizer" }) { Text("EQ") }
+                TextButton(onClick = { drawer = "Controls" }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Controls") }
+                TextButton(onClick = { drawer = "History" }, modifier = Modifier.heightIn(min = 48.dp)
+                    .testTag("player:history")) { Text("History") }
             }
-
-            // Source status indicator pill preserving PixelodyStateTags.PLAYER_SOURCE
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.20f))
-            ) {
-                Row(
-                    modifier = Modifier
-                        .testTag(PixelodyStateTags.PLAYER_SOURCE)
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp)
-                ) {
-                    Text(
-                        text = if (sourceStatus.contains("Android")) "Device" else if (sourceStatus.contains("host")) "Host" else "Source",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            if (onOpenLyrics != null) {
-                val isLyrics = activeViewMode == "Lyrics"
-                Surface(
-                    onClick = {
-                        haptic.performTick()
-                        onOpenLyrics()
-                    },
-                    shape = RoundedCornerShape(8.dp),
-                    color = if (isLyrics) Color(0xFF6C9EFF).copy(alpha = 0.25f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    border = BorderStroke(
-                        1.dp,
-                        if (isLyrics) Color(0xFF6C9EFF).copy(alpha = 0.8f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = "Lyrics",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp,
-                            color = if (isLyrics) Color(0xFF6C9EFF) else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            if (onOpenPitchAndSpeed != null) {
-                val speedActive = playbackSpeed != 1.0f || !pitchLocked
-                val speedLabel = String.format(java.util.Locale.US, "%.2f", playbackSpeed).trimEnd('0').trimEnd('.')
-                Surface(
-                    onClick = {
-                        haptic.performTick()
-                        onOpenPitchAndSpeed()
-                    },
-                    shape = RoundedCornerShape(8.dp),
-                    color = if (speedActive) Color(0xFF6C9EFF).copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    border = BorderStroke(
-                        1.dp,
-                        if (speedActive) Color(0xFF6C9EFF).copy(alpha = 0.7f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = "Speed ${speedLabel}x",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp,
-                            color = if (speedActive) Color(0xFF6C9EFF) else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            if (onOpenSleepTimer != null) {
-                Surface(
-                    onClick = {
-                        haptic.performTick()
-                        onOpenSleepTimer()
-                    },
-                    shape = RoundedCornerShape(8.dp),
-                    color = if (sleepTimerActive) Color(0xFFE5A93C).copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    border = BorderStroke(
-                        1.dp,
-                        if (sleepTimerActive) Color(0xFFE5A93C).copy(alpha = 0.7f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = if (sleepTimerActive) "Timer $sleepTimerRemaining" else "Timer",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp,
-                            color = if (sleepTimerActive) Color(0xFFE5A93C) else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+            Surface(onClick = onCollapse, shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.size(48.dp).semantics { contentDescription = "Close player" }) {
+                Box(contentAlignment = Alignment.Center) {
+                    PixelodyTransportGlyph(TransportGlyphType.ChevronDown,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, sizeDp = 20)
                 }
             }
         }
-
-        Spacer(modifier = Modifier.width(6.dp))
-
-        // Minimize / Close button
-        Surface(
-            onClick = {
-                haptic.performTick()
-                onCollapse()
-            },
-            shape = RoundedCornerShape(8.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.20f))
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(3.dp)
-            ) {
-                PixelodyTransportGlyph(
-                    glyph = TransportGlyphType.ChevronDown,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    size = 12.dp
-                )
-                Text(
-                    text = "Close",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+    }
+    if (drawer != null) ModalBottomSheet(onDismissRequest = { drawer = null }) {
+        LazyColumn(Modifier.fillMaxWidth(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            item {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("Controls", "History").forEach { page ->
+                        FilterChip(selected = drawer == page, onClick = { drawer = page }, label = { Text(page) },
+                            modifier = Modifier.heightIn(min = 48.dp))
+                    }
+                }
+            }
+            if (drawer == "History") item {
+                ListeningHistorySection(dailyCapsule, onPlay = { id -> drawer = null; onPlayHistoryTrack(id) },
+                    onDetails = { drawer = null; onListeningDetails() })
+            } else item {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Playback controls", style = MaterialTheme.typography.titleMedium)
+                    Text(sourceStatus, style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.testTag(PixelodyStateTags.PLAYER_SOURCE))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ExperienceModeQuickChip(mode = experienceMode,
+                            onToggle = { onExperienceModeChange(experienceMode.toggle()) })
+                        if (onOpenEqualizer != null) TextButton(onClick = { drawer = null; onOpenEqualizer() },
+                            modifier = Modifier.heightIn(min = 48.dp)
+                                .semantics { contentDescription = "Open advanced equalizer" }) { Text("Equalizer") }
+                        if (onOpenLyrics != null) FilterChip(selected = activeViewMode == "Lyrics",
+                            onClick = { drawer = null; onOpenLyrics() }, label = { Text("Lyrics") },
+                            modifier = Modifier.heightIn(min = 48.dp))
+                        if (onOpenPitchAndSpeed != null) TextButton(onClick = { drawer = null; onOpenPitchAndSpeed() },
+                            modifier = Modifier.heightIn(min = 48.dp)) {
+                            Text("Speed ${String.format(java.util.Locale.US, "%.2f", playbackSpeed).trimEnd('0').trimEnd('.')}x")
+                        }
+                        if (onOpenSleepTimer != null) TextButton(onClick = { drawer = null; onOpenSleepTimer() },
+                            modifier = Modifier.heightIn(min = 48.dp)) {
+                            Text(if (sleepTimerActive) "Timer $sleepTimerRemaining" else "Sleep timer")
+                        }
+                    }
+                }
             }
         }
     }
@@ -759,7 +501,10 @@ internal fun NowPlayingHeroConsole(
     onTriggerDjTransition: (() -> Unit)? = null,
     onOpenDjConsole: (() -> Unit)? = null,
     positionMsProvider: (() -> Long)? = null,
-    modifier: Modifier = Modifier.padding(horizontal = 16.dp)
+    modifier: Modifier = Modifier.padding(horizontal = 16.dp),
+    showTransportControls: Boolean = true,
+    showProgress: Boolean = true,
+    showPlaybackChoices: Boolean = true
 ) {
     val theme = LocalPixelodyThemeVariant.current
     val haptic = LocalHapticFeedback.current
@@ -946,7 +691,7 @@ internal fun NowPlayingHeroConsole(
             )
 
             // Velocity Scrubber Progress
-            NowPlayingProgress(
+            if (showProgress) NowPlayingProgress(
                 positionMs = positionMs,
                 durationMs = durationMs,
                 trackDurationSeconds = track.durationSeconds,
@@ -955,7 +700,7 @@ internal fun NowPlayingHeroConsole(
             )
 
             // Primary Tactile Transport Controls (Prev, Play/Pause, Next)
-            NowPlayingTransportControls(
+            if (showTransportControls) NowPlayingTransportControls(
                 track = track,
                 isPlaying = isPlaying,
                 onPrevious = onPrevious,
@@ -964,7 +709,7 @@ internal fun NowPlayingHeroConsole(
             )
 
             // Ordinary playback choices; Android manages the real hardware route.
-            NowPlayingModeChips(
+            if (showPlaybackChoices) NowPlayingModeChips(
                 shuffleEnabled = shuffleEnabled,
                 shuffleMode = shuffleMode,
                 repeatMode = repeatMode,

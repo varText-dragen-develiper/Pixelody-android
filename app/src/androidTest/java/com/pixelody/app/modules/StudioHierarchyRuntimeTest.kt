@@ -88,10 +88,10 @@ class StudioHierarchyRuntimeTest {
         assertFalse(device.hasObject(By.textContains("Choose Your Next Move")))
         capture("home-tools")
         open("home")
-        tap("Browse controls")
+        tap("Browse filters")
         find("Lossless")
         tap("Lossless")
-        tap("Browse controls")
+        tap("Browse filters")
         find("All Sources · Picks: Lossless only")
         capture("home-filter-summary")
     }
@@ -111,12 +111,16 @@ class StudioHierarchyRuntimeTest {
         assertFalse(device.hasObject(By.textContains("HARMONIC CAMELOT DIGGING LENS")))
         capture("library-filter-summary")
     }
-    @Test fun playerKeepsSimpleEqualizerReachable() {
+    @Test fun playerKeepsBasicToneVisibleAndAdvancedEqualizerReachable() {
         open("player")
         assertFalse(device.hasObject(By.textContains("Sound tools")))
+        find("Tone")
+        assertTrue(device.hasObject(By.descStartsWith("Bass,")))
+        assertTrue(device.hasObject(By.descStartsWith("Mids,")))
+        assertTrue(device.hasObject(By.descStartsWith("Treble,")))
         capture("player-quiet")
-        device.wait(Until.findObject(By.desc("Open equalizer")), 5000)!!.click()
-        find("Equalizer")
+        device.wait(Until.findObject(By.desc("Open advanced equalizer")), 5000)!!.click()
+        find("Advanced equalizer")
         capture("player-equalizer")
         tap("Done")
     }
@@ -139,7 +143,9 @@ class StudioHierarchyRuntimeTest {
             device.pressBack()
             device.waitForIdle()
             Thread.sleep(1000)
-            find(if (view == "essential") "Your music" else "Albums To Start")
+            if (view == "essential") {
+                assertTrue("Album Back returns to Home", device.wait(Until.hasObject(By.desc("Home page")), 5000))
+            } else find("Albums To Start")
         }
     }
     @Test fun everyThemeKeepsTheListeningLeadAndToolTargetsUsable() {

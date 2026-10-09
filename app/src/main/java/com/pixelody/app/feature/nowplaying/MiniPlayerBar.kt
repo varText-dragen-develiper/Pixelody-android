@@ -46,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -643,7 +644,7 @@ internal fun MiniPlayerBar(
                             .weight(1f)
                             .combinedClickable(
                                 onClickLabel = "Open full player for ${track.title}",
-                                onLongClickLabel = "Quick hardware console router",
+                                onLongClickLabel = "Open listening tools",
                                 role = Role.Button,
                                 onClick = {
                                     haptic.performTick()
@@ -702,6 +703,15 @@ internal fun MiniPlayerBar(
                                 )
                             }
                         }
+                        // The artwork/title remains one large tap target; the quiet arrow
+                        // makes opening the player visible without crowding transport.
+                        Spacer(modifier = Modifier.width(4.dp))
+                        PixelodyTransportGlyph(
+                            glyph = TransportGlyphType.ChevronDown,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            sizeDp = 16,
+                            modifier = Modifier.graphicsLayer { rotationZ = 180f }
+                        )
                     }
 
                     Spacer(modifier = Modifier.width(6.dp))

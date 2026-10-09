@@ -1,5 +1,6 @@
 package com.pixelody.app.data.storage
 
+import com.pixelody.app.core.playback.EqualizerRuntimeState
 import android.content.Context
 import android.content.SharedPreferences
 import com.pixelody.app.data.model.AcousticChamberPreset
@@ -18,6 +19,23 @@ class MobileEqualizerStore(private val prefs: SharedPreferences) {
     constructor(context: Context) : this(
         context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
     )
+
+    fun loadRuntimeState(): EqualizerRuntimeState = runCatching {
+        val state = JSONObject(prefs.getString(KEY_EQ_RUNTIME, "{}") ?: "{}")
+        EqualizerRuntimeState(active = state.optBoolean("active"), audioSessionId = state.optInt("session"),
+            platformBandCount = state.optInt("bands"), engine = state.optString("engine"),
+            appliedGainsDb = state.optJSONArray("gains")?.let { array ->
+                (0 until array.length()).map { array.optDouble(it).toFloat() }
+            } ?: emptyList(), isMasteringActive = state.optBoolean("mastering"),
+            isSpatialActive = state.optBoolean("spatial"), message = state.optString("message", "Waiting for playback"))
+    }.getOrDefault(EqualizerRuntimeState())
+
+    fun saveRuntimeState(state: EqualizerRuntimeState) {
+        prefs.edit().putString(KEY_EQ_RUNTIME, JSONObject().put("active", state.active)
+            .put("session", state.audioSessionId).put("bands", state.platformBandCount)
+            .put("mastering", state.isMasteringActive).put("spatial", state.isSpatialActive)
+            .put("engine", state.engine).put("gains", JSONArray(state.appliedGainsDb)).put("message", state.message).toString()).apply()
+    }
 
     fun loadGlobalProfile(): EqualizerProfile {
         val raw = prefs.getString(KEY_GLOBAL_EQ, null) ?: return EqualizerProfile()
@@ -256,6 +274,7 @@ class MobileEqualizerStore(private val prefs: SharedPreferences) {
 
     companion object {
         const val PREFERENCES_NAME = "pixelody_mobile_settings"
+        const val KEY_EQ_RUNTIME = "equalizer_runtime_state"
         const val KEY_GLOBAL_EQ = "equalizer_global_profile"
         const val KEY_TRACK_EQ = "equalizer_track_profiles"
         const val KEY_GLOBAL_MASTERING = "mastering_global_profile"

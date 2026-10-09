@@ -2,6 +2,7 @@ package com.pixelody.app.data.storage
 
 import android.content.SharedPreferences
 import com.pixelody.app.data.model.Track
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -9,6 +10,16 @@ import org.junit.Before
 import org.junit.Test
 
 class TrackMetadataStoreTest {
+    @Test fun resetClearsPersistedAndLiveEditsAndReturnsOriginalMetadata() {
+        val prefs = FakeSharedPreferences()
+        val store = TrackMetadataStore(prefs)
+        store.saveOverride(TrackMetadataOverride("track_1", title = "Test title"))
+        store.clearAllOverrides()
+        assertTrue(store.overridesFlow.value.isEmpty())
+        assertTrue(prefs.all.isEmpty())
+        assertEquals(sampleTrack().title, store.applyOverride(sampleTrack()).title)
+    }
+
 
     private class FakeSharedPreferences : SharedPreferences {
         private val data = mutableMapOf<String, Any?>()

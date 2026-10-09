@@ -105,6 +105,6 @@ fun classifyPlaybackFailure(
     responseCode == 416 -> PlaybackFailure("The host rejected the seek range. Restart the track and try again.")
     mediaErrorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
         mediaErrorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ->
-        PlaybackFailure("Media connection was lost. Check Wi-Fi and that the saved host address is still current, then retry.")
+        PlaybackFailure("Desktop connection was lost.", connectionState = HostConnectionState.HostUnavailable)
     else -> PlaybackFailure("Playback failed ($mediaErrorName). Retry the track or refresh the host connection.")
 }

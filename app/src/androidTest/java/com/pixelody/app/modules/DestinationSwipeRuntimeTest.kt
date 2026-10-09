@@ -17,7 +17,6 @@ import com.pixelody.app.data.storage.CrateStore
 import com.pixelody.app.data.storage.MobileSettingsStore
 import com.pixelody.app.ui.theme.PixelodyMobileTheme
 import java.io.File
-import java.util.regex.Pattern
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -110,10 +109,26 @@ class DestinationSwipeRuntimeTest {
             }.firstOrNull() ?: error("Missing horizontal playlist scroller")
             val bounds = row.visibleBounds
             val rowY = bounds.centerY()
-            fun visibleLabels() = device.findObjects(By.text(Pattern.compile(".+"))).filter {
-                val r = it.visibleBounds
-                r.top >= bounds.top && r.bottom <= bounds.bottom
-            }.map { it.text to it.visibleBounds.left }
+            fun visibleLabels(): List<Pair<String, Int>> {
+                if (android.os.Build.VERSION.SDK_INT >= 33) InstrumentationRegistry.getInstrumentation().uiAutomation.clearCache()
+                val output = java.io.ByteArrayOutputStream()
+                device.dumpWindowHierarchy(output)
+                val parser = android.util.Xml.newPullParser()
+                parser.setInput(java.io.ByteArrayInputStream(output.toByteArray()), "UTF-8")
+                val labels = mutableListOf<Pair<String, Int>>()
+                while (parser.eventType != org.xmlpull.v1.XmlPullParser.END_DOCUMENT) {
+                    if (parser.eventType == org.xmlpull.v1.XmlPullParser.START_TAG && parser.name == "node") {
+                        val text = parser.getAttributeValue(null, "text").orEmpty()
+                        val coordinates = Regex("[0-9]+").findAll(parser.getAttributeValue(null, "bounds").orEmpty())
+                            .map { it.value.toInt() }.toList()
+                        if (text.isNotBlank() && coordinates.size == 4 && coordinates[1] >= bounds.top && coordinates[3] <= bounds.bottom) {
+                            labels += text to coordinates[0]
+                        }
+                    }
+                    parser.next()
+                }
+                return labels
+            }
             val beforeLabels = visibleLabels()
             assertTrue("Need visible shelf labels", beforeLabels.isNotEmpty())
             device.swipe(device.displayWidth * 3 / 4, rowY, device.displayWidth / 2, rowY, 40)
