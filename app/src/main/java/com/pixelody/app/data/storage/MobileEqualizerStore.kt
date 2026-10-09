@@ -191,9 +191,9 @@ class MobileEqualizerStore(private val prefs: SharedPreferences) {
     // --- Spatial Acoustic Chamber Settings ---
 
     fun loadSpatialSettings(): SpatialChamberSettings {
-        val raw = prefs.getString(KEY_SPATIAL_SETTINGS, null) ?: return SpatialChamberSettings()
+        val raw = prefs.getString(KEY_SPATIAL_SETTINGS, null) ?: return SpatialChamberSettings(isEnabled = false)
         return runCatching { spatialSettingsFromJson(JSONObject(raw)) }
-            .getOrDefault(SpatialChamberSettings())
+            .getOrDefault(SpatialChamberSettings(isEnabled = false))
     }
 
     fun saveSpatialSettings(settings: SpatialChamberSettings) {

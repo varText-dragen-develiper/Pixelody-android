@@ -60,7 +60,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pixelody.app.core.playback.FlowShuffleMode
-import com.pixelody.app.core.playback.HarmonicKeyEngine
+import com.pixelody.app.core.playback.FlowBrowseFilter
 import com.pixelody.app.data.model.EqualizerProfile
 import com.pixelody.app.data.model.LibrarySnapshot
 import com.pixelody.app.data.model.RepeatMode
@@ -425,7 +425,8 @@ internal fun MiniPlayerBar(
     onOpenPlayerToView: ((String) -> Unit)? = null,
     positionMsProvider: (() -> Long)? = null,
     experienceMode: com.pixelody.app.data.model.AppExperienceMode = com.pixelody.app.data.model.AppExperienceMode.Essential,
-    playbackError: String = ""
+    playbackError: String = "",
+    embeddedInDock: Boolean = false
 ) {
     if (track == null) return
     val effectivePositionMsProvider = positionMsProvider ?: { positionMs }
@@ -453,7 +454,7 @@ internal fun MiniPlayerBar(
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f))
+                .background(if (embeddedInDock && offsetX.value == 0f) Color.Transparent else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f))
                 .padding(horizontal = 16.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -536,10 +537,10 @@ internal fun MiniPlayerBar(
 
         // Draggable Foreground Player Surface
         Surface(
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
-            tonalElevation = 4.dp,
+            color = if (embeddedInDock) Color.Transparent else MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+            tonalElevation = if (embeddedInDock) 0.dp else 4.dp,
             shape = theme.compactSurfaceShape(),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.20f)),
+            border = if (embeddedInDock) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.20f)),
             modifier = Modifier
                 .fillMaxWidth()
                 .offset { IntOffset(offsetX.value.roundToInt(), 0) }
@@ -679,9 +680,9 @@ internal fun MiniPlayerBar(
                             }
                             val harmonicTag = remember(track, nextTrack) {
                                 if (nextTrack != null) {
-                                    val deckA = HarmonicKeyEngine.estimateTrackTelemetry(track)
-                                    val deckB = HarmonicKeyEngine.estimateTrackTelemetry(nextTrack)
-                                    "[${deckA.key.code}->${deckB.key.code}]"
+                                    val left = FlowBrowseFilter.knownKey(track)
+                                    val right = FlowBrowseFilter.knownKey(nextTrack)
+                                    if (left != null && right != null) "[${left.code}->${right.code}]" else null
                                 } else null
                             }
                             if (experienceMode == com.pixelody.app.data.model.AppExperienceMode.Essential && playbackError.isBlank()) {

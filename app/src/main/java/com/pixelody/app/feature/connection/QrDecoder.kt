@@ -5,9 +5,12 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.BinaryBitmap
 import com.google.zxing.DecodeHintType
 import com.google.zxing.MultiFormatReader
-import com.google.zxing.NotFoundException
+import com.google.zxing.LuminanceSource
+import com.google.zxing.ReaderException
 import com.google.zxing.PlanarYUVLuminanceSource
 import com.google.zxing.common.HybridBinarizer
+import com.google.zxing.common.GlobalHistogramBinarizer
+import java.nio.ByteBuffer
 
 /** Reads QR codes from camera frames with ZXing. Not thread-safe; use from one analysis thread. */
 internal class QrDecoder {
@@ -23,22 +26,30 @@ internal class QrDecoder {
     /** Returns the decoded QR text, or null when no QR code is in the frame. */
     fun decode(image: ImageProxy): String? {
         val plane = image.planes.firstOrNull() ?: return null
-        val width = image.width
-        val height = image.height
-        val buffer = plane.buffer
-        val rowStride = plane.rowStride
-        val luma = ByteArray(width * height)
-        for (row in 0 until height) {
-            buffer.position(row * rowStride)
-            buffer.get(luma, row * width, width)
-        }
-        val (data, w, h) = rotate(luma, width, height, image.imageInfo.rotationDegrees)
+        val crop = image.cropRect
+        val luma = copyQrLuminance(
+            plane.buffer, plane.rowStride, plane.pixelStride,
+            crop.left, crop.top, crop.width(), crop.height()
+        )
+        return decodeLuminance(luma, crop.width(), crop.height(), image.imageInfo.rotationDegrees)
+    }
+
+    internal fun decodeLuminance(luma: ByteArray, width: Int, height: Int, rotationDegrees: Int = 0): String? {
+        val (data, w, h) = rotate(luma, width, height, rotationDegrees)
         val source = PlanarYUVLuminanceSource(data, w, h, 0, 0, w, h, false)
+        // Local thresholding handles shadows; global thresholding helps a flat
+        // monitor image. Inversion also permits light modules on dark surfaces.
+        return decodeSource(source) ?: decodeSource(source.invert())
+    }
+
+    private fun decodeSource(source: LuminanceSource): String? =
+        decodeBitmap(BinaryBitmap(HybridBinarizer(source)))
+            ?: decodeBitmap(BinaryBitmap(GlobalHistogramBinarizer(source)))
+
+    private fun decodeBitmap(bitmap: BinaryBitmap): String? {
         return try {
-            reader.decodeWithState(BinaryBitmap(HybridBinarizer(source))).text
-        } catch (_: NotFoundException) {
-            null
-        } catch (_: com.google.zxing.ReaderException) {
+            reader.decodeWithState(bitmap).text
+        } catch (_: ReaderException) {
             null
         } finally {
             reader.reset()
@@ -64,6 +75,27 @@ internal class QrDecoder {
             else -> Triple(src, w, h)
         }
     }
+}
+
+/** Copy the visible Y plane without changing the camera buffer's position. */
+internal fun copyQrLuminance(
+    buffer: ByteBuffer, rowStride: Int, pixelStride: Int,
+    left: Int, top: Int, width: Int, height: Int
+): ByteArray {
+    require(rowStride > 0 && pixelStride > 0 && left >= 0 && top >= 0 && width > 0 && height > 0)
+    val source = buffer.duplicate()
+    val start = source.position()
+    val luma = ByteArray(width * height)
+    for (y in 0 until height) {
+        val offset = start + (top + y) * rowStride + left * pixelStride
+        if (pixelStride == 1) {
+            source.position(offset)
+            source.get(luma, y * width, width)
+        } else {
+            for (x in 0 until width) luma[y * width + x] = source.get(offset + x * pixelStride)
+        }
+    }
+    return luma
 }
 
 internal fun String.payloadCandidates(): List<String> =

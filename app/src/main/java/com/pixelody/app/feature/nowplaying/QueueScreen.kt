@@ -18,7 +18,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -26,43 +25,30 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.pixelody.app.core.playback.FlowShuffleMode
-import com.pixelody.app.core.playback.HarmonicFlowCoordinator
 import com.pixelody.app.core.playback.QueueUndoState
 import com.pixelody.app.core.playback.ShuffledTrackEntry
 import com.pixelody.app.data.model.CamelotKey
 import com.pixelody.app.data.model.EqualizerProfile
-import com.pixelody.app.data.model.HarmonicFlowProfile
 import com.pixelody.app.data.model.LibrarySnapshot
 import com.pixelody.app.data.model.LiveState
 import com.pixelody.app.data.model.Track
 import com.pixelody.app.ui.components.EmptyState
-import com.pixelody.app.ui.components.HarmonicFlowProfilePicker
-import com.pixelody.app.ui.components.HarmonicGpsDestinationSheet
-import com.pixelody.app.ui.components.HarmonicTrajectorySculptor
-import com.pixelody.app.ui.components.HarmonicTrajectorySparkline
 import com.pixelody.app.ui.components.PixelodyTransportGlyph
-import com.pixelody.app.ui.components.QueueSlotHarmonicRibbon
 import com.pixelody.app.ui.components.QueueUndoPill
 import com.pixelody.app.ui.components.ScreenHeader
 import com.pixelody.app.ui.components.SectionCard
 import com.pixelody.app.ui.components.TrackRow
 import com.pixelody.app.ui.components.TransportGlyphType
-import com.pixelody.app.ui.components.performConfirm
 import com.pixelody.app.ui.components.performTick
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.sp
 import com.pixelody.app.ui.theme.LocalPixelodyThemeVariant
 
 @Composable
@@ -76,6 +62,8 @@ internal fun QueueScreen(
     isLocalQueue: Boolean,
     isPlaying: Boolean = false,
     shuffleMode: FlowShuffleMode = FlowShuffleMode.Off,
+    flowKey: CamelotKey? = null,
+    flowBpm: Float? = null,
     plannedEntries: List<ShuffledTrackEntry> = emptyList(),
     onToggleShuffle: () -> Unit = {},
     onReshuffle: () -> Unit = {},
@@ -102,10 +90,7 @@ internal fun QueueScreen(
 ) {
     val haptic = LocalHapticFeedback.current
     val theme = LocalPixelodyThemeVariant.current
-    var flowProfile by remember { mutableStateOf(HarmonicFlowProfile.DeepListening) }
-    var showGpsSheet by remember { mutableStateOf(false) }
     val plannedMap = remember(plannedEntries) { plannedEntries.associate { it.track.id to it.cue } }
-    val slotAffinities = remember(queue) { HarmonicFlowCoordinator.calculateQueueRoadmap(queue) }
 
     Surface(
         modifier = Modifier
@@ -163,94 +148,8 @@ internal fun QueueScreen(
                         }
                     }
                 }
-            if (queue.size >= 2 && experienceMode == com.pixelody.app.data.model.AppExperienceMode.Studio) {
-                item {
-                    HarmonicTrajectorySculptor(
-                        queue = queue,
-                        selectedTrackId = selectedTrack?.id,
-                        onApplySculptedQueue = onReorderQueue,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-                        onShowDoc = onShowDoc
-                    )
-                }
-            }
-            if (experienceMode == com.pixelody.app.data.model.AppExperienceMode.Studio) item {
-                SectionCard(
-                    title = "Harmonic Flow & Progression",
-                    subtitle = "Profile: ${flowProfile.title} • ${flowProfile.subtitle}"
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        HarmonicFlowProfilePicker(
-                            activeProfile = flowProfile,
-                            onSelectProfile = {
-                                flowProfile = it
-                                HarmonicFlowCoordinator.setProfile(it)
-                            }
-                        )
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            FilterChip(
-                                selected = shuffleMode != FlowShuffleMode.Off,
-                                onClick = {
-                                    haptic.performTick()
-                                    onToggleShuffle()
-                                },
-                                shape = theme.plate,
-                                label = { Text(if (shuffleMode != FlowShuffleMode.Off) shuffleMode.badge else "Shuffle Off") }
-                            )
-
-                            OutlinedButton(
-                                onClick = {
-                                    haptic.performTick()
-                                    showGpsSheet = true
-                                },
-                                shape = theme.plate
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    PixelodyTransportGlyph(
-                                        glyph = TransportGlyphType.Sparkle,
-                                        color = Color(0xFF38BDF8),
-                                        size = 14.dp
-                                    )
-                                    Text("GPS", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color(0xFF38BDF8))
-                                }
-                            }
-
-                            Button(
-                                onClick = {
-                                    haptic.performConfirm()
-                                    val optimized = HarmonicFlowCoordinator.optimizeQueueHarmonicFlow(
-                                        queue = queue,
-                                        anchorTrackId = selectedTrack?.id,
-                                        energyMode = flowProfile.energyMode
-                                    )
-                                    onReorderQueue(optimized)
-                                },
-                                shape = theme.plate,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    PixelodyTransportGlyph(
-                                        glyph = TransportGlyphType.FlowShuffle,
-                                        color = Color.Black,
-                                        size = 14.dp
-                                    )
-                                    Text("AUTO-SMOOTH", fontWeight = FontWeight.Black, fontSize = 11.sp)
-                                }
-                            }
-                        }
-                    }
-                }
+            item {
+                FlowEntry(shuffleMode, flowKey, flowBpm, onToggleShuffle)
             }
             if (!isLocalQueue && snapshot != null) {
                 item {
@@ -287,7 +186,7 @@ internal fun QueueScreen(
             if ((!isLocalQueue && snapshot == null) || queue.isEmpty()) {
                 item { EmptyState(text = "No queue is available.") }
             } else {
-                itemsIndexed(queue, key = { _, track -> track.id }) { index, track ->
+                itemsIndexed(queue, key = { index, track -> "$index-${track.id}" }) { index, track ->
                     val cue = plannedMap[track.id]
                     Column {
                         Row(
@@ -297,7 +196,7 @@ internal fun QueueScreen(
                             Box(modifier = Modifier.weight(1f)) {
                                 TrackRow(
                                     track = track,
-                                    selected = selectedTrack?.id == track.id,
+                                    selected = false,
                                     onClick = { onPlayTrack(track) },
                                     transitionCue = cue,
                                     isPlaying = isPlaying && selectedTrack?.id == track.id,
@@ -319,7 +218,7 @@ internal fun QueueScreen(
                                 shape = theme.plate,
                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                                 modifier = Modifier.padding(start = 4.dp, end = 8.dp).size(48.dp)
-                                    .semantics { contentDescription = "Remove ${track.title} from queue" }
+                                    .semantics { contentDescription = "Remove ${track.title} from queue, position ${index + 1}" }
                             ) {
                                 Box(
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
@@ -338,24 +237,7 @@ internal fun QueueScreen(
                                 Text("Add to host queue")
                             }
                         }
-                        if (experienceMode == com.pixelody.app.data.model.AppExperienceMode.Studio && index < queue.size - 1 && index < slotAffinities.size) {
-                            QueueSlotHarmonicRibbon(
-                                affinity = slotAffinities[index],
-                                onInsertBridge = { _, _ ->
-                                    val pool = snapshot?.tracks.orEmpty()
-                                    if (pool.isNotEmpty() && index + 1 < queue.size) {
-                                        val bridgeCandidates = HarmonicFlowCoordinator.findHarmonicBridgeTracks(
-                                            fromTrack = track,
-                                            toTrack = queue[index + 1],
-                                            candidatePool = pool
-                                        )
-                                        if (bridgeCandidates.isNotEmpty()) {
-                                            onInsertBridgeTracks(bridgeCandidates.take(1), index + 1)
-                                        }
-                                    }
-                                }
-                            )
-                        }
+
                     }
                 }
             }
@@ -373,22 +255,7 @@ internal fun QueueScreen(
             )
         }
 
-        if (showGpsSheet) {
-            val origin = selectedTrack ?: queue.firstOrNull() ?: snapshot?.tracks?.firstOrNull()
-            if (origin != null) {
-                HarmonicGpsDestinationSheet(
-                    originTrack = origin,
-                    libraryPool = snapshot?.tracks ?: queue,
-                    onDismiss = { showGpsSheet = false },
-                    onApplyRouteToQueue = { journeyTracks ->
-                        onReorderQueue(journeyTracks)
-                        showGpsSheet = false
-                    }
-                )
-            } else {
-                showGpsSheet = false
-            }
-        }
+
     }
 }
 }

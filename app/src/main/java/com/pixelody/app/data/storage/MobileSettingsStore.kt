@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.pixelody.app.data.model.AppExperienceMode
 import com.pixelody.app.ui.brand.PixelodyLogoColor
+import com.pixelody.app.ui.brand.LogoPreferences
 import com.pixelody.app.ui.theme.PixelodyMobileTheme
 import com.pixelody.app.ui.theme.AppearanceSettings
 import com.pixelody.app.ui.theme.StylePalette
@@ -64,13 +65,23 @@ class MobileSettingsStore(private val prefs: SharedPreferences) {
     fun loadLogoColor(): PixelodyLogoColor = PixelodyLogoColor.fromKey(prefs.getString(KEY_LOGO_COLOR, null))
 
     fun saveLogoColor(color: PixelodyLogoColor) {
-        prefs.edit().putString(KEY_LOGO_COLOR, color.key).apply()
+        prefs.edit().putString(KEY_LOGO_COLOR, color.key).putBoolean(KEY_LOGO_FOLLOWS_THEME, false).apply()
     }
 
-    fun loadLogoFollowsTheme(): Boolean = prefs.getBoolean(KEY_LOGO_FOLLOWS_THEME, true)
+    fun loadLogoFollowsTheme(): Boolean = prefs.getBoolean(KEY_LOGO_FOLLOWS_THEME, !prefs.contains(KEY_LOGO_COLOR))
 
     fun saveLogoFollowsTheme(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_LOGO_FOLLOWS_THEME, enabled).apply()
+    }
+
+    fun loadLogoPreferences() = LogoPreferences(loadLogoColor(), loadLogoFollowsTheme())
+
+    fun observeLogoPreferences(onChange: (LogoPreferences) -> Unit): () -> Unit {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == null || key == KEY_LOGO_COLOR || key == KEY_LOGO_FOLLOWS_THEME) onChange(loadLogoPreferences())
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        return { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
 
     fun loadStorageQuotaBytes(): Long {

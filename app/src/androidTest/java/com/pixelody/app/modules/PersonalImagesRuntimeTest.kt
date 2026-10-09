@@ -131,7 +131,7 @@ class PersonalImagesRuntimeTest {
             var colored = 0
             for (y in 0 until shot.height step 4) for (x in 0 until shot.width step 4) {
                 val pixel = shot.getPixel(x, y)
-                if (android.graphics.Color.red(pixel) in 42..50 && android.graphics.Color.blue(pixel) in 42..50 && android.graphics.Color.green(pixel) < 5) colored++
+                if (android.graphics.Color.red(pixel) > 40 && android.graphics.Color.blue(pixel) > 40 && android.graphics.Color.red(pixel) > android.graphics.Color.green(pixel) + 20 && android.graphics.Color.blue(pixel) > android.graphics.Color.green(pixel) + 20) colored++
             }
             shot.recycle(); assertTrue("Dimmed chosen background painted", colored > 200)
             // Select a playlist picture through its menu, then verify the same key paints its Home card.

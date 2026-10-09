@@ -18,6 +18,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
+import com.pixelody.app.ui.components.LocalPagePosition
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -68,8 +73,8 @@ import com.pixelody.app.ui.navigation.PixelodyPaneLayout
 object BaseLayerBands {
     val Identity: Dp = 72.dp
     val SurfaceActions: Dp = 64.dp
-    val ListeningSlot: Dp = 80.dp
-    val Destinations: Dp = 72.dp
+    val ListeningSlot: Dp = 68.dp
+    val Destinations: Dp = 64.dp
     val NavigationRailWidth: Dp = 80.dp
 }
 
@@ -84,8 +89,16 @@ fun BaseLayerScaffold(
     sidePane: (@Composable () -> Unit)? = null,
     railDestinations: (@Composable ColumnScope.() -> Unit)? = null,
     contentModifier: Modifier = Modifier,
+    backdropOpacity: Float = 1f,
+    selectedDestination: BaseDestination = BaseDestination.Home,
     content: @Composable () -> Unit
 ) {
+    // Lives above destination content, so disposing a page cannot reset its marker animation.
+    val pagePosition = animateFloatAsState(
+        targetValue = when (selectedDestination) { BaseDestination.Home -> 0f; BaseDestination.Search -> 1f; BaseDestination.Library -> 2f },
+        animationSpec = tween(280, easing = FastOutSlowInEasing),
+        label = "Page position"
+    )
     val listeningHeight = BaseLayerBands.ListeningSlot + (40f * (LocalDensity.current.fontScale - 1f).coerceAtLeast(0f)).dp
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val paneLayout = paneLayoutOverride ?: PixelodyAdaptivePolicy.forWindow(
@@ -105,7 +118,8 @@ fun BaseLayerScaffold(
                 Column(
                     modifier = Modifier
                         .width(BaseLayerBands.NavigationRailWidth)
-                        .fillMaxHeight(),
+                        .fillMaxHeight()
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically)
                 ) {
@@ -150,7 +164,7 @@ fun BaseLayerScaffold(
                             .weight(1f)
                             .then(contentModifier)
                     ) {
-                        content()
+                        CompositionLocalProvider(LocalPagePosition provides pagePosition) { content() }
                     }
 
                     if (surfaceActions != null) {
@@ -172,6 +186,7 @@ fun BaseLayerScaffold(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(listeningHeight)
+                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.75f))
                         ) {
                             listeningSlot()
                         }
@@ -185,6 +200,7 @@ fun BaseLayerScaffold(
                         modifier = Modifier
                             .width(360.dp)
                             .fillMaxHeight()
+                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
                     ) {
                         sidePane?.invoke() ?: listeningSlot()
                     }
@@ -196,7 +212,6 @@ fun BaseLayerScaffold(
                 modifier = Modifier
                     .fillMaxSize()
                     .statusBarsPadding()
-                    .navigationBarsPadding()
             ) {
                 if (identity != null) {
                     Row(
@@ -217,7 +232,7 @@ fun BaseLayerScaffold(
                         .weight(1f)
                         .then(contentModifier)
                 ) {
-                    content()
+                    CompositionLocalProvider(LocalPagePosition provides pagePosition) { content() }
                     if (identity == null) {
                         Box(
                             modifier = Modifier
@@ -249,22 +264,16 @@ fun BaseLayerScaffold(
                     )
                 }
 
-                BandRule()
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(listeningHeight)
-                ) {
-                    listeningSlot()
+                // One anchored dock shares a scrim between transport and navigation.
+                Column(Modifier.fillMaxWidth().background(Brush.verticalGradient(listOf(
+                    MaterialTheme.colorScheme.surface.copy(alpha = 0.50f + 0.25f * backdropOpacity),
+                    MaterialTheme.colorScheme.surface.copy(alpha = 0.68f + 0.18f * backdropOpacity)
+                ))).navigationBarsPadding()) {
+                    BandRule()
+                    Box(Modifier.fillMaxWidth().height(listeningHeight)) { listeningSlot() }
+                    BandRule()
+                    Row(Modifier.fillMaxWidth().height(BaseLayerBands.Destinations), content = destinations)
                 }
-
-                BandRule()
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(BaseLayerBands.Destinations),
-                    content = destinations
-                )
             }
         }
     }
@@ -304,7 +313,8 @@ fun ListeningSlot(
     onOpenPlayer: () -> Unit,
     onSessionTray: () -> Unit,
     modifier: Modifier = Modifier,
-    transport: @Composable RowScope.() -> Unit = {}
+    transport: @Composable RowScope.() -> Unit = {},
+    embeddedInDock: Boolean = false
 ) {
     val openable = state !is ListeningSlotState.Silent
     val clickLabel = when (state) {
@@ -369,9 +379,9 @@ fun ListeningSlot(
                 onClick = { if (openable) onOpenPlayer() }
             ),
         shape = slotShape,
-        color = slotColor,
-        border = slotBorder,
-        tonalElevation = 4.dp
+        color = if (embeddedInDock) Color.Transparent else slotColor,
+        border = if (embeddedInDock) null else slotBorder,
+        tonalElevation = if (embeddedInDock) 0.dp else 4.dp
     ) {
         Row(
             modifier = Modifier

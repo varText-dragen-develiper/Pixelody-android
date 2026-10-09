@@ -101,7 +101,7 @@ class StudioHierarchyRuntimeTest {
         assertFalse(device.hasObject(By.textContains("HARMONIC CAMELOT DIGGING LENS")))
         capture("library-quiet")
         tap("Library controls")
-        find("HARMONIC CAMELOT DIGGING LENS")
+        find("Flow ·")
         capture("library-tools")
         open("library")
         tap("Library controls")
@@ -111,23 +111,16 @@ class StudioHierarchyRuntimeTest {
         assertFalse(device.hasObject(By.textContains("HARMONIC CAMELOT DIGGING LENS")))
         capture("library-filter-summary")
     }
-    @Test fun playerKeepsSoundCabinetsAndTheirSelectionsWhenClosed() {
+    @Test fun playerKeepsSimpleEqualizerReachable() {
         open("player")
-        find("Sound tools")
-        assertFalse(device.hasObject(By.textContains("STUDIO EXPANSIONS & CABINETS")))
+        assertFalse(device.hasObject(By.textContains("Sound tools")))
         capture("player-quiet")
-        tap("Sound tools")
-        find("STUDIO EXPANSIONS & CABINETS")
-        tap("STUDIO MASTERING & PARAMETRIC EQ")
-        capture("mastering-after-open")
-        find("Mastering Rack")
-        capture("player-tools")
-        tap("Sound tools")
-        assertTrue(device.wait(Until.gone(By.textContains("STUDIO EXPANSIONS & CABINETS")), 4000))
-        find("EQ")
-        tap("Sound tools")
-        find("Mastering Rack")
+        device.wait(Until.findObject(By.desc("Open equalizer")), 5000)!!.click()
+        find("Equalizer")
+        capture("player-equalizer")
+        tap("Done")
     }
+
     @Test fun albumsOpenTheirTracksFromBothStudioViewsAndEssential() {
         listOf("deck", "shelf", "essential").forEach { view ->
             MobileSettingsStore(context).saveExperienceMode(

@@ -456,6 +456,8 @@ class PixelodyHostApiClient {
 }
 
 internal fun hostApiErrorMessage(statusCode: Int, code: String): String = when (code) {
+    "pairing_not_found", "pairing_expired" -> "This pairing invite expired or was already used. Create a fresh QR code in the Windows J.A.M. drawer."
+    "pairing_secret_invalid" -> "The pairing invite was rejected. Create a fresh QR code in the Windows J.A.M. drawer."
     "auth_required" -> "This request needs a trusted-device credential. Pair with the host first."
     "auth_invalid" -> "The saved credential is not valid. Pair again with a fresh invite."
     "auth_expired" -> "This trusted-device credential expired. Ask the host owner for a fresh invite."
@@ -471,9 +473,22 @@ internal fun hostApiErrorMessage(statusCode: Int, code: String): String = when (
     }
 }
 
+/** Show structured recovery guidance without echoing URLs, tokens or raw server text. */
+internal fun hostConnectionFailureMessage(error: Throwable): String = when (error) {
+    is HostApiException -> hostApiErrorMessage(error.statusCode, error.code)
+    is HostNetworkException -> when (error.connectionState) {
+        HostConnectionState.NetworkUnavailable -> "No route to your desktop. Check Wi-Fi or the private network, then scan a fresh invite. Your phone music is still available."
+        else -> "Your desktop is not responding. Start J.A.M. private-network hosting and check Windows Firewall, then try again. Your phone music is still available."
+    }
+    else -> error.cause?.takeIf { it !== error }?.let(::hostConnectionFailureMessage)
+        ?: "Couldn't connect to your desktop. Check that Pixelody is open and both devices can reach the same network, then try again. Your phone music is still available."
+}
+
 internal fun connectionStateFor(error: Throwable): HostConnectionState = when (error) {
     is HostNetworkException -> error.connectionState
     is HostApiException -> when (error.code) {
+        "pairing_expired", "pairing_not_found" -> HostConnectionState.CredentialExpired
+        "pairing_secret_invalid" -> HostConnectionState.AuthFailed
         "auth_expired" -> HostConnectionState.CredentialExpired
         "auth_revoked" -> HostConnectionState.Revoked
         "auth_required", "auth_invalid" -> HostConnectionState.AuthFailed

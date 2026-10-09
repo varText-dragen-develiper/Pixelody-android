@@ -82,4 +82,24 @@ class CoverModelsTest {
         assertEquals("kept", onlyOld.noteFor(playlistCoverKey("p2")))
         assertEquals("file:///old.jpg", onlyOld.imageFor(playlistCoverKey("p2"), null))
     }
+    @Test fun opacitySurvivesImageResetAndRestartWithoutChangingOtherCovers() {
+        val book = CoverBook().withImage(ScreenBackground.Home.key, "file:///home.jpg")
+            .withBackgroundOpacity(ScreenBackground.Home, 0.7f)
+            .withImage(playlistCoverKey("p"), "file:///playlist.jpg")
+        val reset = CoverCodec.decode(CoverCodec.encode(book.withImage(ScreenBackground.Home.key, null)))
+        assertEquals(0.7f, reset.backgroundOpacityFor(ScreenBackground.Home), 0f)
+        assertEquals("file:///playlist.jpg", reset.imageFor(playlistCoverKey("p"), null))
+        assertEquals(1f, reset.backgroundOpacityFor(ScreenBackground.Search), 0f)
+    }
+
+    @Test fun previousImagesKeepTheirSubtleDefaultAndOpacityRejectsInvalidValues() {
+        val old = CoverCodec.decode("v1\nbackground:home|file:///old.jpg|")
+        assertEquals(0.6f, old.backgroundOpacityFor(ScreenBackground.Home), 0f)
+        assertEquals(0f, old.withBackgroundOpacity(ScreenBackground.Home, -1f).backgroundOpacityFor(ScreenBackground.Home), 0f)
+        assertEquals(1f, old.withBackgroundOpacity(ScreenBackground.Home, 2f).backgroundOpacityFor(ScreenBackground.Home), 0f)
+        assertEquals(0.6f, old.withBackgroundOpacity(ScreenBackground.Home, Float.NaN).backgroundOpacityFor(ScreenBackground.Home), 0f)
+        val corrupt = CoverCodec.decode("v1\nbackground:search|||Infinity\nbackground:home|||0.6")
+        assertEquals(1f, corrupt.backgroundOpacityFor(ScreenBackground.Search), 0f)
+        assertEquals(0.6f, corrupt.backgroundOpacityFor(ScreenBackground.Home), 0f)
+    }
 }

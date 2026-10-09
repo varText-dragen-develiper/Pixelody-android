@@ -93,6 +93,7 @@ import com.pixelody.app.ui.theme.units.toItemData
 import com.pixelody.app.ui.theme.LocalPixelodyThemeVariant
 import com.pixelody.app.ui.components.CompactTrackPill
 import com.pixelody.app.ui.components.HomeSectionHeader
+import com.pixelody.app.ui.components.PageIdentity
 import com.pixelody.app.ui.components.PixelodyNavGlyph
 import com.pixelody.app.ui.components.PixelodyTransportGlyph
 import com.pixelody.app.ui.components.QuickStartTile
@@ -266,17 +267,6 @@ internal fun HomeScreen(
                     moodColorHex = 0xFFE5A93C
                 )
             } else null,
-            if (playablePool.size >= 2) {
-                CuratedSmartCrate(
-                    id = "crate-harmonic-flow",
-                    title = "Harmonic Camelot Flow",
-                    subtitle = "Key-matched melodic transitions",
-                    tag = "FLOW",
-                    glyphType = TransportGlyphType.WaveformBars,
-                    tracks = playablePool.take(9),
-                    moodColorHex = 0xFF38BDF8
-                )
-            } else null,
             if (albumGroups.isNotEmpty()) {
                 val vinylTracks = albumGroups.flatMap { it.second }.take(9)
                 CuratedSmartCrate(
@@ -356,6 +346,18 @@ internal fun HomeScreen(
                 )
             }
         }
+        item(key = "home_access") {
+            HomeAccessPanel(
+                mode = experienceMode, onModeChange = onExperienceModeChange,
+                onOpenFavorites = { onOpenCollection("favorites", "") },
+                onOpenRecent = { onOpenCollection("recent", "") },
+                onOpenLossless = { onOpenCollection("lossless", "") },
+                onOpenPlaylists = { onOpenCollection("playlists", "") },
+                onAddMusic = onOpenDevice,
+                onConnectDesktop = { showConnectionSetup = !showConnectionSetup },
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+        }
         if (startState != HomeStartState.Ready) {
             item(key = "music_setup") {
                 HomeMusicSetupCard(state = startState,
@@ -363,13 +365,6 @@ internal fun HomeScreen(
                     onShowAll = { onSourceScopeChange(SourceScope.All) },
                     onConnectDesktop = { showConnectionSetup = !showConnectionSetup },
                     modifier = Modifier.padding(horizontal = 16.dp))
-            }
-        } else if (experienceMode == AppExperienceMode.Essential) {
-            item(key = "music_sources") {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = onOpenDevice, modifier = Modifier.heightIn(min = 48.dp)) { Text("Add music") }
-                    TextButton(onClick = { showConnectionSetup = !showConnectionSetup }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Connect desktop") }
-                }
             }
         }
         if (showConnectionSetup || qrScannerVisible || isConnecting || error.isNotBlank()) {
@@ -397,6 +392,12 @@ internal fun HomeScreen(
                 )
             }
         }
+        }
+        if (startState == HomeStartState.Ready) item(key = "flow_settings") {
+            TextButton(onClick = onOpenFlowCabinet,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).heightIn(min = 48.dp)) {
+                Text("Flow & shuffle")
+            }
         }
         if (experienceMode == AppExperienceMode.Essential && startState == HomeStartState.Ready) {
             item(key = "essential_play_row", contentType = "essential_play_row") {
@@ -429,16 +430,6 @@ internal fun HomeScreen(
             item(key = "essential_search", contentType = "search_prompt") {
                 Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                     HomeSearchPrompt(onClick = onOpenSearch)
-                }
-            }
-            item(key = "essential_cover_grid", contentType = "essential_cover_grid") {
-                Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                    EssentialCoverGrid(
-                        onOpenFavorites = { onOpenCollection("favorites", "") },
-                        onOpenRecent = { onOpenCollection("recent", "") },
-                        onOpenLossless = { onOpenCollection("lossless", "") },
-                        onOpenPlaylists = { onOpenCollection("playlists", "") }
-                    )
                 }
             }
             if (playlists.isNotEmpty()) {
@@ -833,8 +824,7 @@ internal fun HomeHeroHeader(
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("Your music", style = MaterialTheme.typography.headlineSmall.copy(letterSpacing = 0.sp),
-                    fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onBackground)
+                PageIdentity(PixelodyTab.Home)
                 Text(
                     text = when { connectionState == HostConnectionState.Connected && hostName != null && hostName != "Local Phone / Standalone" -> "Connected to $hostName"; localTrackCount > 0 -> "$localTrackCount songs on this phone"; else -> "Your library starts here" },
                     style = MaterialTheme.typography.bodySmall,
@@ -852,7 +842,6 @@ internal fun HomeHeroHeader(
                 }
             }
         }
-        ExperienceModeToggle(mode = experienceMode, onModeChange = onExperienceModeChange)
     }
 }
 
@@ -1949,13 +1938,31 @@ private fun CoverShelf(
  * picture-and-note menu on long press.
  */
 @Composable
-private fun EssentialCoverGrid(
+private fun HomeAccessPanel(
+    mode: AppExperienceMode,
+    onModeChange: (AppExperienceMode) -> Unit,
+    onAddMusic: () -> Unit,
+    onConnectDesktop: () -> Unit,
+    modifier: Modifier = Modifier,
     onOpenFavorites: () -> Unit,
     onOpenRecent: () -> Unit,
     onOpenLossless: () -> Unit,
     onOpenPlaylists: () -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Surface(modifier = modifier.fillMaxWidth().testTag("home:quick-access"),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = .65f),
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = .3f))) {
+    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween) {
+            Column(Modifier.weight(1f)) {
+                Text("Quick access", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text("Tap the mode to change your tools", style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            ExperienceModeQuickChip(mode, { onModeChange(mode.toggle()) })
+        }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             CoverPill("Liked songs", null, onOpenFavorites, null, Modifier.weight(1f),
                 leading = { PixelodyTransportGlyph(TransportGlyphType.HeartFilled, color = MaterialTheme.colorScheme.primary, sizeDp = 22) })
@@ -1968,6 +1975,13 @@ private fun EssentialCoverGrid(
             CoverPill("Playlists", null, onOpenPlaylists, null, Modifier.weight(1f),
                 leading = { PixelodyTransportGlyph(TransportGlyphType.Folder, color = MaterialTheme.colorScheme.primary, sizeDp = 22) })
         }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            CoverPill("Add music", null, onAddMusic, null, Modifier.weight(1f),
+                leading = { PixelodyTransportGlyph(TransportGlyphType.Folder, color = MaterialTheme.colorScheme.primary, sizeDp = 22) })
+            CoverPill("Desktop", null, onConnectDesktop, null, Modifier.weight(1f),
+                leading = { PixelodyTransportGlyph(TransportGlyphType.MeshNetwork, color = MaterialTheme.colorScheme.primary, sizeDp = 22) })
+        }
+    }
     }
 }
 

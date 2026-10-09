@@ -262,6 +262,30 @@ class MobileSettingsStoreTest {
         assertEquals(com.pixelody.app.ui.theme.AppearanceSettings(), store.loadAppearance())
     }
 
+    @Test fun automaticIconsAreDefaultButManualChoicesPersistAsOverrides() {
+        assertTrue(store.loadLogoFollowsTheme())
+        store.saveLogoColor(com.pixelody.app.ui.brand.PixelodyLogoColor.Grape)
+        assertFalse(store.loadLogoFollowsTheme())
+        store.saveTheme(PixelodyMobileTheme.Obsession)
+        assertFalse(MobileSettingsStore(fakePrefs).loadLogoFollowsTheme())
+        assertEquals(com.pixelody.app.ui.brand.PixelodyLogoColor.Grape, store.loadLogoColor())
+    }
+
+    @Test fun oldManualChoicesRemainExplicitUnlessFollowingWasChosen() {
+        fakePrefs.edit().putString(MobileSettingsStore.KEY_LOGO_COLOR, "electric").apply()
+        assertFalse(store.loadLogoFollowsTheme())
+        fakePrefs.edit().putBoolean(MobileSettingsStore.KEY_LOGO_FOLLOWS_THEME, true).apply()
+        assertTrue(store.loadLogoFollowsTheme())
+    }
+
+    @Test fun followingCanBeTurnedOffWithoutLosingTheSavedLogoColor() {
+        store.saveLogoColor(com.pixelody.app.ui.brand.PixelodyLogoColor.Lavender)
+        store.saveLogoFollowsTheme(true)
+        assertTrue(store.loadLogoFollowsTheme())
+        store.saveLogoFollowsTheme(false)
+        assertEquals(com.pixelody.app.ui.brand.PixelodyLogoColor.Lavender, store.loadLogoColor())
+    }
+
     private class FakeSharedPreferences : SharedPreferences {
         private val map = mutableMapOf<String, Any?>()
 
