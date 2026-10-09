@@ -14,23 +14,32 @@ import org.junit.Test
 class FirstUseRuntimeTest {
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
     private val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+    private fun usable(node: UiObject2?): Boolean {
+        if (node == null) return false
+        val bounds = node.visibleBounds
+        val navigationTop = device.findObjects(By.text("Home")).maxByOrNull { it.visibleBounds.bottom }
+            ?.parent?.visibleBounds?.top?.takeIf { it > device.displayHeight / 2 } ?: device.displayHeight
+        return bounds.width() > 0 && bounds.height() > 0 && bounds.top >= 0 && bounds.bottom < navigationTop
+    }
     private fun text(value: String): UiObject2 {
         var result = device.wait(Until.findObject(By.text(value)), 5000)
         repeat(4) {
-            if (result == null) {
+            if (!usable(result)) {
                 assertEquals("Scroll only the test app", context.packageName, device.currentPackageName)
                 device.swipe(device.displayWidth / 2, device.displayHeight * 3 / 4, device.displayWidth / 2, device.displayHeight / 3, 30)
                 device.waitForIdle()
                 result = device.findObject(By.text(value))
             }
         }
-        return result ?: error("Missing $value")
+        return result?.takeIf { usable(it) } ?: error("Missing visible $value above navigation")
     }
     private fun tap(value: String) {
         assertEquals("Keep the test app in the foreground", context.packageName, device.currentPackageName)
-        var target = text(value)
-        while (!target.isClickable && target.parent != null) target = target.parent
-        target.click()
+        // Compose merges click semantics into ancestors whose bounds can be
+        // stale after a scroll. Tap the visible label, as a person would.
+        val bounds = text(value).visibleBounds
+        check(bounds.width() > 0 && bounds.height() > 0) { "Target is not visible: $value" }
+        device.click(bounds.centerX(), bounds.centerY())
         device.waitForIdle()
     }
     private fun home() {
@@ -58,7 +67,9 @@ class FirstUseRuntimeTest {
         tap("Find music on this phone")
         val deny = device.wait(Until.findObject(By.res("com.android.permissioncontroller", "permission_deny_button")), 10000)
             ?: error("Music permission was not requested at the explicit scan action")
-        deny.click()
+        device.click(deny.visibleBounds.centerX(), deny.visibleBounds.centerY())
+        assertTrue("Permission dismissal completes before app recovery", device.wait(Until.gone(By.res("com.android.permissioncontroller", "permission_deny_button")), 10000))
+        device.waitForIdle()
         text("Music access was not granted. You can still choose specific files or a folder below.")
         capture("permission-denied")
         tap("Choose files")
@@ -75,7 +86,9 @@ class FirstUseRuntimeTest {
         tap("Scan QR")
         val deny = device.wait(Until.findObject(By.res("com.android.permissioncontroller", "permission_deny_button")), 10000)
             ?: error("Camera permission was not requested at Scan QR")
-        deny.click()
+        device.click(deny.visibleBounds.centerX(), deny.visibleBounds.centerY())
+        assertTrue("Camera permission dismissal completes", device.wait(Until.gone(By.res("com.android.permissioncontroller", "permission_deny_button")), 10000))
+        device.waitForIdle()
         text("Camera access was not granted. You can paste a desktop invite instead.")
         text("Paste Invite")
         capture("camera-denied")
@@ -95,15 +108,16 @@ class FirstUseRuntimeTest {
             }
         }
         assertEquals(context.packageName, device.currentPackageName)
-        device.swipe(device.displayWidth / 2, device.displayHeight * 3 / 4, device.displayWidth / 2, device.displayHeight / 3, 30)
+        val inviteField = field ?: error("Invite input missing")
+        val bounds = inviteField.visibleBounds
+        device.click(bounds.centerX(), bounds.centerY())
         device.waitForIdle()
-        val inviteField = device.findObject(By.clazz("android.widget.EditText")) ?: error("Invite input missing")
-        println("Invite field: bounds=${inviteField.visibleBounds}, clickable=${inviteField.isClickable}, focused=${inviteField.isFocused}")
-        val label = text("Invite")
-        device.click(label.visibleBounds.centerX(), label.visibleBounds.centerY())
+        // Use real key input: ACTION_SET_TEXT on a cached Compose node can
+        // return without updating the field after focus opens the keyboard.
+        device.executeShellCommand("input text not-a-pixelody-invite")
         device.waitForIdle()
-        println("Invite focus after click: ${device.findObject(By.clazz("android.widget.EditText"))?.isFocused}")
-        device.findObject(By.clazz("android.widget.EditText"))!!.text = "not-a-pixelody-invite"
+        device.pressBack() // dismiss the keyboard before scrolling the form
+        device.waitForIdle()
         capture("invite-entry")
         text("not-a-pixelody-invite")
         tap("Use Invite")

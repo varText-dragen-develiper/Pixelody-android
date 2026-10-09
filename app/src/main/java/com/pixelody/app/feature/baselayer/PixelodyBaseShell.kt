@@ -44,6 +44,14 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.Crossfade
+import androidx.compose.runtime.CompositionLocalProvider
+import com.pixelody.app.feature.nowplaying.LocalPlayerMotion
+import com.pixelody.app.feature.nowplaying.rememberPlayerMotion
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.draw.clip
@@ -66,6 +74,11 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -214,6 +227,8 @@ fun PixelodyBaseShell(
     onRemoveQueueItem: (String) -> Unit = {},
     onRemoveQueueItemAt: (Int) -> Unit = { index -> data.queue.getOrNull(index)?.let(onRemoveQueueItem) },
     onClearQueue: () -> Unit = {},
+    onResetDeveloperData: (suspend (Boolean) -> Unit)? = null,
+    equalizerRuntimeState: EqualizerRuntimeState = EqualizerRuntimeState(),
     equalizerProfile: EqualizerProfile = EqualizerProfile(),
     onEqualizerChange: (EqualizerProfile) -> Unit = {},
     trackEqualizers: Map<String, EqualizerProfile> = emptyMap(),
@@ -263,6 +278,7 @@ fun PixelodyBaseShell(
     hostBaseUrl: String? = null,
     hostConnectionState: HostConnectionState = HostConnectionState.Disconnected,
     hostConnectionError: String = "",
+    jamCoordinator: JamSessionCoordinator = remember { JamSessionCoordinator() },
     onConnectHost: (String) -> Unit = {},
     isLoadingLocalLibrary: Boolean = false,
     offlineCacheSizeBytes: Long = 0L,
@@ -313,13 +329,24 @@ fun PixelodyBaseShell(
 
     val queueUndoManager = remember { QueueUndoManager() }
     val queueUndoState by queueUndoManager.undoState.collectAsState()
-    val jamCoordinator = remember { JamSessionCoordinator() }
     val jamSession by jamCoordinator.session.collectAsState()
     val jamSyncStatus by jamCoordinator.syncStatus.collectAsState()
+    val connectionNotice = remember { androidx.compose.material3.SnackbarHostState() }
+    var previousConnection by remember { mutableStateOf(hostConnectionState) }
+    var previousJamActive by remember { mutableStateOf(jamSession.active) }
 
     var state by rememberSaveable(stateSaver = BaseLayerStateSaver) {
         mutableStateOf(BaseLayerState(destination = BaseDestination.Home))
     }
+    val destinationPager = rememberPagerState(initialPage = state.destination.ordinal) { BaseDestination.values().size }
+    LaunchedEffect(state.destination, state.pushed, state.sheet) {
+        destinationPager.animateScrollToPage(state.destination.ordinal,
+            animationSpec = spring(dampingRatio = 1f, stiffness = 380f))
+    }
+    val playerMotion = rememberPlayerMotion(state.sheet == BaseSheet.Player ||
+        (state.sheet == BaseSheet.Queue && state.queueReturnsToPlayer),
+        onOpen = { state = reduceBaseLayer(state, BaseIntent.OpenSheet(BaseSheet.Player)) },
+        onClose = { if (state.sheet == BaseSheet.Player) state = reduceBaseLayer(state, BaseIntent.Back) })
     var showFlow by rememberSaveable { mutableStateOf(false) }
     var flowKeyCode by rememberSaveable { mutableStateOf<String?>(null) }
     var flowFilterName by rememberSaveable { mutableStateOf(HarmonicFilterMode.StrictAdjacent.name) }
@@ -561,6 +588,30 @@ fun PixelodyBaseShell(
     }
     val backgroundOpacity = backgroundScreen?.let { data.covers.backgroundOpacityFor(it) } ?: 1f
     val backgroundImage = backgroundScreen?.let { data.covers.imageFor(it.key, null) }
+    LaunchedEffect(jamSession.active) {
+        val ended = previousJamActive && !jamSession.active
+        previousJamActive = jamSession.active
+        if (ended) {
+            state = state.copy(overlays = state.overlays.filterNot { it is BaseOverlay.JamHub })
+            if (data.source == BaseSource.Jam) onSourceChange(BaseSource.Phone)
+            if (hostConnectionState == HostConnectionState.Connected) {
+                connectionNotice.showSnackbar("J.A.M. ended. Back to your music.", duration = androidx.compose.material3.SnackbarDuration.Short)
+            }
+        }
+    }
+    LaunchedEffect(hostConnectionState) {
+        val lostConnection = previousConnection == HostConnectionState.Connected &&
+            hostConnectionState !in listOf(HostConnectionState.Connected, HostConnectionState.Connecting, HostConnectionState.Reconnecting)
+        previousConnection = hostConnectionState
+        if (lostConnection) {
+            state = state.copy(overlays = state.overlays.filterNot { it is BaseOverlay.JamHub })
+            val needsPairing = hostConnectionState in listOf(HostConnectionState.Revoked, HostConnectionState.AuthFailed, HostConnectionState.CredentialExpired)
+            if (connectionNotice.showSnackbar("Desktop disconnected. Phone music is ready.", if (needsPairing) "Pair again" else "Reconnect",
+                    duration = androidx.compose.material3.SnackbarDuration.Short) == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                if (needsPairing) openConnectionSetup() else onRetryHost()
+            }
+        }
+    }
     Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Box(Modifier.matchParentSize().graphicsLayer { alpha = if (backgroundImage == null) backgroundOpacity else 1f }.pixelodyGround()) {
             when (activeTheme) {
@@ -625,13 +676,19 @@ fun PixelodyBaseShell(
                 PixelodyMobileTheme.Studio -> Unit // Keep the ground quiet behind music and controls.
             }
         }
-        ScreenImageBackground(backgroundImage, backgroundOpacity)
+        Crossfade(targetState = backgroundImage to backgroundOpacity,
+            modifier = Modifier.fillMaxSize(), animationSpec = tween(220), label = "Page background") { (image, opacity) ->
+            ScreenImageBackground(image, opacity)
+        }
         BaseLayerScaffold(
+            modifier = if (playerMotion.presented || state.sheet != null) Modifier.clearAndSetSemantics {} else Modifier,
             selectedDestination = state.destination,
+            pagePositionProvider = { destinationPager.currentPage + destinationPager.currentPageOffsetFraction },
             backdropOpacity = backgroundOpacity,
             contentModifier = destinationSwipeModifier(
                 enabled = state.pushed.isEmpty() && state.sheet == null && state.overlays.isEmpty() && state.rearrangingCrate == null,
                 destination = state.destination,
+                pager = destinationPager,
                 onNavigate = { send(BaseIntent.SelectDestination(it)) }
             ),
             identity = if (state.pushed.isNotEmpty() || openCollection != null || openTrack != null) {
@@ -685,6 +742,7 @@ fun PixelodyBaseShell(
             surfaceActions = null,
             listeningSlot = {
                 if (currentTrack != null) {
+                    CompositionLocalProvider(LocalPlayerMotion provides playerMotion) {
                     MiniPlayerBar(
                         embeddedInDock = true,
                         experienceMode = experienceMode,
@@ -715,6 +773,7 @@ fun PixelodyBaseShell(
                         },
                         playbackError = playbackError
                     )
+                    }
                 } else if (data.tracks.isNotEmpty() || data.lastTrackId != null) {
                     ListeningSlot(
                         embeddedInDock = true,
@@ -757,6 +816,11 @@ fun PixelodyBaseShell(
                 }
             }
         ) {
+            HorizontalPager(state = destinationPager, userScrollEnabled = false,
+                pageNestedScrollConnection = remember { object: androidx.compose.ui.input.nestedscroll.NestedScrollConnection {} },
+                modifier = Modifier.fillMaxSize()) { page ->
+            val pageDestination = BaseDestination.values()[page]
+            Box(Modifier.fillMaxSize().then(routeArrival(state.pushed))) {
             when {
                 openCollection != null -> {
                     val detailKind = when (openCollection.kindKey.lowercase()) {
@@ -928,6 +992,10 @@ fun PixelodyBaseShell(
                         onStopHost = {}
                     )
                     BasePush.Appearance -> ProfileScreen(
+                        onResetDeveloperData = if (onResetDeveloperData != null) { { includeEdits ->
+                            queueUndoManager.clear()
+                            onResetDeveloperData(includeEdits)
+                        } } else null,
                         covers = data.covers, coverStore = coverStore, onCoversChange = onCoversChange,
                         activeTheme = activeTheme,
                         onThemeChange = onThemeChange,
@@ -990,7 +1058,7 @@ fun PixelodyBaseShell(
                     }
                 }
 
-                state.destination == BaseDestination.Library -> LibraryScreen(
+                pageDestination == BaseDestination.Library -> LibraryScreen(
                     shuffleMode = shuffleMode,
                     harmonicBaseKey = flowKey,
                     harmonicFilterMode = flowFilterMode,
@@ -1051,7 +1119,7 @@ fun PixelodyBaseShell(
                     onShowDoc = { topicId -> send(BaseIntent.ShowOverlay(BaseOverlay.Documentation(topicId))) }
                 )
 
-                state.destination == BaseDestination.Search -> SearchScreen(
+                pageDestination == BaseDestination.Search -> SearchScreen(
                     shuffleMode = shuffleMode,
                     harmonicBaseKey = flowKey,
                     harmonicFilterMode = flowFilterMode,
@@ -1100,7 +1168,7 @@ fun PixelodyBaseShell(
                     onShowDoc = { topicId -> send(BaseIntent.ShowOverlay(BaseOverlay.Documentation(topicId))) }
                 )
 
-                state.destination == BaseDestination.Home -> HomeScreen(
+                pageDestination == BaseDestination.Home -> HomeScreen(
                     onOpenFlowCabinet = { showFlow = true },
                     snapshot = librarySnapshot,
                     liveState = liveState,
@@ -1199,13 +1267,22 @@ fun PixelodyBaseShell(
                     onShowDoc = { topicId -> send(BaseIntent.ShowOverlay(BaseOverlay.Documentation(topicId))) }
                 )
 
-                else -> BaseNotPortedYet(what = state.destination.label)
+                else -> BaseNotPortedYet(what = pageDestination.label)
+            }
+            }
             }
         }
 
-        state.sheet?.let { sheet ->
-            when (sheet) {
-                BaseSheet.Player -> {
+        if (playerMotion.presented || state.sheet == BaseSheet.Queue) {
+            when {
+                playerMotion.presented && state.sheet != BaseSheet.Queue -> {
+                    CompositionLocalProvider(LocalPlayerMotion provides playerMotion) {
+                    Box(Modifier.fillMaxSize().pointerInput(playerMotion) {
+                        detectTapGestures { playerMotion.close() }
+                    })
+                    val playerSemantics = if (state.sheet == BaseSheet.Player) Modifier.semantics { paneTitle = "Now playing" }
+                        else Modifier.clearAndSetSemantics {}
+                    Box(Modifier.fillMaxSize().then(playerMotion.layer()).then(playerSemantics)) {
                     NowPlayingScreen(
                         dailyCapsule = dailyCapsule,
                         onPlayHistoryTrack = { id -> playFrom(id, dailyCapsule.memoryTimeline.sortedByDescending { it.timestampMs }.map { it.trackId }.distinct().filter { data.isPlayable(it) }) },
@@ -1225,7 +1302,7 @@ fun PixelodyBaseShell(
                         globalMastering = globalMastering,
                         trackMastering = null,
                         useMasteringRack = useMasteringRack,
-                        equalizerRuntimeState = EqualizerRuntimeState(),
+                        equalizerRuntimeState = equalizerRuntimeState,
                         shuffleEnabled = shuffleEnabled,
                         shuffleMode = shuffleMode,
                         repeatMode = repeatMode,
@@ -1240,7 +1317,7 @@ fun PixelodyBaseShell(
                         onNext = onNext,
                         onToggleShuffle = { showFlow = true },
                         onOpenQueue = { send(BaseIntent.OpenSheet(BaseSheet.Queue)) },
-                        onCollapse = { send(BaseIntent.Back) },
+                        onCollapse = { if (state.sheet == BaseSheet.Player) send(BaseIntent.Back) },
                         onToggleRepeat = onToggleRepeat,
                         onToggleFavorite = onToggleFavorite,
                         onAddToPlaylist = { trackId -> send(BaseIntent.ShowOverlay(BaseOverlay.AddToPlaylist(trackId))) },
@@ -1388,8 +1465,11 @@ fun PixelodyBaseShell(
                             settingsStore.saveExperienceMode(newMode)
                         }
                     )
+                    }
+                    }
                 }
-                BaseSheet.Queue -> {
+                state.sheet == BaseSheet.Queue -> {
+                    Box(Modifier.fillMaxSize().then(routeArrival(BaseSheet.Queue))) {
                     QueueScreen(
                         flowKey = flowKey, flowBpm = flowBpm,
                         experienceMode = experienceMode,
@@ -1436,6 +1516,7 @@ fun PixelodyBaseShell(
                         onClose = { send(BaseIntent.Back) },
                         onShowDoc = { topicId -> send(BaseIntent.ShowOverlay(BaseOverlay.Documentation(topicId))) }
                     )
+                    }
                 }
             }
         }
@@ -1510,6 +1591,8 @@ fun PixelodyBaseShell(
                 metadataStore = metadataStore
             )
         }
+        androidx.compose.material3.SnackbarHost(connectionNotice,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 144.dp))
     }
 }
 
@@ -3144,7 +3227,7 @@ val BaseLayerStateSaver = listSaver<BaseLayerState, Any>(
                 BasePush.SonicTimeline -> listOf<Any>("s", "", "")
             }
         }
-        header + pushed
+        header + pushed + state.queueReturnsToPlayer
     },
     restore = { saved ->
         val destination = BaseDestination.values()
@@ -3167,7 +3250,9 @@ val BaseLayerStateSaver = listSaver<BaseLayerState, Any>(
             destination = destination,
             pushed = pushed,
             sheet = BaseSheet.values().getOrNull(sheetOrdinal),
-            overlays = emptyList()
+            overlays = emptyList(),
+            // Old saved states used Queue as an unconditional child of Player.
+            queueReturnsToPlayer = saved.getOrNull(3 + count * 3) as? Boolean ?: true
         )
     }
 )

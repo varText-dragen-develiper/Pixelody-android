@@ -14,6 +14,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SonicCapsuleTimelineEngineTest {
+    @Test fun resetLeavesNoOldTimelineNarrativeOrWeeklyTrend() {
+        val engine = SonicCapsuleTimelineEngine()
+        engine.recordTrackListen(Track(id = "reset-track", title = "Old listen", artist = "Old artist", durationSeconds = 180), 180)
+        engine.clearTimeline()
+        assertTrue(engine.dailyCapsule.value.memoryTimeline.isEmpty())
+        assertTrue(engine.dailyCapsule.value.highlightTracks.isEmpty())
+        assertTrue(engine.dailyCapsule.value.aiNarrative.isBlank())
+        assertTrue(engine.weeklyTrend.value.dailyMinutes.isEmpty())
+        engine.recordTrackListen(Track(id = "new-track", title = "New listen", durationSeconds = 180), 30)
+        assertEquals(listOf("new-track"), engine.dailyCapsule.value.memoryTimeline.map { it.trackId })
+    }
+
 
     @Test
     fun testInitialStateAndDefaults() {

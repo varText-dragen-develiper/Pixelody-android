@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -37,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -51,6 +53,7 @@ import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -151,7 +154,7 @@ fun VelocityMicroScrubber(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(34.dp),
+                .heightIn(min = 34.dp),
             contentAlignment = Alignment.BottomCenter
         ) {
             androidx.compose.animation.AnimatedVisibility(
@@ -206,7 +209,8 @@ fun VelocityMicroScrubber(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(44.dp)
+                .height(48.dp)
+                .clipToBounds()
                 .testTag(PixelodyStateTags.PLAYER_SCRUBBER)
                 .semantics {
                     contentDescription = if (hasKnownDuration) "Precision scrubber" else "Track length unknown, seeking unavailable"
@@ -214,6 +218,10 @@ fun VelocityMicroScrubber(
                         current = scrubProgress,
                         range = 0f..1f
                     )
+                    if (hasKnownDuration) setProgress { fraction ->
+                        onSeek((fraction.coerceIn(0f, 1f) * durationMs).toLong())
+                        true
+                    }
                 }
                 .pointerInput(durationMs) {
                     if (durationMs <= 0) return@pointerInput
@@ -336,7 +344,7 @@ fun VelocityMicroScrubber(
 
                 // Vertical tension guide ray when pulled down in precision mode
                 if (isDragging && verticalOffsetDp > 20f) {
-                    val guideLengthPx = with(density) { verticalOffsetDp.dp.toPx() }.coerceAtMost(size.height * 2.5f)
+                    val guideLengthPx = with(density) { verticalOffsetDp.dp.toPx() }.coerceAtMost(size.height - centerY)
                     drawLine(
                         color = activeColor.copy(alpha = 0.45f),
                         start = Offset(currentX, centerY),

@@ -23,6 +23,7 @@ internal fun QuickEqualizerSheet(
     trackId: String, global: EqualizerProfile, track: EqualizerProfile?, masteringActive: Boolean,
     onMasteringChange: (Boolean) -> Unit, onGlobalChange: (EqualizerProfile) -> Unit,
     onTrackChange: (EqualizerProfile?) -> Unit, onDismiss: () -> Unit,
+    runtimeState: com.pixelody.app.core.playback.EqualizerRuntimeState = com.pixelody.app.core.playback.EqualizerRuntimeState(),
     roomEffectActive: Boolean = false, onDisableRoomEffect: () -> Unit = {}
 ) {
     var editTrack by remember(trackId) { mutableStateOf(track != null) }
@@ -38,20 +39,22 @@ internal fun QuickEqualizerSheet(
             verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Equalizer", style = MaterialTheme.typography.titleLarge)
+                Text("Advanced equalizer", style = MaterialTheme.typography.titleLarge)
                 Switch(checked = profile.enabled && !masteringActive,
                     onCheckedChange = { commit(profile.copy(enabled = it)) },
                     modifier = Modifier.semantics { contentDescription = "Enable equalizer" })
             }
+            Text(runtimeState.message, style = MaterialTheme.typography.labelSmall,
+                color = if (runtimeState.active) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary)
             Text(if (masteringActive) "Mastering is active. Editing EQ switches to the equalizer."
-                else "Choose a preset or drag the five points to shape your sound.",
+                else "Choose a preset, drag the curve or adjust each band precisely.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (roomEffectActive) {
                 TextButton(onClick = onDisableRoomEffect) { Text("Turn off saved room effect") }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(selected = !editTrack, onClick = { editTrack = false }, label = { Text("All songs") })
-                FilterChip(selected = editTrack, onClick = { editTrack = true }, label = { Text("This song") })
+                if (trackId.isNotBlank()) FilterChip(selected = editTrack, onClick = { editTrack = true }, label = { Text("This song") })
             }
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(EqualizerPreset.quickPresets) { preset ->
@@ -62,9 +65,23 @@ internal fun QuickEqualizerSheet(
             PixelodyEqualizerCurve(gainsDb = profile.gainsDb, enabled = profile.enabled && !masteringActive,
                 onBandGainChange = { index, gain -> commit(profile.withBandGain(index, gain)) },
                 modifier = Modifier.testTag("player:quick-equalizer-curve"))
+            EqualizerPreset.bandLabels.forEachIndexed { index, label ->
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("$label Hz", modifier = Modifier.width(56.dp), style = MaterialTheme.typography.labelMedium)
+                    Slider(value = profile.gainsDb[index],
+                        onValueChange = { commit(profile.withBandGain(index, it)) },
+                        valueRange = EqualizerProfile.MIN_GAIN_DB..EqualizerProfile.MAX_GAIN_DB,
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                            .semantics { contentDescription = "Equalizer band $label Hz" })
+                    Text(java.lang.String.format(java.util.Locale.ROOT, "%+.1f dB", profile.gainsDb[index]),
+                        modifier = Modifier.width(64.dp), style = MaterialTheme.typography.labelSmall)
+                }
+            }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 if (editTrack && track != null) TextButton(onClick = { onTrackChange(null); editTrack = false }) { Text("Use all-songs EQ") }
                 else Spacer(Modifier.weight(1f))
+                TextButton(onClick = { onDisableRoomEffect(); commit(profile.flatTone()) }) { Text("Reset to flat") }
                 TextButton(onClick = onDismiss) { Text("Done") }
             }
         }

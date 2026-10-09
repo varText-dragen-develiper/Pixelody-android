@@ -256,7 +256,8 @@ class SonicCapsuleTimelineEngine(
         rawMemories.clear()
         memoryTracks.clear()
         totalSecondsListenedToday = 0L
-        recomputeCapsule()
+        _dailyCapsule.value = generateInitialCapsule()
+        _weeklyTrend.value = generateInitialWeeklyTrend()
     }
 
     /**

@@ -80,7 +80,7 @@ class ListeningIntegrationRuntimeTest {
             tap("QA listen two")
             assertEquals(two.id, settings.loadLastTrackId())
             open("player")
-            find("Listening history"); tap("Show recent plays")
+            tap("History"); find("Listening history")
             find("QA listen one · Integration fixture")
             capture("player-integrated-history")
             tap("QA listen one · Integration fixture")

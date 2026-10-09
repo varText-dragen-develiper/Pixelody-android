@@ -4,6 +4,15 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class DestinationSwipeTest {
+    @Test fun flickNeedsPurposefulDistanceAndVelocityInTheSameDirection() {
+        val swipe = DestinationSwipe(72f)
+        swipe.begin(); swipe.direct(-20f, 0f); assertEquals(1, swipe.finish(velocity = -900f))
+        swipe.begin(); swipe.direct(-10f, 0f); assertNull(swipe.finish(velocity = -3000f))
+        swipe.begin(); swipe.direct(-20f, 0f); assertNull(swipe.finish(velocity = 900f))
+        swipe.begin(); swipe.direct(-20f, 0f); assertNull(swipe.finish(velocity = -400f))
+        swipe.begin(); swipe.direct(-100f, 0f); assertNull(swipe.finish(velocity = 900f))
+    }
+
     @Test fun reversingBackIntoAChildAbandonsItsPreviousEdgeHandoff() {
         val swipe = DestinationSwipe(72f)
         swipe.begin(); swipe.childScroll(0f, -90f)

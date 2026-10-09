@@ -238,7 +238,11 @@ class PixelodyPlaybackService : MediaLibraryService() {
     private fun updateEqualizerEffects() {
         val exo = player ?: return
         val sessionId = exo.audioSessionId
-        if (sessionId == C.AUDIO_SESSION_ID_UNSET || sessionId <= 0) return
+        if (sessionId == C.AUDIO_SESSION_ID_UNSET || sessionId <= 0) {
+            equalizerController.release()
+            equalizerStore.saveRuntimeState(EqualizerRuntimeState())
+            return
+        }
 
         equalizerStore.saveAudioSessionId(sessionId)
         val currentMediaId = exo.currentMediaItem?.mediaId
@@ -252,13 +256,14 @@ class PixelodyPlaybackService : MediaLibraryService() {
         val activeEq = currentMediaId?.let { trackEqs[it] } ?: globalEq
         val activeMastering = currentMediaId?.let { trackMasterings[it] } ?: globalMastering
 
-        equalizerController.applyEffects(
+        val runtime = equalizerController.applyEffects(
             audioSessionId = sessionId,
             eqProfile = activeEq,
             masteringProfile = activeMastering,
             useMastering = useMastering,
             spatialSettings = spatialSettings
         )
+        equalizerStore.saveRuntimeState(runtime)
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = mediaLibrarySession
@@ -274,6 +279,7 @@ class PixelodyPlaybackService : MediaLibraryService() {
         credentialPreferences.unregisterOnSharedPreferenceChangeListener(credentialListener)
         equalizerPreferences.unregisterOnSharedPreferenceChangeListener(equalizerSettingsListener)
         equalizerController.release()
+        equalizerStore.saveRuntimeState(EqualizerRuntimeState())
         player?.let(::persistPlayback)
         mediaLibrarySession?.release()
         mediaLibrarySession = null

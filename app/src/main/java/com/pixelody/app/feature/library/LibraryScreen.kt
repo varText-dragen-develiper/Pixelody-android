@@ -175,7 +175,7 @@ internal fun LibraryScreen(
     flowTolerance: Float = 10f,
     onOpenFlow: () -> Unit = {}
 ) {
-    var query by remember { mutableStateOf("") }
+    var query by rememberSaveable { mutableStateOf("") }
     var browseMode by rememberSaveable { mutableStateOf("Tracks") }
     val browseModeDetailKind = when (browseMode) {
         "Playlists" -> PixelodyDetailKind.Playlist

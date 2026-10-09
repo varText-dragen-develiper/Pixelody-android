@@ -111,7 +111,7 @@ internal fun SearchScreen(
 ) {
     val haptic = LocalHapticFeedback.current
     val theme = LocalPixelodyThemeVariant.current
-    var query by remember { mutableStateOf("") }
+    var query by rememberSaveable { mutableStateOf("") }
     var intentFilter by rememberSaveable { mutableStateOf("Everything") }
     var isMultiSelectMode by remember { mutableStateOf(false) }
     var selectedTrackIds by remember { mutableStateOf(setOf<String>()) }

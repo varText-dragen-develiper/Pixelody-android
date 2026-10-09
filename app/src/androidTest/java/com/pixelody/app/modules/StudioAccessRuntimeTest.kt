@@ -266,7 +266,7 @@ class StudioAccessRuntimeTest {
             assertFalse(device.hasObject(By.text("Speaker")))
             assertEquals("Scope", settings.loadPlayerViewMode()) // Saved prototype preference is preserved.
             device.wait(Until.findObject(By.desc("Pause")), 5000)?.click(); device.waitForIdle()
-            click(find(By.desc("Open equalizer")))
+            click(find(By.desc("Open advanced equalizer")))
             find(By.text("Mastering is active. Editing EQ switches to the equalizer."))
             tap("Turn off saved room effect")
             assertFalse(eq.loadSpatialSettings().isEnabled)

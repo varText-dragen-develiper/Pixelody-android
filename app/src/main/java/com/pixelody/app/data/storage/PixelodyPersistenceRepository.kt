@@ -115,6 +115,11 @@ class PixelodyDatabaseHelper(context: Context) : SQLiteOpenHelper(
 class PixelodyPersistenceRepository(context: Context) {
     private val dbHelper = PixelodyDatabaseHelper(context)
 
+    /** Removes generated listening archives only; library and authored data stay intact. */
+    suspend fun clearListeningArchives() = withContext(Dispatchers.IO) {
+        dbHelper.writableDatabase.delete(PixelodyDatabaseHelper.TABLE_CAPSULES, null, null)
+    }
+
     // --- Smart Crates Persistence ---
 
     suspend fun saveSmartCrate(

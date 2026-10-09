@@ -25,6 +25,12 @@ class SessionCapsuleEngine {
     private val playedTracks = mutableListOf<Track>()
     private var sessionStartTimeMs: Long = System.currentTimeMillis()
 
+    fun resetSession() {
+        playedTracks.clear()
+        sessionStartTimeMs = System.currentTimeMillis()
+        _insights.value = SessionSoundInsights()
+    }
+
     fun recordTrackPlay(track: Track) {
         playedTracks.add(track)
         recompute()
