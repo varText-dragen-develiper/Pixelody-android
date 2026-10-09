@@ -5,6 +5,9 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import com.pixelody.app.ui.brand.BrandIconSwitcher
+import com.pixelody.app.ui.brand.resolveLauncherIcon
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,6 +44,14 @@ class MainActivity : ComponentActivity() {
             DisposableEffect(settingsStore) {
                 val unsubscribe = settingsStore.observeAppearance { appearance = it }
                 onDispose { unsubscribe() }
+            }
+            var logoPreferences by remember { mutableStateOf(settingsStore.loadLogoPreferences()) }
+            DisposableEffect(settingsStore) {
+                val unsubscribe = settingsStore.observeLogoPreferences { logoPreferences = it }
+                onDispose { unsubscribe() }
+            }
+            LaunchedEffect(mobileTheme, appearance, logoPreferences) {
+                BrandIconSwitcher.apply(applicationContext, resolveLauncherIcon(logoPreferences, mobileTheme, appearance))
             }
             PixelodyTheme(variant = mobileTheme, appearance = appearance) {
                 BasePlaybackHost(

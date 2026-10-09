@@ -200,6 +200,11 @@ class MobileEqualizerStoreTest {
     }
 
     @Test
+    fun freshInstallDoesNotEnableRetiredRoomProcessing() {
+        assertFalse(store.loadSpatialSettings().isEnabled)
+    }
+
+    @Test
     fun corruptedJsonRecoversGracefullyToDefaults() {
         fakePrefs.putString(MobileEqualizerStore.KEY_GLOBAL_EQ, "{ broken json }")
         fakePrefs.putString(MobileEqualizerStore.KEY_GLOBAL_MASTERING, "not-a-json")
@@ -214,6 +219,7 @@ class MobileEqualizerStoreTest {
 
         val spatial = store.loadSpatialSettings()
         assertEquals(AcousticChamberPreset.AbbeyStudioControlRoom, spatial.preset)
+        assertFalse(spatial.isEnabled)
 
         val trackMap = store.loadTrackProfiles()
         assertTrue(trackMap.isEmpty())

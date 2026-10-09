@@ -41,13 +41,17 @@ class NowPlayingScreenTest {
     }
 
     @Test
-    fun availablePlayerViewModes_distinctModesWithUniqueGlyphs() {
-        assertEquals(14, AvailablePlayerViewModes.size)
-        // Verify unique IDs
-        assertEquals(14, AvailablePlayerViewModes.map { it.id }.distinct().size)
-        // Verify 100% unique glyphs across all view modes
-        assertEquals(14, AvailablePlayerViewModes.map { it.glyph }.distinct().size)
-        // Verify all labels are non-blank
+    fun ordinaryPlayerOnlyOffersArtworkAndLyrics() {
+        assertEquals(listOf("Classic", "Lyrics"), AvailablePlayerViewModes.map { it.id })
         assertTrue(AvailablePlayerViewModes.all { it.label.isNotBlank() })
+    }
+
+    @Test
+    fun retiredSavedViewsFallBackWithoutOpeningTools() {
+        listOf("Soundstage", "Dual-Rack", "Turntable", "Vinyl-Vault", "Scope", "Mastering",
+            "Spatial", "Tape", "Stems", "Laser", "Auto-DJ", "Haptics", "Hi-Res", "", "unknown")
+            .forEach { assertEquals("Classic", ordinaryPlayerViewMode(it)) }
+        assertEquals("Lyrics", ordinaryPlayerViewMode("Lyrics"))
+        assertEquals("Classic", ordinaryPlayerViewMode("Classic"))
     }
 }

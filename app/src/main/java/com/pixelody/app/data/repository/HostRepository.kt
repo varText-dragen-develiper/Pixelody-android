@@ -36,18 +36,22 @@ class HostRepository(
         return withContext(Dispatchers.IO) {
             val candidates = normalizedCandidates(details.baseUrls)
             var lastError: Throwable? = null
+            var token = details.token
+            var grantedPermissions = emptyList<String>()
             for (candidate in candidates) {
                 runCatching {
-                    var grantedPermissions = emptyList<String>()
-                    val token = when {
-                        details.hasToken -> details.token
-                        details.hasPairingSecret -> hostApiClient.completePairing(
+                    // Pairing consumes a one-use secret. Once exchanged, reuse
+                    // the credential if library loading needs another address.
+                    if (token.isBlank()) {
+                        require(details.hasPairingSecret) { "A trusted-device token or pairing payload is required." }
+                        val credential = hostApiClient.completePairing(
                             baseUrl = candidate,
                             pairingCode = details.pairingCode,
                             secret = details.pairingSecret,
                             deviceName = details.deviceName
-                        ).also { grantedPermissions = it.permissions }.token
-                        else -> throw IllegalArgumentException("A trusted-device token or pairing payload is required.")
+                        )
+                        token = credential.token
+                        grantedPermissions = credential.permissions
                     }
                     hostApiClient.connectToHost(baseUrl = candidate, token = token).copy(grantedPermissions = grantedPermissions)
                 }.onSuccess { return@withContext it }

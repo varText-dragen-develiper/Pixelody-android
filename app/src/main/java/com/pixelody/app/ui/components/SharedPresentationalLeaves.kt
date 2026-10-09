@@ -1187,23 +1187,16 @@ internal fun PixelodyNavGlyph(
     selected: Boolean
 ) {
     val color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+    if (tab == PixelodyTab.Home || tab == PixelodyTab.Search || tab == PixelodyTab.Library) {
+        DestinationGlyph(tab, color, selected = selected)
+        return
+    }
     Canvas(modifier = Modifier.size(24.dp)) {
         val strokeWidth = if (selected) 3.2f else 2.4f
         val stroke = Stroke(width = strokeWidth)
         val w = size.width
         val h = size.height
         when (tab) {
-            PixelodyTab.Home -> {
-                drawLine(color, Offset(w * 0.18f, h * 0.58f), Offset(w * 0.50f, h * 0.28f), strokeWidth, StrokeCap.Round)
-                drawLine(color, Offset(w * 0.50f, h * 0.28f), Offset(w * 0.82f, h * 0.58f), strokeWidth, StrokeCap.Round)
-                drawLine(color, Offset(w * 0.28f, h * 0.54f), Offset(w * 0.28f, h * 0.82f), strokeWidth, StrokeCap.Round)
-                drawLine(color, Offset(w * 0.72f, h * 0.54f), Offset(w * 0.72f, h * 0.82f), strokeWidth, StrokeCap.Round)
-                drawLine(color, Offset(w * 0.28f, h * 0.82f), Offset(w * 0.72f, h * 0.82f), strokeWidth, StrokeCap.Round)
-            }
-            PixelodyTab.Search -> {
-                drawCircle(color, radius = w * 0.24f, center = Offset(w * 0.42f, h * 0.42f), style = stroke)
-                drawLine(color, Offset(w * 0.60f, h * 0.60f), Offset(w * 0.82f, h * 0.82f), strokeWidth, StrokeCap.Round)
-            }
             PixelodyTab.Create -> {
                 drawCircle(color, radius = w * 0.30f, center = Offset(w * 0.50f, h * 0.50f), style = stroke)
                 drawLine(color, Offset(w * 0.50f, h * 0.30f), Offset(w * 0.50f, h * 0.70f), strokeWidth, StrokeCap.Round)
@@ -1212,14 +1205,6 @@ internal fun PixelodyNavGlyph(
             PixelodyTab.Profile -> {
                 drawCircle(color, radius = w * 0.18f, center = Offset(w * 0.50f, h * 0.34f), style = stroke)
                 drawCircle(color, radius = w * 0.30f, center = Offset(w * 0.50f, h * 0.86f), style = stroke)
-            }
-            PixelodyTab.Library -> {
-                drawLine(color, Offset(w * 0.22f, h * 0.28f), Offset(w * 0.82f, h * 0.28f), strokeWidth, StrokeCap.Round)
-                drawLine(color, Offset(w * 0.22f, h * 0.50f), Offset(w * 0.72f, h * 0.50f), strokeWidth, StrokeCap.Round)
-                drawLine(color, Offset(w * 0.22f, h * 0.72f), Offset(w * 0.82f, h * 0.72f), strokeWidth, StrokeCap.Round)
-                drawCircle(color, radius = w * 0.035f, center = Offset(w * 0.12f, h * 0.28f))
-                drawCircle(color, radius = w * 0.035f, center = Offset(w * 0.12f, h * 0.50f))
-                drawCircle(color, radius = w * 0.035f, center = Offset(w * 0.12f, h * 0.72f))
             }
             PixelodyTab.Player -> {
                 drawCircle(color, radius = w * 0.34f, center = Offset(w * 0.50f, h * 0.50f), style = stroke)

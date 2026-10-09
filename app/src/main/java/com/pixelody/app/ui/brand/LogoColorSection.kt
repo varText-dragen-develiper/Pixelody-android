@@ -51,16 +51,13 @@ fun PixelodyMark(color: Color, size: Dp, modifier: Modifier = Modifier) {
     )
 }
 
-/**
- * On base Pixelody (Studio) the mark uses the chosen purple. Other themes may
- * recolour it with their accent unless the user turns that off. The launcher
- * icon always uses the chosen purple, because its icons are baked resources.
- */
+/** Explicit logo colors override the effective theme/palette accent. */
 fun resolveLogoMarkColor(
     logoColor: PixelodyLogoColor,
     followsTheme: Boolean,
-    activeTheme: PixelodyMobileTheme
-): Color = if (followsTheme && activeTheme != PixelodyMobileTheme.Studio) activeTheme.accentColor else logoColor.color
+    activeTheme: PixelodyMobileTheme,
+    themeAccent: Color = activeTheme.accentColor
+): Color = if (followsTheme) themeAccent else logoColor.color
 
 @Composable
 internal fun LogoColorSection(
@@ -70,18 +67,18 @@ internal fun LogoColorSection(
     val context = LocalContext.current
     var logoColor by remember { mutableStateOf(settingsStore.loadLogoColor()) }
     var followsTheme by remember { mutableStateOf(settingsStore.loadLogoFollowsTheme()) }
-    val markColor = resolveLogoMarkColor(logoColor, followsTheme, activeTheme)
-    val followingTheme = markColor != logoColor.color
+    val markColor = resolveLogoMarkColor(logoColor, followsTheme, activeTheme, MaterialTheme.colorScheme.primary)
+    val followingTheme = followsTheme
 
     SectionCard(
         title = "Logo color",
-        subtitle = if (followingTheme) "Following ${activeTheme.displayName} / home-screen icon: ${logoColor.displayName}" else "${logoColor.displayName} / app and home-screen icon"
+        subtitle = if (followingTheme) "Following theme and palette" else "${logoColor.displayName} / app and home-screen icon"
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             PixelodyMark(color = markColor, size = 44.dp)
             Spacer(modifier = Modifier.width(12.dp))
             Text(
-                text = "The home-screen icon can take a few seconds to update.",
+                text = "The home-screen icon follows your theme and palette. Custom colors use the closest available shade. Android themed icons can follow your wallpaper instead.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -92,14 +89,12 @@ internal fun LogoColorSection(
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             PixelodyLogoColor.entries.forEach { option ->
-                val selected = option == logoColor
+                val selected = !followsTheme && option == logoColor
                 Surface(
                     onClick = {
-                        if (option != logoColor) {
-                            logoColor = option
-                            settingsStore.saveLogoColor(option)
-                            BrandIconSwitcher.apply(context, option)
-                        }
+                        logoColor = option
+                        followsTheme = false
+                        settingsStore.saveLogoColor(option)
                     },
                     modifier = Modifier
                         .weight(1f)
@@ -134,11 +129,12 @@ internal fun LogoColorSection(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Let other themes recolor the in-app logo",
+                text = "Follow theme and palette",
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.weight(1f)
             )
             Switch(
+                modifier = Modifier.semantics { contentDescription = "Follow theme and palette" },
                 checked = followsTheme,
                 onCheckedChange = {
                     followsTheme = it

@@ -396,11 +396,8 @@ class CanonicalJourneysTest {
      */
     @Test
     fun journey_J09_playerViewModeAxisPersistenceAndParity() {
-        val viewModes = listOf(
-            "Classic", "Turntable", "Scope", "Mastering", "Spatial",
-            "Tape", "Stems", "Laser", "Auto-DJ", "Haptics", "Hi-Res"
-        )
-        assertEquals("Must support exactly 11 specialized player view modes", 11, viewModes.size)
+        val viewModes = listOf("Classic", "Lyrics")
+        assertEquals("The ordinary player supports artwork and lyrics", 2, viewModes.size)
 
         var activeMode = "Classic"
         var data = sampleBaseLayerData().copy(currentTrackId = "t1", isPlaying = true)

@@ -3,6 +3,8 @@ package com.pixelody.app.feature.baselayer
 import com.pixelody.app.BuildConfig
 import kotlinx.coroutines.CancellationException
 import com.pixelody.app.data.model.HostConnectionState
+import com.pixelody.app.data.network.connectionStateFor
+import com.pixelody.app.data.network.hostConnectionFailureMessage
 import android.Manifest
 import android.content.ComponentName
 import android.content.pm.PackageManager
@@ -72,6 +74,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
 import com.pixelody.app.data.model.EqualizerPreset
 import com.pixelody.app.data.model.EqualizerProfile
+import com.pixelody.app.feature.nowplaying.ordinaryPlayerViewMode
 import com.pixelody.app.data.model.MasteringProfile
 import com.pixelody.app.data.model.SpatialChamberSettings
 import com.pixelody.app.data.model.CassetteTapeSettings
@@ -228,7 +231,7 @@ fun BasePlaybackHost(
     // Active lens & source preferences
     var activeSource by remember { mutableStateOf(initialData.source) }
     var activeLens by remember { mutableStateOf(initialData.lens) }
-    var activePlayerViewMode by remember { mutableStateOf(settingsStore.loadPlayerViewMode()) }
+    var activePlayerViewMode by remember { mutableStateOf(ordinaryPlayerViewMode(settingsStore.loadPlayerViewMode())) }
     var currentTrackId by remember { mutableStateOf<String?>(initialData.currentTrackId) }
     var lastTrackId by remember { mutableStateOf<String?>(initialData.lastTrackId) }
     var isPlaying by remember { mutableStateOf(initialData.isPlaying) }
@@ -236,6 +239,8 @@ fun BasePlaybackHost(
 
     // Hardware DSP, Mastering, Equalizer & Console state
     var globalEqualizer by remember { mutableStateOf(equalizerStore.loadGlobalProfile()) }
+    var trackEqualizers by remember { mutableStateOf(equalizerStore.loadTrackProfiles()) }
+    var useMasteringRack by remember { mutableStateOf(equalizerStore.loadUseMasteringRack()) }
     var globalMastering by remember { mutableStateOf(equalizerStore.loadGlobalMasteringProfile()) }
     var spatialSettings by remember { mutableStateOf(equalizerStore.loadSpatialSettings()) }
     var cassetteSettings by remember { mutableStateOf(CassetteTapeSettings()) }
@@ -337,8 +342,8 @@ fun BasePlaybackHost(
                 throw error
             } catch (error: Exception) {
                 hostReachable = false
-                hostConnectionState = HostConnectionState.Unreachable
-                hostConnectionError = "Couldn't connect to your desktop. Check that Pixelody is open and both devices can reach the same network, then try again. Your phone music is still available."
+                hostConnectionState = connectionStateFor(error)
+                hostConnectionError = hostConnectionFailureMessage(error)
             } finally {
                 isConnectingHost = false
             }
@@ -811,17 +816,20 @@ fun BasePlaybackHost(
         }
     }
 
-    fun addToQueue(trackId: String) {
+    fun addTracksToQueue(trackIds: List<String>) {
+        val tracks = trackIds.mapNotNull(::resolveTrack)
+        if (tracks.isEmpty()) return
         val activePlayer = player
-        val track = resolveTrack(trackId) ?: return
-        val mediaItem = baseMediaItemFor(track, offlineMediaStore, hostBaseUrl)
         if (activePlayer == null) {
-            queue = queue + trackId
+            queue = queue + tracks.map { it.id }
             return
         }
-        activePlayer.addMediaItem(mediaItem)
+        // One timeline update avoids rescanning the queue after every matched song.
+        activePlayer.addMediaItems(tracks.map { baseMediaItemFor(it, offlineMediaStore, hostBaseUrl) })
         syncQueueFromPlayer()
     }
+
+    fun addToQueue(trackId: String) = addTracksToQueue(listOf(trackId))
 
     fun seek(positionMs: Long) {
         val activePlayer = player ?: return
@@ -851,8 +859,8 @@ fun BasePlaybackHost(
      * Replan only upcoming music. Keep the current item, position, pause state, and
      * played history intact. Off freezes the current order; new plays use source order.
      */
-    fun toggleShuffle() {
-        val nextMode = shuffleMode.next()
+    fun setShuffleMode(nextMode: FlowShuffleMode) {
+        if (nextMode == shuffleMode) return
         shuffleMode = nextMode
         queuePlanningJob?.cancel()
         val activePlayer = player
@@ -866,20 +874,17 @@ fun BasePlaybackHost(
             val items = (start until activePlayer.mediaItemCount).map { activePlayer.getMediaItemAt(it) }
             val anchorId = activePlayer.currentMediaItem?.mediaId
             val anchor = resolveTrack(anchorId)
-            val tracks = items.mapNotNull { resolveTrack(it.mediaId) }
+            val tracks = items.map { resolveTrack(it.mediaId) }
             queuePlanningJob = coroutineScope.launch {
                 val planned = withContext(Dispatchers.Default) {
-                    FlowShuffleEngine.planQueue(anchor, tracks, nextMode, tracks.size,
-                        checkActive = { ensureActive() }).map { it.track.id }
+                    FlowShuffleEngine.planUpcomingOrder(anchor, tracks, nextMode,
+                        checkActive = { ensureActive() })
                 }
                 // A skip, queue edit, or external controller invalidates this snapshot.
                 if (player !== activePlayer || activePlayer.currentMediaItem?.mediaId != anchorId ||
                     activePlayer.currentMediaItemIndex + 1 != start ||
                     (start until activePlayer.mediaItemCount).map { activePlayer.getMediaItemAt(it) } != items) return@launch
-                val byId = items.associateBy { it.mediaId }
-                // Keep unresolved items (e.g. an external media controller's track).
-                val plannedIds = planned.toSet()
-                val reordered = planned.mapNotNull { byId[it] } + items.filter { it.mediaId !in plannedIds }
+                val reordered = planned.map { items[it] }
                 activePlayer.removeMediaItems(start, activePlayer.mediaItemCount)
                 activePlayer.addMediaItems(reordered)
                 syncQueueFromPlayer()
@@ -888,6 +893,8 @@ fun BasePlaybackHost(
         settingsStore.saveShuffleMode(nextMode.name)
         settingsStore.saveShuffleEnabled(nextMode != FlowShuffleMode.Off)
     }
+
+    fun toggleShuffle() = setShuffleMode(shuffleMode.next())
 
     fun toggleRepeat() {
         val nextMode = when (repeatMode) {
@@ -975,6 +982,18 @@ fun BasePlaybackHost(
         val index = (start until activePlayer.mediaItemCount)
             .firstOrNull { activePlayer.getMediaItemAt(it).mediaId == trackId }
         if (index != null) activePlayer.removeMediaItem(index)
+        syncQueueFromPlayer()
+    }
+
+    fun removeQueueItemAt(position: Int) {
+        if (position !in queue.indices) return
+        val activePlayer = player
+        if (activePlayer == null) {
+            queue = queue.filterIndexed { index, _ -> index != position }
+            return
+        }
+        val index = activePlayer.currentMediaItemIndex + 1 + position
+        if (index in 0 until activePlayer.mediaItemCount) activePlayer.removeMediaItem(index)
         syncQueueFromPlayer()
     }
 
@@ -1080,15 +1099,27 @@ fun BasePlaybackHost(
         onNext = ::nextTrack,
         onSeek = ::seek,
         onAddToQueue = ::addToQueue,
+        onAddTracksToQueue = ::addTracksToQueue,
         onMoveQueueItem = ::moveQueueItem,
         onReorderQueue = ::setQueueOrder,
         onInsertIntoQueue = ::insertIntoQueue,
         onRemoveQueueItem = ::removeQueueItem,
+        onRemoveQueueItemAt = ::removeQueueItemAt,
         onClearQueue = ::clearQueue,
         equalizerProfile = globalEqualizer,
         onEqualizerChange = { eq ->
             globalEqualizer = eq
             equalizerStore.saveGlobalProfile(eq)
+        },
+        trackEqualizers = trackEqualizers,
+        onTrackEqualizerChange = { id, profile ->
+            trackEqualizers = if (profile == null) trackEqualizers - id else trackEqualizers + (id to profile.normalized())
+            equalizerStore.saveTrackProfiles(trackEqualizers)
+        },
+        useMasteringRack = useMasteringRack,
+        onUseMasteringRackChange = { enabled ->
+            useMasteringRack = enabled
+            equalizerStore.saveUseMasteringRack(enabled)
         },
         onCycleEqualizerPreset = ::cycleEqualizerPreset,
         globalMastering = globalMastering,
@@ -1119,6 +1150,7 @@ fun BasePlaybackHost(
         shuffleEnabled = shuffleEnabled,
         shuffleMode = shuffleMode,
         onToggleShuffle = ::toggleShuffle,
+        onShuffleModeChange = ::setShuffleMode,
         repeatMode = repeatMode,
         onToggleRepeat = ::toggleRepeat,
         onSourceChange = { source ->
@@ -1165,8 +1197,8 @@ fun BasePlaybackHost(
         onResetTheme = onThemeReset,
         activePlayerViewMode = activePlayerViewMode,
         onPlayerViewModeChange = { mode ->
-            activePlayerViewMode = mode
-            settingsStore.savePlayerViewMode(mode)
+            activePlayerViewMode = ordinaryPlayerViewMode(mode)
+            settingsStore.savePlayerViewMode(activePlayerViewMode)
         },
         incomingDeepLink = incomingDeepLink,
         incomingSearchQuery = incomingSearchQuery,

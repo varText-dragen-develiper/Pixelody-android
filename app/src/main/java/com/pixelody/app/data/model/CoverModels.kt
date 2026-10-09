@@ -14,9 +14,10 @@ package com.pixelody.app.data.model
 data class CoverEntry(
     val key: String,
     val imageUri: String? = null,
-    val note: String = ""
+    val note: String = "",
+    val backgroundOpacity: Float? = null
 ) {
-    val isEmpty: Boolean get() = imageUri.isNullOrBlank() && note.isBlank()
+    val isEmpty: Boolean get() = imageUri.isNullOrBlank() && note.isBlank() && backgroundOpacity == null
 }
 
 data class CoverBook(val entries: Map<String, CoverEntry> = emptyMap()) {
@@ -34,6 +35,12 @@ data class CoverBook(val entries: Map<String, CoverEntry> = emptyMap()) {
     fun withImage(key: String, imageUri: String?): CoverBook =
         updated(key) { it.copy(imageUri = imageUri?.takeIf { uri -> uri.isNotBlank() }) }
 
+    fun backgroundOpacityFor(screen: ScreenBackground): Float =
+        entries[screen.key]?.backgroundOpacity ?: if (hasCustomImage(screen.key)) 0.6f else 1f
+
+    fun withBackgroundOpacity(screen: ScreenBackground, opacity: Float): CoverBook =
+        updated(screen.key) { it.copy(backgroundOpacity = opacity.takeIf { value -> value.isFinite() }?.coerceIn(0f, 1f)) }
+
     fun withNote(key: String, note: String): CoverBook =
         updated(key) { it.copy(note = note.trim()) }
 
@@ -44,7 +51,7 @@ data class CoverBook(val entries: Map<String, CoverEntry> = emptyMap()) {
 }
 
 /**
- * One line per entry: `key|imageUri|note`, with the three reserved characters
+ * One line per entry: `key|imageUri|note|backgroundOpacity` (the optional fourth field extends v1), with the three reserved characters
  * percent-escaped so a note containing a pipe or a line break survives a round trip.
  * Anything that fails to decode is dropped rather than thrown, for the same reason
  * crates do it: a bad character should not become a crash on launch.
@@ -55,7 +62,7 @@ object CoverCodec {
 
     fun encode(book: CoverBook): String =
         (listOf(VERSION) + book.entries.values.map { entry ->
-            listOf(escape(entry.key), escape(entry.imageUri.orEmpty()), escape(entry.note))
+            listOf(escape(entry.key), escape(entry.imageUri.orEmpty()), escape(entry.note), entry.backgroundOpacity?.toString().orEmpty())
                 .joinToString("|")
         }).joinToString("\n")
 
@@ -71,7 +78,8 @@ object CoverCodec {
             CoverEntry(
                 key = key,
                 imageUri = unescape(fields[1]).ifBlank { null },
-                note = unescape(fields[2])
+                note = unescape(fields[2]),
+                backgroundOpacity = fields.getOrNull(3)?.toFloatOrNull()?.takeIf { it.isFinite() }?.coerceIn(0f, 1f)
             ).takeUnless { it.isEmpty }
         }
         // Earlier collection menus wrote plural prefixes; shelves use canonical singular keys.

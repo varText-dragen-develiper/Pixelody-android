@@ -8,6 +8,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HostApiErrorMessageTest {
+    @Test fun pairingAndNetworkFailuresGiveDifferentRecoveryWithoutLeakingSecrets() {
+        val expired = HostApiException(400, "pairing_not_found", "secret-token-at-http://host")
+        val invalid = HostApiException(400, "pairing_secret_invalid", "secret-token-at-http://host")
+        assertTrue(hostConnectionFailureMessage(IllegalStateException("outer", expired)).contains("fresh QR"))
+        assertTrue(hostConnectionFailureMessage(invalid).contains("rejected"))
+        assertTrue(connectionStateFor(expired) == HostConnectionState.CredentialExpired)
+        assertTrue(connectionStateFor(invalid) == HostConnectionState.AuthFailed)
+        assertTrue(!hostConnectionFailureMessage(expired).contains("secret-token"))
+        val network = HostNetworkException("network_unavailable", HostConnectionState.NetworkUnavailable, "secret-token", ConnectException())
+        assertTrue(hostConnectionFailureMessage(network).contains("No route"))
+        assertTrue(!hostConnectionFailureMessage(network).contains("secret-token"))
+    }
     @Test
     fun authenticationCodesRemainDistinctAndActionable() {
         val invalid = hostApiErrorMessage(401, "auth_invalid")

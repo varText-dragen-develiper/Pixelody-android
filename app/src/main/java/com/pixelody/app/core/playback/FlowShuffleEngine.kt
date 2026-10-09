@@ -44,6 +44,25 @@ data class ShuffledTrackEntry(
  */
 object FlowShuffleEngine {
 
+    /** Reorder an existing queue by occurrence, retaining repeats and unresolved media items. */
+    fun planUpcomingOrder(
+        currentTrack: Track?, upcoming: List<Track?>, mode: FlowShuffleMode,
+        random: Random = Random.Default, checkActive: () -> Unit = {}
+    ): List<Int> {
+        if (mode == FlowShuffleMode.Off) return upcoming.indices.toList()
+        val aliases = upcoming.mapIndexedNotNull { position, track ->
+            checkActive()
+            track?.copy(id = "flow-occurrence-$position")
+        }
+        // These identities exist only inside planning. The host applies positions to
+        // its original media items, so real track IDs and metadata never change.
+        val positions = aliases.associate { it.id to it.id.removePrefix("flow-occurrence-").toInt() }
+        val planned = planQueue(currentTrack?.copy(id = "flow-current-anchor"), aliases, mode,
+            aliases.size, random, checkActive).mapNotNull { positions[it.track.id] }
+        val plannedSet = planned.toSet()
+        return planned + upcoming.indices.filterNot { it in plannedSet }
+    }
+
     private fun normalize(text: String?): String =
         text?.lowercase(Locale.US)?.replace(Regex("[^\\p{L}\\p{N}]+"), " ")?.trim().orEmpty()
 
@@ -146,7 +165,7 @@ object FlowShuffleEngine {
                 val normalizedText = mutableMapOf<String?, String>()
                 val normalized: (String?) -> String = { normalizedText.getOrPut(it) { normalize(it) } }
                 val keys = (listOfNotNull(currentTrack) + candidates).associate { it.id to
-                    (HarmonicKeyEngine.parseKey(it.format) ?: HarmonicKeyEngine.parseKey(it.title)) }
+                    FlowBrowseFilter.knownKey(it) }
                 val genreScores = mutableMapOf<Pair<String?, String>, Int>()
 
                 var step = 0

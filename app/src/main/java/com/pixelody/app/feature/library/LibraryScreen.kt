@@ -1,5 +1,8 @@
 package com.pixelody.app.feature.library
 
+import com.pixelody.app.core.playback.FlowBrowseFilter
+import com.pixelody.app.core.playback.FlowShuffleMode
+import com.pixelody.app.feature.nowplaying.FlowEntry
 import com.pixelody.app.ui.components.StudioSectionToggle
 
 import com.pixelody.app.data.model.CoverBook
@@ -62,8 +65,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.pixelody.app.core.genre.GenreTaxonomyEngine
-import com.pixelody.app.core.playback.HarmonicFlowCoordinator
-import com.pixelody.app.core.playback.HarmonicKeyEngine
 import com.pixelody.app.data.model.CamelotKey
 import com.pixelody.app.data.model.EqualizerProfile
 import com.pixelody.app.data.model.HostConnectionState
@@ -74,10 +75,8 @@ import com.pixelody.app.feature.connection.hostSourceNeedsRecovery
 import com.pixelody.app.feature.connection.label
 import com.pixelody.app.ui.components.AlphabetScrubber
 import com.pixelody.app.ui.components.BatchSelectionActionBar
-import com.pixelody.app.ui.components.CollectionHarmonicCardBadge
 import com.pixelody.app.ui.components.EmptyState
 import com.pixelody.app.ui.components.FlippableCrateView
-import com.pixelody.app.ui.components.HarmonicDiggingRingLens
 import com.pixelody.app.ui.components.HarmonicFilterMode
 import com.pixelody.app.ui.components.getCompatibleCamelotKeyCodes
 import com.pixelody.app.ui.components.HomeSectionHeader
@@ -86,7 +85,8 @@ import com.pixelody.app.ui.components.LibraryScopeSummary
 import com.pixelody.app.ui.components.PixelodyTransportGlyph
 import com.pixelody.app.ui.components.QuickStartTile
 import com.pixelody.app.ui.components.RemoteArtwork
-import com.pixelody.app.ui.components.ScreenHeader
+import com.pixelody.app.ui.components.PageIdentity
+import com.pixelody.app.ui.navigation.PixelodyTab
 import com.pixelody.app.data.model.AppExperienceMode
 import com.pixelody.app.ui.components.ExperienceModeQuickChip
 import com.pixelody.app.ui.components.SmartPocketFilter
@@ -167,7 +167,13 @@ internal fun LibraryScreen(
     onShowDoc: ((String) -> Unit)? = null,
     experienceMode: AppExperienceMode = AppExperienceMode.Essential,
     onExperienceModeChange: (AppExperienceMode) -> Unit = {},
-    onShuffleAllFlow: () -> Unit = {}
+    onShuffleAllFlow: () -> Unit = {},
+    shuffleMode: FlowShuffleMode = FlowShuffleMode.Off,
+    harmonicBaseKey: CamelotKey? = null,
+    harmonicFilterMode: HarmonicFilterMode = HarmonicFilterMode.StrictAdjacent,
+    flowBpm: Float? = null,
+    flowTolerance: Float = 10f,
+    onOpenFlow: () -> Unit = {}
 ) {
     var query by remember { mutableStateOf("") }
     var browseMode by rememberSaveable { mutableStateOf("Tracks") }
@@ -309,8 +315,6 @@ internal fun LibraryScreen(
             smartFilter = SmartPocketFilter.Recent
         }
     }
-    var harmonicBaseKey by remember { mutableStateOf<CamelotKey?>(null) }
-    var harmonicFilterMode by remember { mutableStateOf(HarmonicFilterMode.StrictAdjacent) }
     var selectedGenreFilter by rememberSaveable { mutableStateOf<String?>(null) }
 
     val availableGenresWithCounts = remember(tracks) {
@@ -360,10 +364,9 @@ internal fun LibraryScreen(
     }
 
     val compatibleKeys = harmonicBaseKey?.let { getCompatibleCamelotKeyCodes(it, harmonicFilterMode) }
-    val harmonicScopedTracks = if (compatibleKeys == null) pocketFilteredTracks else {
+    val harmonicScopedTracks = if (compatibleKeys == null && flowBpm == null) pocketFilteredTracks else {
         pocketFilteredTracks.filter { track ->
-            val trackKeyCode = HarmonicKeyEngine.estimateTrackTelemetry(track).key.code
-            trackKeyCode in compatibleKeys
+            FlowBrowseFilter.matches(track, compatibleKeys, flowBpm, flowTolerance)
         }
     }
 
@@ -398,25 +401,20 @@ internal fun LibraryScreen(
             state = listState,
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(top = 10.dp, end = if (browseMode == "Tracks") 28.dp else 0.dp, bottom = 16.dp)
+            contentPadding = PaddingValues(top = 12.dp, end = if (browseMode == "Tracks") 28.dp else 0.dp, bottom = 16.dp)
         ) {
             item {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                        .padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
+                        PageIdentity(PixelodyTab.Library)
                         Text(
-                            text = "Library",
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                        Text(
-                            text = "Your tracks, playlists, and albums.",
+                            text = "${allTracks.size} tracks",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
                         )
@@ -547,18 +545,8 @@ internal fun LibraryScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
             }
-            if (experienceMode == AppExperienceMode.Studio && showLibraryTools) {
-                item {
-                    HarmonicDiggingRingLens(
-                        currentTrack = selectedTrack,
-                        selectedBaseKey = harmonicBaseKey,
-                        filterMode = harmonicFilterMode,
-                        onSelectBaseKey = { harmonicBaseKey = it },
-                        onSelectFilterMode = { harmonicFilterMode = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        onShowDoc = onShowDoc
-                    )
-                }
+            item {
+                FlowEntry(shuffleMode, harmonicBaseKey, flowBpm, onOpenFlow)
             }
             if (experienceMode == AppExperienceMode.Studio && showLibraryTools) item {
                 LibraryQuickActionShelf(
@@ -894,19 +882,7 @@ internal fun LibraryScreen(
                     onPlayFirst = { playableVisibleTracks.firstOrNull()?.let(onPlayTrack) },
                     onShuffle = { playableVisibleTracks.shuffled().firstOrNull()?.let(onPlayTrack) },
                     onOpenQueue = onOpenQueue,
-                    onFlowFromHere = {
-                        playableVisibleTracks.firstOrNull()?.let { firstTrack ->
-                            val runway = HarmonicFlowCoordinator.seedHarmonicFlowRunway(
-                                anchorTrack = firstTrack,
-                                libraryPool = allTracks,
-                                profile = HarmonicFlowCoordinator.activeProfile.value
-                            )
-                            onPlayTrack(firstTrack)
-                            if (runway.size > 1) {
-                                onAddBatchToQueue(runway.drop(1))
-                            }
-                        }
-                    },
+                    onFlowFromHere = onOpenFlow,
                     onShowDoc = onShowDoc
                 )
             }
@@ -1132,7 +1108,6 @@ internal fun CollectionPreviewCard(
             onLongClick = onLongClick
         )
         if (tracks.size >= 2) {
-            CollectionHarmonicCardBadge(tracks = tracks)
         }
     }
 }

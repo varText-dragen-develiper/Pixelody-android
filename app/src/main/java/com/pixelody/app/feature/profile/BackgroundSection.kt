@@ -10,6 +10,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import kotlin.math.roundToInt
 import com.pixelody.app.data.model.CoverBook
 import com.pixelody.app.data.model.ScreenBackground
 import com.pixelody.app.data.storage.CoverStore
@@ -45,7 +48,7 @@ internal fun BackgroundSection(covers: CoverBook, store: CoverStore?, onChange: 
             Text(if (expanded) "Close background controls" else "Customize backgrounds")
         }
         if (expanded) {
-            Text("Images stay on this phone. Each screen has its own choice, dimmed to keep music and controls readable.",
+            Text("Images stay on this phone. Each screen has its own choice, with adjustable opacity. Automatic shading keeps music and controls readable.",
                 style = MaterialTheme.typography.bodySmall)
             if (importing) Text("Saving image…")
             ScreenBackground.values().forEach { screen ->
@@ -57,6 +60,14 @@ internal fun BackgroundSection(covers: CoverBook, store: CoverStore?, onChange: 
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                     Text(if (image == null) "Choose ${screen.label} background" else "Change ${screen.label} background")
                 }
+                val savedOpacity = covers.backgroundOpacityFor(screen)
+                var opacity by remember(screen, savedOpacity) { mutableStateOf(savedOpacity) }
+                Text("${screen.label} background opacity: ${(opacity * 100).roundToInt()}%",
+                    style = MaterialTheme.typography.bodySmall)
+                Slider(value = opacity, onValueChange = { opacity = it },
+                    onValueChangeFinished = { onChange(currentCovers.withBackgroundOpacity(screen, opacity)) },
+                    modifier = Modifier.fillMaxWidth().semantics { contentDescription = "${screen.label} background opacity" })
+                if (image == null) Text("Applies to the selected theme's background.", style = MaterialTheme.typography.bodySmall)
                 if (image != null) TextButton(onClick = { onChange(currentCovers.withImage(screen.key, null)) },
                     enabled = !importing, modifier = Modifier.heightIn(min = 48.dp)) {
                     Text("Reset ${screen.label} background")

@@ -237,7 +237,7 @@ fun ActiveGrooveConsole(
                         color = MaterialTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Turntable", style = MaterialTheme.typography.labelMedium)
+                    Text("Player", style = MaterialTheme.typography.labelMedium)
                 }
 
                 OutlinedButton(

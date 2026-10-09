@@ -124,6 +124,203 @@
             </intent-filter>
         </activity-alias>
 
+        <!-- Automatic theme/palette icons; manual purple aliases remain for saved overrides. -->
+        <activity-alias
+            android:name=".LauncherThemeStudio"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_theme_studio"
+            android:roundIcon="@mipmap/ic_launcher_theme_studio"
+            android:label="Pixelody"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".LauncherThemeQuest"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_theme_quest"
+            android:roundIcon="@mipmap/ic_launcher_theme_quest"
+            android:label="Pixelody"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".LauncherThemeGlass"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_theme_glass"
+            android:roundIcon="@mipmap/ic_launcher_theme_glass"
+            android:label="Pixelody"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".LauncherThemeCafe"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_theme_cafe"
+            android:roundIcon="@mipmap/ic_launcher_theme_cafe"
+            android:label="Pixelody"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".LauncherThemeTerminal"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_theme_terminal"
+            android:roundIcon="@mipmap/ic_launcher_theme_terminal"
+            android:label="Pixelody"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".LauncherThemeObsession"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_theme_obsession"
+            android:roundIcon="@mipmap/ic_launcher_theme_obsession"
+            android:label="Pixelody"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".LauncherThemeGold"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_theme_gold"
+            android:roundIcon="@mipmap/ic_launcher_theme_gold"
+            android:label="Pixelody"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".LauncherThemeAurora"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_theme_aurora"
+            android:roundIcon="@mipmap/ic_launcher_theme_aurora"
+            android:label="Pixelody"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".LauncherThemeEmber"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_theme_ember"
+            android:roundIcon="@mipmap/ic_launcher_theme_ember"
+            android:label="Pixelody"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".LauncherThemeViolet"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_theme_violet"
+            android:roundIcon="@mipmap/ic_launcher_theme_violet"
+            android:label="Pixelody"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".LauncherThemeMono"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_theme_mono"
+            android:roundIcon="@mipmap/ic_launcher_theme_mono"
+            android:label="Pixelody"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".LauncherThemeCobalt"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_theme_cobalt"
+            android:roundIcon="@mipmap/ic_launcher_theme_cobalt"
+            android:label="Pixelody"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".LauncherThemeSakura"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_theme_sakura"
+            android:roundIcon="@mipmap/ic_launcher_theme_sakura"
+            android:label="Pixelody"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".LauncherThemeCafeNight"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_theme_cafenight"
+            android:roundIcon="@mipmap/ic_launcher_theme_cafenight"
+            android:label="Pixelody"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".LauncherThemeVerdant"
+            android:targetActivity=".MainActivity"
+            android:icon="@mipmap/ic_launcher_theme_verdant"
+            android:roundIcon="@mipmap/ic_launcher_theme_verdant"
+            android:label="Pixelody"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
         <service
             android:name=".core.playback.PixelodyPlaybackService"
             android:exported="true"

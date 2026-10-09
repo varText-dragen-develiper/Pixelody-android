@@ -1,5 +1,8 @@
 package com.pixelody.app.feature.search
 
+import com.pixelody.app.core.playback.FlowBrowseFilter
+import com.pixelody.app.core.playback.FlowShuffleMode
+import com.pixelody.app.feature.nowplaying.FlowEntry
 import com.pixelody.app.data.model.CoverBook
 import com.pixelody.app.data.model.collectionCoverKey
 import com.pixelody.app.data.model.trackCoverKey
@@ -30,7 +33,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.pixelody.app.ui.theme.compactSurfaceShape
 import androidx.compose.ui.unit.dp
-import com.pixelody.app.core.playback.HarmonicKeyEngine
 import com.pixelody.app.data.model.CamelotKey
 import com.pixelody.app.data.model.EqualizerProfile
 import com.pixelody.app.data.model.LibrarySnapshot
@@ -38,13 +40,12 @@ import com.pixelody.app.data.model.Track
 import com.pixelody.app.feature.library.CollectionPreviewCard
 import com.pixelody.app.feature.library.CollectionShortcut
 import com.pixelody.app.ui.components.CompactTrackPill
-import com.pixelody.app.ui.components.HarmonicDiggingRingLens
 import com.pixelody.app.ui.components.HarmonicFilterMode
-import com.pixelody.app.ui.components.HarmonicTrajectorySparkline
 import com.pixelody.app.ui.components.getCompatibleCamelotKeyCodes
 import com.pixelody.app.ui.components.HomeSectionHeader
 import com.pixelody.app.ui.components.QuickStartTile
-import com.pixelody.app.ui.components.ScreenHeader
+import com.pixelody.app.ui.components.PageIdentity
+import com.pixelody.app.ui.navigation.PixelodyTab
 import com.pixelody.app.ui.components.SectionCard
 import com.pixelody.app.ui.components.SourceScope
 import com.pixelody.app.ui.components.TrackRow
@@ -100,14 +101,18 @@ internal fun SearchScreen(
     onShowDoc: ((String) -> Unit)? = null,
     experienceMode: com.pixelody.app.data.model.AppExperienceMode = com.pixelody.app.data.model.AppExperienceMode.Essential,
     covers: CoverBook = CoverBook(),
-    onCoverActions: (String, String) -> Unit = { _, _ -> }
+    onCoverActions: (String, String) -> Unit = { _, _ -> },
+    shuffleMode: FlowShuffleMode = FlowShuffleMode.Off,
+    harmonicBaseKey: CamelotKey? = null,
+    harmonicFilterMode: HarmonicFilterMode = HarmonicFilterMode.StrictAdjacent,
+    flowBpm: Float? = null,
+    flowTolerance: Float = 10f,
+    onOpenFlow: () -> Unit = {}
 ) {
     val haptic = LocalHapticFeedback.current
     val theme = LocalPixelodyThemeVariant.current
     var query by remember { mutableStateOf("") }
     var intentFilter by rememberSaveable { mutableStateOf("Everything") }
-    var harmonicBaseKey by remember { mutableStateOf<CamelotKey?>(null) }
-    var harmonicFilterMode by remember { mutableStateOf(HarmonicFilterMode.StrictAdjacent) }
     var isMultiSelectMode by remember { mutableStateOf(false) }
     var selectedTrackIds by remember { mutableStateOf(setOf<String>()) }
 
@@ -175,9 +180,9 @@ internal fun SearchScreen(
                 )
             }
     }
-    val combinedTracks = remember(hostTracks, localTracks, query, sourceScope, intentFilter, favoriteIds, queuedIds, harmonicBaseKey, harmonicFilterMode) {
+    val combinedTracks = remember(hostTracks, localTracks, query, sourceScope, intentFilter, favoriteIds, queuedIds, harmonicBaseKey, harmonicFilterMode, flowBpm, flowTolerance) {
         val needle = query.trim().lowercase(Locale.US)
-        val allTracks = hostTracks + localTracks
+        val allTracks = (hostTracks + localTracks).distinctBy { it.id }
         val sourceTracks = filterTracksBySource(allTracks, sourceScope, localTrackIds, jamTrackIds)
         val intentTracks = when (intentFilter) {
             "Playable" -> sourceTracks.filterNot { it.missing || it.streamUrl.isBlank() }
@@ -187,10 +192,9 @@ internal fun SearchScreen(
             else -> sourceTracks
         }
         val compatibleKeys = harmonicBaseKey?.let { getCompatibleCamelotKeyCodes(it, harmonicFilterMode) }
-        val harmonicFiltered = if (compatibleKeys == null) intentTracks else {
+        val harmonicFiltered = if (compatibleKeys == null && flowBpm == null) intentTracks else {
             intentTracks.filter { track ->
-                val trackKeyCode = HarmonicKeyEngine.estimateTrackTelemetry(track).key.code
-                trackKeyCode in compatibleKeys
+                FlowBrowseFilter.matches(track, compatibleKeys, flowBpm, flowTolerance)
             }
         }
         if (needle.isBlank()) harmonicFiltered else harmonicFiltered.filter { track ->
@@ -206,10 +210,7 @@ internal fun SearchScreen(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = if (isMultiSelectMode) 140.dp else 24.dp)
         ) {
             item {
-                ScreenHeader(
-                    title = "Search",
-                    subtitle = "Songs, artists, albums."
-                )
+                PageIdentity(PixelodyTab.Search)
             }
             item {
                 OutlinedTextField(
@@ -252,18 +253,10 @@ internal fun SearchScreen(
                     }
                 }
             }
-            if (experienceMode == com.pixelody.app.data.model.AppExperienceMode.Studio) item {
-                HarmonicDiggingRingLens(
-                    currentTrack = selectedTrack,
-                    selectedBaseKey = harmonicBaseKey,
-                    filterMode = harmonicFilterMode,
-                    onSelectBaseKey = { harmonicBaseKey = it },
-                    onSelectFilterMode = { harmonicFilterMode = it },
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                    onShowDoc = onShowDoc
-                )
+            item {
+                FlowEntry(shuffleMode, harmonicBaseKey, flowBpm, onOpenFlow)
             }
-            if (query.isBlank() && experienceMode == com.pixelody.app.data.model.AppExperienceMode.Studio) {
+            if (query.isBlank() && harmonicBaseKey == null && flowBpm == null && experienceMode == com.pixelody.app.data.model.AppExperienceMode.Studio) {
                 item {
                     HomeSectionHeader(title = "Quick Paths", subtitle = "Resume, narrow the mood, or jump to the right source.")
                     SearchQuickActionShelf(
@@ -281,7 +274,7 @@ internal fun SearchScreen(
                     )
                 }
             }
-            if (query.isBlank() && suggestedTracks.isNotEmpty()) {
+            if (query.isBlank() && harmonicBaseKey == null && flowBpm == null && suggestedTracks.isNotEmpty()) {
                 item {
                     HomeSectionHeader(title = "Start here", subtitle = "")
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -300,7 +293,7 @@ internal fun SearchScreen(
                     }
                 }
             }
-            if (query.isBlank() && (albumShortcuts.isNotEmpty() || artistShortcuts.isNotEmpty())) {
+            if (query.isBlank() && harmonicBaseKey == null && flowBpm == null && (albumShortcuts.isNotEmpty() || artistShortcuts.isNotEmpty())) {
                 item {
                     HomeSectionHeader(title = "Browse", subtitle = "")
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -346,14 +339,6 @@ internal fun SearchScreen(
                     title = "Results",
                     subtitle = "${combinedTracks.size} match${if (combinedTracks.size == 1) "" else "es"} across ${sourceScope.label.lowercase(Locale.US)} music."
                 )
-            }
-            if (combinedTracks.size >= 2) {
-                item {
-                    HarmonicTrajectorySparkline(
-                        tracks = combinedTracks,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp)
-                    )
-                }
             }
             items(combinedTracks, key = { "${it.id}-${it.streamUrl}" }) { track ->
                 val isSelectedInBatch = selectedTrackIds.contains(track.id)

@@ -40,6 +40,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,6 +71,7 @@ import com.pixelody.app.ui.components.performConfirm
 import com.pixelody.app.ui.components.performTick
 import java.util.Locale
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 /* =========================================================================
  * Slice 2 Connection Vocabulary
@@ -631,6 +633,9 @@ internal fun QrScannerPane(
     val lifecycleOwner = LocalLifecycleOwner.current
     val executor = remember { Executors.newSingleThreadExecutor() }
     val decoder = remember { QrDecoder() }
+    val scanActive = remember { AtomicBoolean(true) }
+    val currentOnPayloadScanned by rememberUpdatedState(onPayloadScanned)
+    val currentOnError by rememberUpdatedState(onError)
     var boundCameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
     var hasScanned by remember { mutableStateOf(false) }
     var reportedUnreadableQr by remember { mutableStateOf(false) }
@@ -640,6 +645,7 @@ internal fun QrScannerPane(
 
     DisposableEffect(Unit) {
         onDispose {
+            scanActive.set(false)
             boundCameraProvider?.unbindAll()
             executor.shutdown()
         }
@@ -660,6 +666,7 @@ internal fun QrScannerPane(
                 val cameraProviderFuture = ProcessCameraProvider.getInstance(viewContext)
                 cameraProviderFuture.addListener(
                     {
+                        if (!scanActive.get()) return@addListener
                         val cameraProvider = runCatching { cameraProviderFuture.get() }
                             .onFailure { onError(it.message ?: "Camera could not start.") }
                             .getOrNull()
@@ -675,26 +682,34 @@ internal fun QrScannerPane(
                             .build()
                             .also { analyzer ->
                                 analyzer.setAnalyzer(executor) { imageProxy ->
-                                    if (hasScanned) {
+                                    if (!scanActive.get() || hasScanned) {
                                         imageProxy.close()
                                         return@setAnalyzer
                                     }
-                                    val text = runCatching { decoder.decode(imageProxy) }
-                                        .onFailure { mainExecutor.execute { onError(it.message ?: "QR scan failed.") } }
-                                        .getOrNull()
-                                    imageProxy.close()
+                                    val result = try {
+                                        runCatching { decoder.decode(imageProxy) }
+                                    } finally {
+                                        imageProxy.close()
+                                    }
                                     mainExecutor.execute {
+                                        if (!scanActive.get() || hasScanned) return@execute
+                                        if (result.isFailure) {
+                                            scannerStatus = "Camera frame could not be read"
+                                            currentOnError("Camera frame could not be read. Stop Scan and try again, or paste the desktop invite.")
+                                            return@execute
+                                        }
+                                        val text = result.getOrNull()
                                         val candidates = text?.payloadCandidates().orEmpty()
                                         detectedQrCount = if (text != null) 1 else 0
                                         val payload = candidates.firstOrNull { HostConnectionDetails.fromText(it) != null }.orEmpty()
                                         if (payload.isNotBlank() && !hasScanned) {
                                             hasScanned = true
                                             scannerStatus = "Pixelody QR found"
-                                            onPayloadScanned(payload)
+                                            currentOnPayloadScanned(payload)
                                         } else if (text != null && !reportedUnreadableQr) {
                                             reportedUnreadableQr = true
                                             scannerStatus = "QR detected, reading data"
-                                            onError("QR recognized, but no Pixelody pairing data was found. Text: ${candidates.firstOrNull().toQrDebugPreview()}")
+                                            currentOnError("QR recognized, but it isn't a Pixelody connection invite. Create a fresh code in the Windows J.A.M. drawer.")
                                         } else if (text != null) {
                                             scannerStatus = "QR detected, reading data"
                                         } else {

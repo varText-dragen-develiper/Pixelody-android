@@ -1,5 +1,10 @@
 package com.pixelody.app.feature.baselayer
 
+import com.pixelody.app.feature.nowplaying.FlowListeningSheet
+import com.pixelody.app.core.playback.FlowBrowseFilter
+import com.pixelody.app.data.model.CamelotKey
+import com.pixelody.app.ui.components.HarmonicFilterMode
+import com.pixelody.app.ui.components.getCompatibleCamelotKeyCodes
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -57,6 +62,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -201,13 +207,19 @@ fun PixelodyBaseShell(
     onNext: () -> Unit,
     onSeek: (Long) -> Unit = {},
     onAddToQueue: (String) -> Unit = {},
+    onAddTracksToQueue: (List<String>) -> Unit = { ids -> ids.forEach(onAddToQueue) },
     onMoveQueueItem: (Int, Int) -> Unit = { _, _ -> },
     onReorderQueue: (List<String>) -> Unit = {},
     onInsertIntoQueue: (String, Int) -> Unit = { _, _ -> },
     onRemoveQueueItem: (String) -> Unit = {},
+    onRemoveQueueItemAt: (Int) -> Unit = { index -> data.queue.getOrNull(index)?.let(onRemoveQueueItem) },
     onClearQueue: () -> Unit = {},
     equalizerProfile: EqualizerProfile = EqualizerProfile(),
     onEqualizerChange: (EqualizerProfile) -> Unit = {},
+    trackEqualizers: Map<String, EqualizerProfile> = emptyMap(),
+    onTrackEqualizerChange: (String, EqualizerProfile?) -> Unit = { _, _ -> },
+    useMasteringRack: Boolean = false,
+    onUseMasteringRackChange: (Boolean) -> Unit = {},
     onCycleEqualizerPreset: () -> Unit = {},
     globalMastering: MasteringProfile = MasteringProfile(),
     onMasteringChange: (MasteringProfile) -> Unit = {},
@@ -232,6 +244,7 @@ fun PixelodyBaseShell(
     shuffleMode: FlowShuffleMode = FlowShuffleMode.Off,
     onResume: () -> Unit = {},
     onToggleShuffle: () -> Unit = {},
+    onShuffleModeChange: (FlowShuffleMode) -> Unit = {},
     onShuffleTracks: (List<String>) -> Unit = onPlayTracks,
     repeatMode: RepeatMode = RepeatMode.Off,
     onToggleRepeat: () -> Unit = {},
@@ -307,6 +320,14 @@ fun PixelodyBaseShell(
     var state by rememberSaveable(stateSaver = BaseLayerStateSaver) {
         mutableStateOf(BaseLayerState(destination = BaseDestination.Home))
     }
+    var showFlow by rememberSaveable { mutableStateOf(false) }
+    var flowKeyCode by rememberSaveable { mutableStateOf<String?>(null) }
+    var flowFilterName by rememberSaveable { mutableStateOf(HarmonicFilterMode.StrictAdjacent.name) }
+    var flowBpm by rememberSaveable { mutableStateOf<Float?>(null) }
+    var flowTolerance by rememberSaveable { mutableStateOf(10f) }
+    val flowKey = flowKeyCode?.let(CamelotKey::fromCode)
+    val flowFilterMode = HarmonicFilterMode.entries.firstOrNull { it.name == flowFilterName }
+        ?: HarmonicFilterMode.StrictAdjacent
     var shape by rememberSaveable { mutableStateOf(BaseBrowseShape.Tracks) }
     var query by rememberSaveable { mutableStateOf("") }
     val haptic = LocalHapticFeedback.current
@@ -346,8 +367,11 @@ fun PixelodyBaseShell(
 
     var experienceMode by rememberSaveable { mutableStateOf(settingsStore.loadExperienceMode()) }
 
-    fun playLibraryTrack(trackId: String, pool: List<Track> = data.visibleTracks()) {
-        val effectivePool = if (pool.isNotEmpty()) pool else (data.tracks.ifEmpty { localTracks })
+    val flowKeyCodes = flowKey?.let { getCompatibleCamelotKeyCodes(it, flowFilterMode) }
+    fun matchesFlow(track: Track) = FlowBrowseFilter.matches(track, flowKeyCodes, flowBpm, flowTolerance)
+
+    fun playLibraryTrack(trackId: String, pool: List<Track> = data.visibleTracks().filter(::matchesFlow)) {
+        val effectivePool = pool
         val playablePool = effectivePool.filter { data.isPlayable(it.id) || localTracks.any { lt -> lt.id == it.id } }
         val current = playablePool.firstOrNull { it.id == trackId } ?: resolveTrack(trackId)
         if (current != null) playFrom(current.id, playablePool.map { it.id })
@@ -355,7 +379,7 @@ fun PixelodyBaseShell(
     }
 
     fun shuffleAllFlow() {
-        val playablePool = data.visibleTracks().filter { data.isPlayable(it.id) }
+        val playablePool = data.visibleTracks().filter { data.isPlayable(it.id) && matchesFlow(it) }
         if (playablePool.isNotEmpty()) {
             val seed = playablePool.random()
             onShuffleTracks(listOf(seed.id) + playablePool.map { it.id }.filterNot { it == seed.id })
@@ -410,7 +434,8 @@ fun PixelodyBaseShell(
     val currentTrack = (data.currentTrackId ?: data.lastTrackId)?.let { resolveTrack(it) }
     val nextTrack = data.queue.firstOrNull()?.let { resolveTrack(it) }
     val previousTrack: Track? = null
-    val queueTracks = data.queue.mapNotNull { resolveTrack(it) }
+    val queueEntries = data.queue.mapIndexedNotNull { index, id -> resolveTrack(id)?.let { index to it } }
+    val queueTracks = queueEntries.map { it.second }
 
     val currentHostProfile = remember(hostBaseUrl, hostConnectionState) {
         HostProfile(
@@ -526,78 +551,84 @@ fun PixelodyBaseShell(
             }
         }
 
-    Box(modifier = modifier.fillMaxSize().pixelodyGround()) {
-        when (activeTheme) {
-            PixelodyMobileTheme.CartridgeQuest -> {
-                ScanlineOverlay(
-                    modifier = Modifier.fillMaxSize(),
-                    lineColor = Color(0x0C000000),
-                    spacingDp = 4.dp
-                )
-            }
-            PixelodyMobileTheme.ObsidianGlass -> {
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    drawRect(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                ObsidianGlassPalette.PrismCyan.copy(alpha = 0.08f),
-                                ObsidianGlassPalette.PrismViolet.copy(alpha = 0.04f),
-                                Color.Transparent
-                            ),
-                            center = Offset(size.width * 0.85f, size.height * 0.12f),
-                            radius = size.width * 0.95f
-                        )
+    val backgroundScreen = when {
+        state.pushed.lastOrNull() == BasePush.Appearance -> ScreenBackground.Settings
+        state.pushed.lastOrNull() is BasePush.Collection -> ScreenBackground.Library
+        state.pushed.isNotEmpty() -> null
+        state.destination == BaseDestination.Home -> ScreenBackground.Home
+        state.destination == BaseDestination.Library -> ScreenBackground.Library
+        else -> ScreenBackground.Search
+    }
+    val backgroundOpacity = backgroundScreen?.let { data.covers.backgroundOpacityFor(it) } ?: 1f
+    val backgroundImage = backgroundScreen?.let { data.covers.imageFor(it.key, null) }
+    Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Box(Modifier.matchParentSize().graphicsLayer { alpha = if (backgroundImage == null) backgroundOpacity else 1f }.pixelodyGround()) {
+            when (activeTheme) {
+                PixelodyMobileTheme.CartridgeQuest -> {
+                    ScanlineOverlay(
+                        modifier = Modifier.fillMaxSize(),
+                        lineColor = Color(0x0C000000),
+                        spacingDp = 4.dp
                     )
                 }
-            }
-            PixelodyMobileTheme.LoFiCafe -> {
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    drawRect(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                LoFiCafePalette.Amber.copy(alpha = 0.07f),
-                                LoFiCafePalette.Wood.copy(alpha = 0.03f),
-                                Color.Transparent
-                            ),
-                            center = Offset(size.width * 0.15f, size.height * 0.08f),
-                            radius = size.width * 0.85f
+                PixelodyMobileTheme.ObsidianGlass -> {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        drawRect(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    ObsidianGlassPalette.PrismCyan.copy(alpha = 0.08f),
+                                    ObsidianGlassPalette.PrismViolet.copy(alpha = 0.04f),
+                                    Color.Transparent
+                                ),
+                                center = Offset(size.width * 0.85f, size.height * 0.12f),
+                                radius = size.width * 0.95f
+                            )
                         )
+                    }
+                }
+                PixelodyMobileTheme.LoFiCafe -> {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        drawRect(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    LoFiCafePalette.Amber.copy(alpha = 0.07f),
+                                    LoFiCafePalette.Wood.copy(alpha = 0.03f),
+                                    Color.Transparent
+                                ),
+                                center = Offset(size.width * 0.15f, size.height * 0.08f),
+                                radius = size.width * 0.85f
+                            )
+                        )
+                    }
+                }
+                PixelodyMobileTheme.BulkheadTerminal -> {
+                    ScanlineOverlay(
+                        modifier = Modifier.fillMaxSize(),
+                        lineColor = Color(0x0E78F09A),
+                        spacingDp = 3.dp
                     )
                 }
-            }
-            PixelodyMobileTheme.BulkheadTerminal -> {
-                ScanlineOverlay(
-                    modifier = Modifier.fillMaxSize(),
-                    lineColor = Color(0x0E78F09A),
-                    spacingDp = 3.dp
-                )
-            }
-            PixelodyMobileTheme.Obsession -> {
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    drawRect(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                ObsessionPalette.Signal.copy(alpha = 0.05f),
-                                Color.Transparent
-                            ),
-                            center = Offset(size.width * 0.5f, size.height * 0.95f),
-                            radius = size.width * 0.7f
+                PixelodyMobileTheme.Obsession -> {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        drawRect(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    ObsessionPalette.Signal.copy(alpha = 0.05f),
+                                    Color.Transparent
+                                ),
+                                center = Offset(size.width * 0.5f, size.height * 0.95f),
+                                radius = size.width * 0.7f
+                            )
                         )
-                    )
+                    }
                 }
+                PixelodyMobileTheme.Studio -> Unit // Keep the ground quiet behind music and controls.
             }
-            PixelodyMobileTheme.Studio -> Unit // Keep the ground quiet behind music and controls.
         }
-        val backgroundScreen = when {
-            state.pushed.lastOrNull() == BasePush.Appearance -> ScreenBackground.Settings
-            state.pushed.lastOrNull() is BasePush.Collection -> ScreenBackground.Library
-            state.pushed.isNotEmpty() -> null
-            state.destination == BaseDestination.Home -> ScreenBackground.Home
-            state.destination == BaseDestination.Library -> ScreenBackground.Library
-            else -> ScreenBackground.Search
-        }
-        ScreenImageBackground(backgroundScreen?.let { data.covers.imageFor(it.key, null) })
+        ScreenImageBackground(backgroundImage, backgroundOpacity)
         BaseLayerScaffold(
+            selectedDestination = state.destination,
+            backdropOpacity = backgroundOpacity,
             contentModifier = destinationSwipeModifier(
                 enabled = state.pushed.isEmpty() && state.sheet == null && state.overlays.isEmpty() && state.rearrangingCrate == null,
                 destination = state.destination,
@@ -655,6 +686,7 @@ fun PixelodyBaseShell(
             listeningSlot = {
                 if (currentTrack != null) {
                     MiniPlayerBar(
+                        embeddedInDock = true,
                         experienceMode = experienceMode,
                         track = currentTrack,
                         previousTrack = previousTrack,
@@ -674,7 +706,7 @@ fun PixelodyBaseShell(
                         onNext = onNext,
                         onOpenQueue = { send(BaseIntent.OpenSheet(BaseSheet.Queue)) },
                         onCycleEqualizerPreset = onCycleEqualizerPreset,
-                        onToggleShuffle = onToggleShuffle,
+                        onToggleShuffle = { showFlow = true },
                         onToggleRepeat = onToggleRepeat,
                         onSeek = onSeek,
                         onOpenPlayerToView = { viewMode ->
@@ -685,6 +717,7 @@ fun PixelodyBaseShell(
                     )
                 } else if (data.tracks.isNotEmpty() || data.lastTrackId != null) {
                     ListeningSlot(
+                        embeddedInDock = true,
                         state = data.listeningSlotState(),
                         onOpenPlayer = { send(BaseIntent.OpenSheet(BaseSheet.Player)) },
                         onSessionTray = { send(BaseIntent.ShowOverlay(BaseOverlay.SessionTray)) },
@@ -737,6 +770,12 @@ fun PixelodyBaseShell(
                         else -> PixelodyDetailKind.Playlist
                     }
                     LibraryScreen(
+                        shuffleMode = shuffleMode,
+                        harmonicBaseKey = flowKey,
+                        harmonicFilterMode = flowFilterMode,
+                        flowBpm = flowBpm,
+                        flowTolerance = flowTolerance,
+                        onOpenFlow = { showFlow = true },
                         recentTrackIds = dailyCapsule.memoryTimeline.sortedByDescending { it.timestampMs }.map { it.trackId },
                         covers = data.covers,
                         onCoverActions = { key, title -> send(BaseIntent.ShowOverlay(BaseOverlay.CoverActions(key, title))) },
@@ -744,7 +783,7 @@ fun PixelodyBaseShell(
                         localTracks = localTracks,
                         selectedTrack = currentTrack,
                         cachedTrackIds = data.downloadedTrackIds,
-                        onPlayTrack = { track -> playFrom(track.id, openCollection.trackIds) },
+                        onPlayTrack = { track -> playLibraryTrack(track.id, openCollection.trackIds.mapNotNull(::resolveTrack).filter(::matchesFlow)) },
                         onOpenQueue = { send(BaseIntent.OpenSheet(BaseSheet.Queue)) },
                         onOpenSearch = { send(BaseIntent.SelectDestination(BaseDestination.Search)) },
                         equalizerProfile = equalizerProfile,
@@ -817,6 +856,12 @@ fun PixelodyBaseShell(
                             else -> PixelodyDetailKind.Playlist
                         }
                         LibraryScreen(
+                            shuffleMode = shuffleMode,
+                            harmonicBaseKey = flowKey,
+                            harmonicFilterMode = flowFilterMode,
+                            flowBpm = flowBpm,
+                            flowTolerance = flowTolerance,
+                            onOpenFlow = { showFlow = true },
                             recentTrackIds = dailyCapsule.memoryTimeline.sortedByDescending { it.timestampMs }.map { it.trackId },
                             covers = data.covers,
                             onCoverActions = { key, title -> send(BaseIntent.ShowOverlay(BaseOverlay.CoverActions(key, title))) },
@@ -824,7 +869,7 @@ fun PixelodyBaseShell(
                             localTracks = localTracks,
                             selectedTrack = currentTrack,
                             cachedTrackIds = data.downloadedTrackIds,
-                            onPlayTrack = { track -> playFrom(track.id, data.visibleTracks().map { it.id }) },
+                            onPlayTrack = { track -> playLibraryTrack(track.id) },
                             onOpenQueue = { send(BaseIntent.OpenSheet(BaseSheet.Queue)) },
                             onOpenSearch = { send(BaseIntent.SelectDestination(BaseDestination.Search)) },
                             equalizerProfile = equalizerProfile,
@@ -946,6 +991,12 @@ fun PixelodyBaseShell(
                 }
 
                 state.destination == BaseDestination.Library -> LibraryScreen(
+                    shuffleMode = shuffleMode,
+                    harmonicBaseKey = flowKey,
+                    harmonicFilterMode = flowFilterMode,
+                    flowBpm = flowBpm,
+                    flowTolerance = flowTolerance,
+                    onOpenFlow = { showFlow = true },
                     recentTrackIds = dailyCapsule.memoryTimeline.sortedByDescending { it.timestampMs }.map { it.trackId },
                     covers = data.covers,
                     onCoverActions = { key, title -> send(BaseIntent.ShowOverlay(BaseOverlay.CoverActions(key, title))) },
@@ -953,13 +1004,7 @@ fun PixelodyBaseShell(
                     localTracks = localTracks,
                     selectedTrack = currentTrack,
                     cachedTrackIds = data.downloadedTrackIds,
-                    onPlayTrack = { track ->
-                        if (experienceMode == AppExperienceMode.Essential) {
-                            playLibraryTrack(track.id)
-                        } else {
-                            playFrom(track.id, data.visibleTracks().map { it.id })
-                        }
-                    },
+                    onPlayTrack = { track -> playLibraryTrack(track.id) },
                     experienceMode = experienceMode,
                     onExperienceModeChange = { newMode ->
                         experienceMode = newMode
@@ -1007,13 +1052,19 @@ fun PixelodyBaseShell(
                 )
 
                 state.destination == BaseDestination.Search -> SearchScreen(
+                    shuffleMode = shuffleMode,
+                    harmonicBaseKey = flowKey,
+                    harmonicFilterMode = flowFilterMode,
+                    flowBpm = flowBpm,
+                    flowTolerance = flowTolerance,
+                    onOpenFlow = { showFlow = true },
                     experienceMode = experienceMode,
                     covers = data.covers,
                     onCoverActions = { key, title -> send(BaseIntent.ShowOverlay(BaseOverlay.CoverActions(key, title))) },
                     snapshot = librarySnapshot,
                     localTracks = localTracks,
                     selectedTrack = currentTrack,
-                    onPlayTrack = { track -> playFrom(track.id, data.visibleTracks().map { it.id }) },
+                    onPlayTrack = { track -> playLibraryTrack(track.id) },
                     onOpenHome = { send(BaseIntent.SelectDestination(BaseDestination.Home)) },
                     onOpenLibrary = { send(BaseIntent.SelectDestination(BaseDestination.Library)) },
                     onOpenCollection = { kindKey, id -> send(BaseIntent.Push(BasePush.Collection(kindKey, id))) },
@@ -1050,6 +1101,7 @@ fun PixelodyBaseShell(
                 )
 
                 state.destination == BaseDestination.Home -> HomeScreen(
+                    onOpenFlowCabinet = { showFlow = true },
                     snapshot = librarySnapshot,
                     liveState = liveState,
                     selectedTrack = currentTrack,
@@ -1078,13 +1130,7 @@ fun PixelodyBaseShell(
                     onQrScannerError = { qrScannerError = it },
                     onForgetSavedHost = onForgetHost,
                     onUseCopiedDetails = { onConnectHost(copiedDetails) },
-                    onPlayTrack = { track ->
-                        if (experienceMode == AppExperienceMode.Essential) {
-                            playLibraryTrack(track.id)
-                        } else {
-                            playFrom(track.id, data.visibleTracks().map { it.id })
-                        }
-                    },
+                    onPlayTrack = { track -> playLibraryTrack(track.id) },
                     experienceMode = experienceMode,
                     onExperienceModeChange = { newMode ->
                         experienceMode = newMode
@@ -1175,24 +1221,24 @@ fun PixelodyBaseShell(
                         durationMs = durationMs,
                         expandedLayout = false,
                         globalEqualizer = equalizerProfile,
-                        trackEqualizer = null,
+                        trackEqualizer = currentTrack?.id?.let { trackEqualizers[it] },
                         globalMastering = globalMastering,
                         trackMastering = null,
-                        useMasteringRack = activePlayerViewMode == "Mastering",
+                        useMasteringRack = useMasteringRack,
                         equalizerRuntimeState = EqualizerRuntimeState(),
                         shuffleEnabled = shuffleEnabled,
                         shuffleMode = shuffleMode,
                         repeatMode = repeatMode,
-                        onToggleMasteringRack = { onPlayerViewModeChange(if (it) "Mastering" else "Classic") },
+                        onToggleMasteringRack = onUseMasteringRackChange,
                         onGlobalEqualizerChange = onEqualizerChange,
-                        onTrackEqualizerChange = {},
+                        onTrackEqualizerChange = { profile -> currentTrack?.id?.let { onTrackEqualizerChange(it, profile) } },
                         onGlobalMasteringChange = onMasteringChange,
                         onTrackMasteringChange = {},
                         onPlayPause = onTogglePlay,
                         onSeek = onSeek,
                         onPrevious = onPrevious,
                         onNext = onNext,
-                        onToggleShuffle = onToggleShuffle,
+                        onToggleShuffle = { showFlow = true },
                         onOpenQueue = { send(BaseIntent.OpenSheet(BaseSheet.Queue)) },
                         onCollapse = { send(BaseIntent.Back) },
                         onToggleRepeat = onToggleRepeat,
@@ -1345,6 +1391,7 @@ fun PixelodyBaseShell(
                 }
                 BaseSheet.Queue -> {
                     QueueScreen(
+                        flowKey = flowKey, flowBpm = flowBpm,
                         experienceMode = experienceMode,
                         snapshot = librarySnapshot,
                         liveState = liveState,
@@ -1355,7 +1402,7 @@ fun PixelodyBaseShell(
                         isLocalQueue = true,
                         isPlaying = data.isPlaying,
                         shuffleMode = shuffleMode,
-                        onToggleShuffle = onToggleShuffle,
+                        onToggleShuffle = { showFlow = true },
                         onPlayTrack = { track -> playFrom(track.id, listOfNotNull(data.currentTrackId) + data.queue) },
                         onOpenPlayer = { send(BaseIntent.OpenSheet(BaseSheet.Player)) },
                         equalizerProfile = equalizerProfile,
@@ -1364,8 +1411,10 @@ fun PixelodyBaseShell(
                         onRemotePlayback = { trackId -> playFrom(trackId, listOfNotNull(data.currentTrackId) + data.queue) },
                         onAddRemoteQueue = { track -> onAddToQueue(track.id) },
                         onRemoveTrack = { track, index ->
-                            queueUndoManager.recordDismissal(track, index)
-                            onRemoveQueueItem(track.id)
+                            queueEntries.getOrNull(index)?.first?.let { position ->
+                                queueUndoManager.recordDismissal(track, position)
+                                onRemoveQueueItemAt(position)
+                            }
                         },
                         undoState = queueUndoState,
                         onUndoQueueRemoval = {
@@ -1389,6 +1438,24 @@ fun PixelodyBaseShell(
                     )
                 }
             }
+        }
+
+        if (showFlow) {
+            FlowListeningSheet(
+                mode = shuffleMode, onModeChange = onShuffleModeChange,
+                currentTrack = currentTrack,
+                upcoming = data.queue.mapNotNull(::resolveTrack),
+                pool = data.visibleTracks().filter { data.isPlayable(it.id) },
+                key = flowKey, filterMode = flowFilterMode, bpm = flowBpm, tolerance = flowTolerance,
+                onKeyChange = { flowKeyCode = it?.code }, onFilterModeChange = { flowFilterName = it.name },
+                onBpmChange = { flowBpm = it }, onToleranceChange = { flowTolerance = it },
+                onPlay = { ids ->
+                    val seed = if (shuffleMode == FlowShuffleMode.Off) ids.first() else ids.random()
+                    onPlayTracks(listOf(seed) + ids.filterNot { it == seed })
+                }, onQueue = onAddTracksToQueue,
+                onSavePlaylist = { ids -> showFlow = false; send(BaseIntent.ShowOverlay(BaseOverlay.NamePlaylist(seedTrackIds = ids))) },
+                onDismiss = { showFlow = false }
+            )
         }
 
         state.overlay?.let { overlay ->
@@ -1533,7 +1600,7 @@ private fun BasePlayerSheet(
                     if (data.queue.isEmpty()) {
                         item { BaseEmptyNote("Nothing queued.") }
                     }
-                    itemsIndexed(data.queue, key = { _, id -> id }) { index, id ->
+                    itemsIndexed(data.queue, key = { index, id -> "$index-$id" }) { index, id ->
                         BaseTrackRow(
                             data = data,
                             trackId = id,
@@ -2235,24 +2302,8 @@ private fun BaseOverlayHost(
                     }
 
                     is BaseOverlay.PlayerViews -> {
-                        BaseOverlayTitle(
-                            title = "Player view mode",
-                            subtitle = "One default view, ten specialized views (H10)"
-                        )
-                        val viewModes = listOf(
-                            "Classic" to "Album art display",
-                            "Lyrics" to "Synchronized time-aligned lyric flow",
-                            "Turntable" to "Vinyl disc simulation",
-                            "Scope" to "Waveform oscilloscope",
-                            "Mastering" to "Precision dynamics & EQ rack",
-                            "Spatial" to "Omnidirectional spatial stage",
-                            "Tape" to "Cassette deck & warmth",
-                            "Stems" to "Multi-stem track mixer",
-                            "Laser" to "Real-time spectrum laser",
-                            "Auto-DJ" to "Harmonic transition mixer",
-                            "Haptics" to "Tactile pulse engine",
-                            "Hi-Res" to "Lossless bit-depth telemetry"
-                        )
+                        BaseOverlayTitle(title = "Player display", subtitle = "Artwork or lyrics")
+                        val viewModes = listOf("Classic" to "Artwork", "Lyrics" to "Lyrics")
                         viewModes.forEach { (modeName, modeDesc) ->
                             BaseOverlayItem(
                                 label = modeName,
@@ -2318,7 +2369,7 @@ private fun BaseOverlayHost(
                             title = if (overlay.playlistId == null) "New playlist" else "Rename playlist",
                             subtitle = if (overlay.playlistId == null) {
                                 if (overlay.seedTrackIds.isNotEmpty()) {
-                                    "${overlay.seedTrackIds.size} track${if (overlay.seedTrackIds.size == 1) "" else "s"} from queue"
+                                    "${overlay.seedTrackIds.size} track${if (overlay.seedTrackIds.size == 1) "" else "s"}"
                                 } else {
                                     track?.let { "Starts with \"${it.title}\"" } ?: "Creates a new playlist"
                                 }

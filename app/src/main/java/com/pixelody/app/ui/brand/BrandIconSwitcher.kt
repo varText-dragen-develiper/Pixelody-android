@@ -3,39 +3,31 @@ package com.pixelody.app.ui.brand
 import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Build
+import com.pixelody.app.MainActivity
 
-/**
- * Switches the home-screen icon by enabling exactly one launcher
- * activity-alias (one per [PixelodyLogoColor]) and disabling the rest.
- *
- * The chosen alias is enabled before the others are disabled, so there is
- * never a moment with no launcher entry. DONT_KILL_APP keeps the app running;
- * some launchers still take a few seconds to redraw the icon, and a few move
- * the home-screen shortcut, which is how every alias-based icon picker behaves.
- */
+/** Keeps one launcher entry, updating atomically on API 33+ without killing playback. */
 object BrandIconSwitcher {
-    fun apply(context: Context, chosen: PixelodyLogoColor) {
-        val packageManager = context.packageManager
-        val packageName = context.packageName
-        fun component(color: PixelodyLogoColor) = ComponentName(packageName, packageName + color.aliasName)
+    fun apply(context: Context, chosen: PixelodyLogoColor) = apply(context, LauncherIcon(chosen.aliasName, chosen.color))
 
-        val chosenComponent = component(chosen)
-        if (packageManager.getComponentEnabledSetting(chosenComponent) != PackageManager.COMPONENT_ENABLED_STATE_ENABLED) {
-            packageManager.setComponentEnabledSetting(
-                chosenComponent,
-                PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
-                PackageManager.DONT_KILL_APP
-            )
+    fun component(context: Context, icon: LauncherIcon) = ComponentName(
+        context.packageName, MainActivity::class.java.name.substringBeforeLast('.') + icon.aliasName
+    )
+
+    fun apply(context: Context, chosen: LauncherIcon) {
+        val manager = context.packageManager
+        val changes = launcherIcons.sortedBy { if (it == chosen) 0 else 1 }.mapNotNull { icon ->
+            val state = if (icon == chosen) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+            val component = component(context, icon)
+            if (manager.getComponentEnabledSetting(component) == state) null else component to state
         }
-        PixelodyLogoColor.entries.filter { it != chosen }.forEach { other ->
-            val otherComponent = component(other)
-            if (packageManager.getComponentEnabledSetting(otherComponent) != PackageManager.COMPONENT_ENABLED_STATE_DISABLED) {
-                packageManager.setComponentEnabledSetting(
-                    otherComponent,
-                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-                    PackageManager.DONT_KILL_APP
-                )
-            }
+        if (Build.VERSION.SDK_INT >= 33) {
+            if (changes.isNotEmpty()) manager.setComponentEnabledSettings(changes.map { (component, state) ->
+                PackageManager.ComponentEnabledSetting(component, state, PackageManager.DONT_KILL_APP)
+            })
+        } else {
+            // Enable the replacement before disabling others on older Android versions.
+            changes.forEach { (component, state) -> manager.setComponentEnabledSetting(component, state, PackageManager.DONT_KILL_APP) }
         }
     }
 }
