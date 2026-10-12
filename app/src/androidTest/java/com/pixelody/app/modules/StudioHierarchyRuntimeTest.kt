@@ -10,6 +10,10 @@ import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.Until
 import com.pixelody.app.data.model.AppExperienceMode
 import com.pixelody.app.data.storage.MobileSettingsStore
+import com.pixelody.app.data.storage.PixelodyPersistenceRepository
+import com.pixelody.app.data.storage.PixelodyDatabaseHelper
+import com.pixelody.app.data.model.Track
+import kotlinx.coroutines.runBlocking
 import com.pixelody.app.ui.theme.PixelodyMobileTheme
 import java.io.File
 import org.junit.Assert.*
@@ -126,26 +130,43 @@ class StudioHierarchyRuntimeTest {
     }
 
     @Test fun albumsOpenTheirTracksFromBothStudioViewsAndEssential() {
-        listOf("deck", "shelf", "essential").forEach { view ->
-            MobileSettingsStore(context).saveExperienceMode(
-                if (view == "essential") AppExperienceMode.Essential else AppExperienceMode.Studio)
-            open("home")
-            if (view != "essential") {
-                find("Albums To Start")
-                if (view == "shelf") tap("3D DECK")
+        // Exercise real phone-library records, not an offline desktop demo advertised as playable.
+        val fixtureFile = File(context.filesDir, "album-navigation-fixture.wav").apply { writeBytes(byteArrayOf()) }
+        val tracks = listOf("Moonlit Circuit", "Window Memory", "Copper Wire").mapIndexed { index, title ->
+            Track("album-navigation-$index", title, artist = "Navigation fixture",
+                album = if (index < 2) "Private Library Tests" else "Other album",
+                streamUrl = Uri.fromFile(fixtureFile).toString())
+        }
+        try {
+            runBlocking { PixelodyPersistenceRepository(context).cacheScannedTracks(tracks) }
+            MobileSettingsStore(context).saveLastSourceScope("all")
+            listOf("deck", "shelf", "essential").forEach { view ->
+                MobileSettingsStore(context).saveExperienceMode(
+                    if (view == "essential") AppExperienceMode.Essential else AppExperienceMode.Studio)
+                open("home")
+                if (view != "essential") {
+                    find("Albums To Start")
+                    if (view == "shelf") tap("3D DECK")
+                }
+                tap("Private Library Tests")
+                find("2 tracks")
+                find("Moonlit Circuit")
+                find("Window Memory")
+                assertFalse(device.hasObject(By.text("Copper Wire")))
+                capture("album-$view-open")
+                device.pressBack()
+                device.waitForIdle()
+                Thread.sleep(1000)
+                if (view == "essential") {
+                    assertTrue("Album Back returns to Home", device.wait(Until.hasObject(By.desc("Home page")), 5000))
+                } else find("Albums To Start")
             }
-            tap("Private Library Tests")
-            find("2 tracks")
-            find("Moonlit Circuit")
-            find("Window Memory")
-            assertFalse(device.hasObject(By.text("Copper Wire")))
-            capture("album-$view-open")
-            device.pressBack()
-            device.waitForIdle()
-            Thread.sleep(1000)
-            if (view == "essential") {
-                assertTrue("Album Back returns to Home", device.wait(Until.hasObject(By.desc("Home page")), 5000))
-            } else find("Albums To Start")
+        } finally {
+            PixelodyDatabaseHelper(context).use { helper ->
+                helper.writableDatabase.delete(PixelodyDatabaseHelper.TABLE_CACHED_TRACKS,
+                    "id IN (?, ?, ?)", tracks.map { it.id }.toTypedArray())
+            }
+            fixtureFile.delete()
         }
     }
     @Test fun everyThemeKeepsTheListeningLeadAndToolTargetsUsable() {

@@ -94,19 +94,19 @@ internal fun connectionGuidanceFor(state: HostConnectionState, message: String):
     val normalized = message.lowercase(Locale.US)
     return when (state) {
         HostConnectionState.AuthFailed ->
-            "Pair again with a fresh QR invite from the Windows J.A.M. drawer. Tokens can expire, be mistyped, or be replaced by a newer trusted-device record."
+            "Pair again with a new QR invite from J.A.M. on your PC."
         HostConnectionState.PermissionDenied ->
-            "The host is reachable, but this device does not have the permission needed for that action. Check trusted-device permissions on the PC."
+            "Your PC is connected, but this action needs permission. Check Trusted devices on the PC."
         HostConnectionState.Revoked ->
-            "This device was revoked by the host. Remove the saved host here, then scan a new QR invite if you want to trust it again."
+            "The host removed this device's access. Remove the saved host here, then scan a new QR invite to pair again."
         HostConnectionState.CredentialExpired ->
-            "This trusted-device credential expired. Ask the host owner to create a fresh pairing code."
+            "Pairing expired. Ask the host owner for a new pairing code."
         HostConnectionState.Reconnecting ->
-            "The live connection was interrupted. Pixelody is retrying with bounded backoff; keep the phone and PC on the same private network."
+            "Connection lost. Pixelody is retrying. Keep your phone and PC on the same private network."
         HostConnectionState.NetworkUnavailable ->
-            "The phone has no usable route to the host. Reconnect Wi-Fi or the private network and Pixelody will retry automatically."
+            "Can't reach the host. Reconnect to Wi-Fi or your private network; Pixelody will retry."
         HostConnectionState.HostUnavailable ->
-            "The saved host is not responding. Confirm the PC is awake and J.A.M. hosting is still running."
+            "The host isn't responding. Check that the PC is awake and J.A.M. hosting is running."
         HostConnectionState.Unreachable -> when {
             "firewall" in normalized ->
                 "Allow Pixelody on private networks in Windows Firewall, then restart the J.A.M. host and scan a fresh QR code."
@@ -116,11 +116,11 @@ internal fun connectionGuidanceFor(state: HostConnectionState, message: String):
                 "Make sure the PC is awake, Pixelody J.A.M. is running, Private-network hosting is enabled for phone use, and the QR invite is current."
         }
         HostConnectionState.Offline ->
-            "The host may be asleep, closed, or on a different network. Restart J.A.M. on the PC and reconnect from the QR-first pairing card."
+            "The host is offline. Start J.A.M. on the PC, check the network, then scan a new QR invite."
         HostConnectionState.Connecting ->
-            "Still trying the advertised host addresses. If this takes too long, create a fresh QR invite from the PC."
+            "Still connecting. If it takes too long, create a new QR invite on the PC."
         HostConnectionState.Connected ->
-            "Connected. If playback or queue state looks stale, use Soft Refresh J.A.M. Devices from Connection Tools."
+            "Connected. If playback or the queue isn't updating, use Soft Refresh J.A.M. Devices in Connection Tools."
         HostConnectionState.Disconnected ->
             "Scan a Pixelody QR invite from the Windows J.A.M. drawer to connect this phone."
     }
@@ -264,7 +264,7 @@ internal fun SharingScreen(
         item {
             SectionCard(
                 title = "Network Mode",
-                subtitle = "Auto keeps normal use simple; advanced modes are placeholders for the hybrid network stack."
+                subtitle = "Use Auto for now. The other network modes are still planned."
             ) {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(NetworkMode.entries) { mode ->
@@ -360,7 +360,7 @@ internal fun SharingScreen(
                         val unavailableCount = session.queue.count { item -> item.availability != "available" }
                         "${session.participants.size} participant${if (session.participants.size == 1) "" else "s"} / ${session.queue.size} queue item${if (session.queue.size == 1) "" else "s"} / $unavailableCount unavailable / Windows source only"
                     } else {
-                        "Join requests require owner approval. Guest permissions apply only inside this J.A.M. session and do not grant library administration."
+                        "The owner approves join requests. Guest permissions apply to this session, without library administration access."
                     },
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall
@@ -440,7 +440,7 @@ internal fun SharingScreen(
         item {
             SectionCard(
                 title = "J.A.M. Device Refresh",
-                subtitle = "Ask the host and connected devices to re-sync without clearing saved pairing or local music."
+                subtitle = "Refresh the host and connected devices. Saved pairing and local music are kept."
             ) {
                 Button(onClick = onRefreshTrustedDevices, modifier = Modifier.fillMaxWidth()) {
                     Text("Soft Refresh J.A.M. Devices")

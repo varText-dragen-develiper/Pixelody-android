@@ -319,7 +319,7 @@ fun JamSessionHubSheet(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Synchronize playback in sample-accurate alignment with nearby phones and PCs on the same network.",
+                            text = "Join a listening session with nearby phones and PCs. Synchronized output is still in development.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

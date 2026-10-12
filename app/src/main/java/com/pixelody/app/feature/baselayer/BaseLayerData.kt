@@ -63,12 +63,18 @@ data class BaseLayerData(
     fun isPlayable(trackId: String): Boolean {
         val track = byId[trackId] ?: return false
         if (track.missing) return false
-        return hostReachable || sourceOf(trackId) != BaseSource.Host
+        if (trackId in phoneTrackIds || trackId in downloadedTrackIds) return true
+        return hostReachable || (trackId !in hostTrackIds && trackId !in jamTrackIds)
     }
 
     fun matchesLens(trackId: String): Boolean {
         val track = byId[trackId] ?: return false
-        val sourceOk = source == BaseSource.All || sourceOf(trackId) == source
+        val sourceOk = when (source) {
+            BaseSource.All -> true
+            BaseSource.Phone -> trackId in phoneTrackIds
+            BaseSource.Host -> trackId in hostTrackIds
+            BaseSource.Jam -> trackId in jamTrackIds
+        }
         val lensOk = when (lens) {
             BaseLens.Everything -> true
             BaseLens.Favourites -> track.favorite

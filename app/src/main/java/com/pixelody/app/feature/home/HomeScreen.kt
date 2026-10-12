@@ -82,6 +82,7 @@ import com.pixelody.app.data.model.HostConnectionState
 import com.pixelody.app.data.model.LibrarySnapshot
 import com.pixelody.app.data.model.LiveState
 import com.pixelody.app.data.model.SavedHostProfile
+import com.pixelody.app.ui.components.isTrackPlayableFromSources
 import com.pixelody.app.data.model.Track
 import com.pixelody.app.feature.connection.HomePairingPanel
 import com.pixelody.app.feature.connection.connectionGuidanceFor
@@ -125,6 +126,7 @@ import com.pixelody.app.ui.navigation.PixelodyTab
 
 @Composable
 internal fun HomeScreen(
+    cachedTrackIds: Set<String> = emptySet(),
     snapshot: LibrarySnapshot?,
     liveState: LiveState?,
     selectedTrack: Track?,
@@ -200,7 +202,7 @@ internal fun HomeScreen(
     val hostTracks = snapshot?.tracks.orEmpty()
     val playlists = snapshot?.playlists.orEmpty()
     val localTrackIds = remember(localTracks) { localTracks.map { it.id }.toSet() }
-    val jamTrackIds = remember(snapshot) { snapshot?.queue?.trackIds.orEmpty().toSet() }
+    val jamTrackIds = remember(liveState?.jamSession) { liveState?.jamSession?.takeIf { it.active }?.queue.orEmpty().map { it.trackId }.toSet() }
     val trackById = remember(snapshot, localTracks) { (hostTracks + localTracks).associateBy { it.id } }
     val favoriteTracks = remember(snapshot, trackById) {
         snapshot?.favorites.orEmpty().mapNotNull { trackById[it] }
@@ -209,16 +211,16 @@ internal fun HomeScreen(
         snapshot?.queue?.trackIds.orEmpty().mapNotNull { trackById[it] }
     }
     val scopedHostTracks = remember(hostTracks, sourceScope, localTrackIds, jamTrackIds) {
-        filterTracksBySource(hostTracks, sourceScope, localTrackIds, jamTrackIds)
+        filterTracksBySource(hostTracks, sourceScope, localTrackIds, jamTrackIds, hostTracks.map { it.id }.toSet())
     }
-    val scopedLocalTracks = remember(localTracks, sourceScope, localTrackIds, jamTrackIds) {
-        filterTracksBySource(localTracks, sourceScope, localTrackIds, jamTrackIds)
+    val scopedLocalTracks = remember(localTracks, hostTracks, sourceScope, localTrackIds, jamTrackIds) {
+        filterTracksBySource(localTracks, sourceScope, localTrackIds, jamTrackIds, hostTracks.map { it.id }.toSet())
     }
-    val playablePool = remember(scopedHostTracks, scopedLocalTracks) {
-        (scopedHostTracks + scopedLocalTracks).filterNot { it.missing || it.streamUrl.isBlank() }
+    val playablePool = remember(scopedHostTracks, scopedLocalTracks, connectionState, localTrackIds, cachedTrackIds) {
+        (scopedHostTracks + scopedLocalTracks).distinctBy { it.id }.filterNot { !isTrackPlayableFromSources(it, connectionState == HostConnectionState.Connected, localTrackIds, cachedTrackIds) }
     }
-    val playableHostTracks = remember(scopedHostTracks) {
-        scopedHostTracks.filterNot { it.missing || it.streamUrl.isBlank() }
+    val playableHostTracks = remember(scopedHostTracks, connectionState, localTrackIds, cachedTrackIds) {
+        scopedHostTracks.filterNot { !isTrackPlayableFromSources(it, connectionState == HostConnectionState.Connected, localTrackIds, cachedTrackIds) }
     }
     val losslessTracks = remember(playablePool) {
         playablePool.filter { it.lossless }.take(12)
@@ -325,7 +327,7 @@ internal fun HomeScreen(
     }
 
     val displayedPlaylists = remember(playlists) { playlists.take(10) }
-    val startState = homeStartState(playablePool.size, (hostTracks + localTracks).count { !it.missing && it.streamUrl.isNotBlank() }, isLoadingMusic, isConnecting)
+    val startState = homeStartState(playablePool.size, (hostTracks + localTracks).distinctBy { it.id }.count { isTrackPlayableFromSources(it, connectionState == HostConnectionState.Connected, localTrackIds, cachedTrackIds) }, isLoadingMusic, isConnecting)
 
     val homeScrollState = rememberLazyListState()
     val navigationScope = rememberCoroutineScope()
@@ -379,7 +381,7 @@ internal fun HomeScreen(
                     modifier = Modifier.padding(horizontal = 16.dp))
             }
         }
-        if (showConnectionSetup || qrScannerVisible || isConnecting || error.isNotBlank()) {
+        if (showConnectionSetup || qrScannerVisible || isConnecting || (error.isNotBlank() && sourceScope == SourceScope.DesktopHost)) {
         item(key = "pairing_panel", contentType = "pairing_panel") {
             Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                 HomePairingPanel(
@@ -555,10 +557,11 @@ internal fun HomeScreen(
                         onSourceScopeChange(scope)
                     },
                     localCount = localTracks.size,
+                    allCount = (hostTracks + localTracks).distinctBy { it.id }.size,
                     hostConnected = connectionState == HostConnectionState.Connected,
                     hostCount = hostTracks.size,
-                    jamActive = liveState != null,
-                    jamCount = queuedTracks.size,
+                    jamActive = liveState?.jamSession?.active == true,
+                    jamCount = jamTrackIds.size,
                     onLongClickScope = onLongClickScope,
                     onConnectDesktop = { showConnectionSetup = true },
                     onStartJam = onStartJam
@@ -846,8 +849,13 @@ internal fun HomeHeroHeader(
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 PageIdentity(PixelodyTab.Home)
-                Text(
-                    text = when { connectionState == HostConnectionState.Connected && hostName != null && hostName != "Local Phone / Standalone" -> "Connected to $hostName"; localTrackCount > 0 -> "$localTrackCount songs on this phone"; else -> "Your library starts here" },
+                val status = when {
+                    connectionState == HostConnectionState.Connected && hostName != null && hostName != "Local Phone / Standalone" -> "Connected to $hostName"
+                    localTrackCount == 0 -> "Your library starts here"
+                    else -> null
+                }
+                if (status != null) Text(
+                    text = status,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onBackground,
                     maxLines = 2, overflow = TextOverflow.Ellipsis

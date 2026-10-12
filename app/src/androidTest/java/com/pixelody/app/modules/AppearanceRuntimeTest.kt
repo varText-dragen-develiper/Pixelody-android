@@ -32,7 +32,8 @@ class AppearanceRuntimeTest {
         device.waitForIdle(); Thread.sleep(1000)
     }
     private fun find(text: String): UiObject2 {
-        for (up in listOf(true, false)) repeat(12) {
+        // Large text in landscape leaves a shorter list viewport below the pinned tabs.
+        for (up in listOf(true, false)) repeat(36) {
             device.findObject(By.text(text))?.let { return it }
             assertEquals(context.packageName, device.currentPackageName)
             val x = device.displayWidth / 2

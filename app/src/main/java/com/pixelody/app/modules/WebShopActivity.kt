@@ -50,7 +50,7 @@ class WebShopActivity : ComponentActivity() {
                             TextButton(onClick = { failed = false; web?.loadUrl(ModulePackage.SHOP_ENTRY) }) { Text("Reload") }
                         }
                         Text("RevenueCat Shop · Website · Test purchases", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelMedium)
-                        if (failed) Text("The shop could not load. Check your connection, then reload. Your local music and notes are still available.", Modifier.padding(16.dp))
+                        if (failed) Text("Couldn't load the shop. Check your connection, then reload. Your music and notes are still available.", Modifier.padding(16.dp))
                         AndroidView(modifier = Modifier.fillMaxWidth().weight(1f), factory = { context ->
                             WebView(context).apply {
                                 web = this

@@ -15,7 +15,7 @@ enum class AcousticChamberPreset(
 ) {
     AbbeyStudioControlRoom(
         title = "Abbey Control Room",
-        description = "World-class mastering acoustics with calibrated 60° nearfield monitors and precise early reflections.",
+        description = "A studio-style room with 60° speaker spacing and short reflections.",
         defaultVolumeM3 = 120f,
         defaultRt60Seconds = 0.45f,
         defaultDamping = WallMaterialDamping.PorousAcousticFoam,
@@ -25,7 +25,7 @@ enum class AcousticChamberPreset(
     ),
     TokyoVinylBar(
         title = "Tokyo Vinyl Bar",
-        description = "Intimate wooden listening salon with warm analog acoustic resonance and cozy low-end absorption.",
+        description = "A small wooden room with warmer reflections and low-end absorption.",
         defaultVolumeM3 = 45f,
         defaultRt60Seconds = 0.65f,
         defaultDamping = WallMaterialDamping.TeakWood,
@@ -35,7 +35,7 @@ enum class AcousticChamberPreset(
     ),
     CathedralOfEchoes(
         title = "Cathedral of Echoes",
-        description = "Monumental stone cathedral with soaring arched reflections, wide 90° stereo field, and majestic 3.6s tail.",
+        description = "A large stone room with 90° speaker spacing and a 3.6-second reverb tail.",
         defaultVolumeM3 = 3500f,
         defaultRt60Seconds = 3.60f,
         defaultDamping = WallMaterialDamping.ConcreteStone,
@@ -45,7 +45,7 @@ enum class AcousticChamberPreset(
     ),
     MinimalistTeahouse(
         title = "Minimalist Teahouse",
-        description = "Ultra-quiet tatami and paper screen chamber with high acoustic damping for razor-sharp vocal intimacy.",
+        description = "A heavily damped room with shorter reflections.",
         defaultVolumeM3 = 28f,
         defaultRt60Seconds = 0.22f,
         defaultDamping = WallMaterialDamping.VelvetCurtain,
@@ -55,7 +55,7 @@ enum class AcousticChamberPreset(
     ),
     CyberpunkAlleyway(
         title = "Cyberpunk Alleyway",
-        description = "Atmospheric metallic and wet asphalt reflections with wide spatial stereo bounce and holographic synthetic reverb.",
+        description = "Metallic reflections, wider stereo movement, and synthetic reverb.",
         defaultVolumeM3 = 850f,
         defaultRt60Seconds = 1.80f,
         defaultDamping = WallMaterialDamping.BrushedAluminum,
@@ -65,7 +65,7 @@ enum class AcousticChamberPreset(
     ),
     CustomStudio(
         title = "Custom Acoustic Rig",
-        description = "Fully personalized virtual chamber with user-defined geometry, absorption, and HRTF crossfeed.",
+        description = "Set your own room size, absorption, and HRTF crossfeed.",
         defaultVolumeM3 = 90f,
         defaultRt60Seconds = 0.50f,
         defaultDamping = WallMaterialDamping.TeakWood,
@@ -128,7 +128,7 @@ enum class BinauralCrossfeedMode(
 ) {
     NaturalNearfield(
         title = "Natural 60° Nearfield",
-        description = "Standard equilateral studio monitor triangle with natural 250μs acoustic bleed for zero ear fatigue.",
+        description = "An equilateral speaker layout with 250μs crossfeed.",
         baseAngleDeg = 30f,
         baseItdMicroseconds = 250f,
         lowPassCutoffHz = 700f
@@ -142,7 +142,7 @@ enum class BinauralCrossfeedMode(
     ),
     IntimateHeadstage(
         title = "Intimate 45° Focus",
-        description = "Focused center imaging with gentle 120μs crossfeed for vocal tracks and acoustic jazz recordings.",
+        description = "A more centered image with 120μs crossfeed.",
         baseAngleDeg = 22.5f,
         baseItdMicroseconds = 120f,
         lowPassCutoffHz = 850f

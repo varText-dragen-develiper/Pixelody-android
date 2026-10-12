@@ -12,31 +12,31 @@ enum class OscilloscopeDisplayMode(
     Lissajous_XY(
         title = "Lissajous Phase Orbit",
         subtitle = "X=Left, Y=Right Direct",
-        description = "Direct 2D phase plane plotting revealing harmonic frequency ratios and stereo channel correlation.",
+        description = "A 2D view of channel correlation and frequency relationships.",
         badgeGlyph = "LISS"
     ),
     CircularGoniometer(
         title = "Circular Goniometer",
         subtitle = "45° Soundstage Spread",
-        description = "Rotated 45° polar stereo field displaying exact stereo width, balance, and center vs side energy.",
+        description = "A 45° view of stereo width, balance, and center/side energy.",
         badgeGlyph = "GONI"
     ),
     StereoWaveform_Dual(
         title = "Dual Trace Waveform",
         subtitle = "Time-Domain Calibrated",
-        description = "Classic dual-beam oscilloscope sweep displaying Left (top) and Right (bottom) analog voltages over time.",
+        description = "Left above right, with both channels shown over time.",
         badgeGlyph = "DUAL"
     ),
     VectorLaserSynth_3D(
         title = "3D Vector Laser Ribbon",
         subtitle = "Rotatable Spatial Mesh",
-        description = "Interactive 3D vector ribbon projected in real-time Euler space with audio energy-driven orbital pitch and yaw.",
+        description = "A 3D ribbon that moves with audio energy.",
         badgeGlyph = "3D"
     ),
     CRT_VectorSpirals(
         title = "Logarithmic Spiral Flower",
         subtitle = "Harmonic Polar Spiral",
-        description = "Complex geometric spiral transformation wrapping audio waveforms into mesmerizing sacred vector flowers.",
+        description = "Spiral shapes built from the waveform.",
         badgeGlyph = "SPIR"
     ),
     AudioMatrixPolar(

@@ -359,16 +359,22 @@ fun PixelodyTransportGlyph(
                 drawCircle(color, radius = w * 0.10f, center = Offset(w * 0.65f, h * 0.65f))
             }
             TransportGlyphType.Settings -> {
-                drawCircle(color, radius = w * 0.20f, center = Offset(w * 0.50f, h * 0.50f), style = stroke)
-                val teeth = 6
-                for (i in 0 until teeth) {
-                    val rad = (i * 60.0 * Math.PI / 180.0).toFloat()
-                    val x1 = w * 0.50f + w * 0.30f * Math.cos(rad.toDouble()).toFloat()
-                    val y1 = h * 0.50f + h * 0.30f * Math.sin(rad.toDouble()).toFloat()
-                    val x2 = w * 0.50f + w * 0.44f * Math.cos(rad.toDouble()).toFloat()
-                    val y2 = h * 0.50f + h * 0.44f * Math.sin(rad.toDouble()).toFloat()
-                    drawLine(color, Offset(x1, y1), Offset(x2, y2), strokeWidth * 1.1f, StrokeCap.Round)
+                // One connected cog silhouette, rather than detached sun rays.
+                val gear = Path()
+                var first = true
+                repeat(8) { tooth ->
+                    val centerAngle = tooth * 45.0 - 90.0
+                    listOf(-22.5 to .31f, -14.0 to .31f, -10.0 to .43f,
+                        10.0 to .43f, 14.0 to .31f, 22.5 to .31f).forEach { (offset, radius) ->
+                        val angle = Math.toRadians(centerAngle + offset)
+                        val x = w * (.5f + radius * Math.cos(angle).toFloat())
+                        val y = h * (.5f + radius * Math.sin(angle).toFloat())
+                        if (first) { gear.moveTo(x, y); first = false } else gear.lineTo(x, y)
+                    }
                 }
+                gear.close()
+                drawPath(gear, color, style = stroke)
+                drawCircle(color, radius = w * .12f, center = Offset(w * .5f, h * .5f), style = stroke)
             }
             TransportGlyphType.Share -> {
                 val p1 = Offset(w * 0.75f, h * 0.25f)

@@ -40,31 +40,31 @@ class ConnectionVocabularyTest {
     @Test
     fun connectionGuidanceFor_returnsAppropriateCopy() {
         assertTrue(
-            connectionGuidanceFor(HostConnectionState.AuthFailed, "").contains("Pair again with a fresh QR invite")
+            connectionGuidanceFor(HostConnectionState.AuthFailed, "").contains("Pair again")
         )
         assertTrue(
-            connectionGuidanceFor(HostConnectionState.PermissionDenied, "").contains("Check trusted-device permissions")
+            connectionGuidanceFor(HostConnectionState.PermissionDenied, "").contains("Check Trusted devices")
         )
         assertTrue(
-            connectionGuidanceFor(HostConnectionState.Revoked, "").contains("This device was revoked")
+            connectionGuidanceFor(HostConnectionState.Revoked, "").contains("removed this device's access")
         )
         assertTrue(
-            connectionGuidanceFor(HostConnectionState.CredentialExpired, "").contains("credential expired")
+            connectionGuidanceFor(HostConnectionState.CredentialExpired, "").contains("Pairing expired")
         )
         assertTrue(
-            connectionGuidanceFor(HostConnectionState.Reconnecting, "").contains("retrying with bounded backoff")
+            connectionGuidanceFor(HostConnectionState.Reconnecting, "").contains("retrying")
         )
         assertTrue(
-            connectionGuidanceFor(HostConnectionState.NetworkUnavailable, "").contains("Reconnect Wi-Fi")
+            connectionGuidanceFor(HostConnectionState.NetworkUnavailable, "").contains("Reconnect to Wi-Fi")
         )
         assertTrue(
-            connectionGuidanceFor(HostConnectionState.HostUnavailable, "").contains("Confirm the PC is awake")
+            connectionGuidanceFor(HostConnectionState.HostUnavailable, "").contains("PC is awake")
         )
         assertTrue(
-            connectionGuidanceFor(HostConnectionState.Offline, "").contains("Restart J.A.M. on the PC")
+            connectionGuidanceFor(HostConnectionState.Offline, "").contains("Start J.A.M. on the PC")
         )
         assertTrue(
-            connectionGuidanceFor(HostConnectionState.Connecting, "").contains("trying the advertised host addresses")
+            connectionGuidanceFor(HostConnectionState.Connecting, "").contains("Still connecting")
         )
         assertTrue(
             connectionGuidanceFor(HostConnectionState.Connected, "").contains("Soft Refresh J.A.M. Devices")

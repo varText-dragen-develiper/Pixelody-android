@@ -152,7 +152,7 @@ internal fun ProfileScreen(
         contentPadding = PaddingValues(bottom = 16.dp)
     ) {
         stickyHeader(key = "settings-navigation") {
-            Surface(color = MaterialTheme.colorScheme.background) {
+            Surface(modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.background) {
                 SettingsNavigation(category, onSelect = { categoryId = it.name })
             }
         }

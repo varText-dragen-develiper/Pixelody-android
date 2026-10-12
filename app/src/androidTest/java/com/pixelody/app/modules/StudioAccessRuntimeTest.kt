@@ -18,6 +18,10 @@ import org.junit.Assume.assumeTrue
 import org.junit.Test
 
 class StudioAccessRuntimeTest {
+    @org.junit.Before fun usePortraitFixture() {
+        assumeTrue("Isolated app only", context.packageName.endsWith(".studioqa"))
+        device.setOrientationNatural()
+    }
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext
     private val device = UiDevice.getInstance(instrumentation)
@@ -63,9 +67,14 @@ class StudioAccessRuntimeTest {
         val downFirst = selector.toString().contains("Match this song")
         for (up in if (downFirst) listOf(false, true) else listOf(true, false)) repeat(14) {
             device.waitForIdle()
-            device.findObject(selector)?.let { node ->
-                val isWheelKey = node.contentDescription?.matches(Regex("\\d{1,2}[AB], .+")) == true
-                if (!isWheelKey || node.visibleBounds.height() >= 48 * context.resources.displayMetrics.density - 1) return node
+            try {
+                device.findObject(selector)?.let { node ->
+                    val isWheelKey = node.contentDescription?.matches(Regex("\\d{1,2}[AB], .+")) == true
+                    if (!isWheelKey || node.visibleBounds.height() >= 48 * context.resources.displayMetrics.density - 1) return node
+                }
+            } catch (_: androidx.test.uiautomator.StaleObjectException) {
+                Thread.sleep(200)
+                return@repeat // Re-query after Compose replaces the node; do not scroll on a stale match.
             }
             assertEquals(context.packageName, device.currentPackageName)
             val x = device.displayWidth / 4
@@ -74,7 +83,15 @@ class StudioAccessRuntimeTest {
         }
         error("Missing $selector")
     }
-    private fun tapFlow(text: String) = click(findFlow(By.text(text)))
+    private fun tapFlow(text: String) {
+        repeat(3) { attempt ->
+            try { click(findFlow(By.text(text))); return }
+            catch (stale: androidx.test.uiautomator.StaleObjectException) {
+                if (attempt == 2) throw stale
+                device.waitForIdle()
+            }
+        }
+    }
     private fun closeFlow() {
         device.pressBack(); device.waitForIdle(); Thread.sleep(700)
         assertFalse(device.hasObject(By.text("Choose how the next songs unfold. Your current song keeps playing.")))
@@ -257,10 +274,17 @@ class StudioAccessRuntimeTest {
             click(find(By.desc("Switch listening mode, currently Studio")))
             assertEquals(AppExperienceMode.Essential, settings.loadExperienceMode())
             tap("Desktop"); find(By.text("Connect your desktop"))
-            open("library"); tap("Access fixture 1"); assertCurrent(tracks[0].id)
+            open("library")
+            // Essential rows expose their title as text; Studio uses a combined row description.
+            click(find(By.text(tracks[0].title)))
+            assertCurrent(tracks[0].id)
             open("player")
+            find(By.desc("Close player"))
+            tap("Controls")
             click(find(By.desc("Switch listening mode, currently Essential")))
             assertEquals(AppExperienceMode.Studio, settings.loadExperienceMode())
+            device.pressBack(); device.waitForIdle()
+            find(By.desc("Close player"))
             assertFalse(device.hasObject(By.text("Sound tools")))
             assertFalse(device.hasObject(By.text("SCOPE")))
             assertFalse(device.hasObject(By.text("Speaker")))
@@ -287,9 +311,11 @@ class StudioAccessRuntimeTest {
                 val distance = if(short) 30 else bounds.width()*3/5
                 val start = if(left) bounds.centerX()+distance/2 else bounds.centerX()-distance/2
                 val end = if(left) start-distance else start+distance
-                device.swipe(start,bounds.centerY(),end,bounds.centerY(),30); device.waitForIdle()
+                // Keep taps/drags below the long-press deadline on software-rendered emulators.
+                device.swipe(start,bounds.centerY(),end,bounds.centerY(),8); device.waitForIdle()
             }
             swipeArtwork(true,short=true); assertCurrent(tracks[0].id)
+            assertFalse("A short swipe does not open long-press actions", device.hasObject(By.text("Track details")))
             swipeArtwork(true); assertCurrent(tracks[1].id)
             swipeArtwork(false); assertCurrent(tracks[0].id)
             assertNotNull(device.findObject(By.desc("Play")))

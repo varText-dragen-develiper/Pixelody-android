@@ -58,8 +58,8 @@ enum class AudioFormatCodec(val displayName: String, val isLossless: Boolean, va
  */
 enum class DacConnectionState(val title: String, val badgeColorHex: Long) {
     Disconnected("No External DAC Detected", 0xFF64748B), // Slate
-    Detecting("Interrogating USB Audio Sink...", 0xFF38BDF8), // Sky Blue
-    ConnectedBitPerfect("Bit-Perfect 1:1 Direct Passthrough", 0xFFE5A93C), // Lossless Gold
+    Detecting("Checking USB output…", 0xFF38BDF8), // Sky Blue
+    ConnectedBitPerfect("Direct output mode selected", 0xFFE5A93C), // Lossless Gold
     ConnectedDirectAudio("Hi-Res Direct Audio (Direct PCM)", 0xFF10B981), // Emerald
     FallbackSystemMixer("System Mixer Audio (48kHz Resampled)", 0xFF94A3B8) // Muted Slate
 }
@@ -68,16 +68,16 @@ enum class DacConnectionState(val title: String, val badgeColorHex: Long) {
  * DSD (Direct Stream Digital) playback mode.
  */
 enum class DsdPlaybackMode(val displayName: String, val description: String) {
-    DoP("DSD over PCM (DoP)", "Encapsulates raw DSD 1-bit frames into 176.4kHz/352.8kHz PCM containers with 0x05/0xFA markers without decoding."),
-    PcmConvert("DSD to PCM Multibit", "Converts 1-bit DSD bitstream to high-resolution 24-bit/88.2kHz PCM via decimation filter.")
+    DoP("DSD over PCM (DoP)", "DSD-over-PCM mode: carry DSD frames in 176.4 or 352.8 kHz PCM with DoP markers."),
+    PcmConvert("DSD to PCM Multibit", "PCM conversion mode: target 24-bit / 88.2 kHz PCM.")
 }
 
 /**
  * Volume attenuation strategy for connected DAC.
  */
 enum class DacVolumeMode(val displayName: String, val description: String) {
-    HardwareDirect("Hardware DAC Direct", "Bypasses Android software digital scaling completely. Audio bits are delivered at 0dBFS directly to the DAC's analog ladder."),
-    SoftwareFloat("32-bit Float Attenuation", "High-precision 32-bit floating point digital volume attenuation with TPDF triangular dither before hardware output.")
+    HardwareDirect("Hardware DAC Direct", "Request hardware volume control. Output behavior depends on the DAC and active audio path."),
+    SoftwareFloat("32-bit Float Attenuation", "Use 32-bit floating-point volume attenuation with TPDF dither.")
 }
 
 /**

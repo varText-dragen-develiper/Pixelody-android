@@ -9,12 +9,12 @@ enum class AppExperienceMode(val label: String, val badge: String, val descripti
     Essential(
         label = "Essential",
         badge = "⚡",
-        description = "Streamlined, minimal & automated"
+        description = "Fewer controls, with more automatic choices"
     ),
     Studio(
         label = "Studio",
         badge = "✦",
-        description = "Audiophile DSP, telemetry & racks"
+        description = "Audio processing, detailed readouts, and racks"
     );
 
     fun toggle(): AppExperienceMode = when (this) {
