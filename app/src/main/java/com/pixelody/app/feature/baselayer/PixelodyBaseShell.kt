@@ -278,6 +278,12 @@ fun PixelodyBaseShell(
     hostBaseUrl: String? = null,
     hostConnectionState: HostConnectionState = HostConnectionState.Disconnected,
     hostConnectionError: String = "",
+    savedHostProfile: SavedHostProfile? = null,
+    availableJamSession: JamSession? = null,
+    hostLiveState: LiveState? = null,
+    joiningJam: Boolean = false,
+    jamIssue: String = "",
+    onJoinDesktopJam: () -> Unit = {},
     jamCoordinator: JamSessionCoordinator = remember { JamSessionCoordinator() },
     onConnectHost: (String) -> Unit = {},
     isLoadingLocalLibrary: Boolean = false,
@@ -464,18 +470,11 @@ fun PixelodyBaseShell(
     val queueEntries = data.queue.mapIndexedNotNull { index, id -> resolveTrack(id)?.let { index to it } }
     val queueTracks = queueEntries.map { it.second }
 
-    val currentHostProfile = remember(hostBaseUrl, hostConnectionState) {
-        HostProfile(
-            hostId = "pixelody-host-1",
-            hostName = if (hostBaseUrl != null) "Studio Workstation" else "Local Phone / Standalone",
-            baseUrl = hostBaseUrl ?: "http://127.0.0.1:8080",
-            platform = "Android",
-            roles = listOf("LibraryHost", "PlaybackDevice"),
-            connectionState = hostConnectionState
-        )
+    val currentHostProfile = remember(savedHostProfile, hostConnectionState) {
+        displayedHostProfile(savedHostProfile, hostConnectionState)
     }
 
-    val currentQueueSnapshot = remember(data.currentTrackId, data.queue, data.tracks, localTracks, shuffleEnabled, repeatMode) {
+    val currentQueueSnapshot = remember(data.currentTrackId, data.isPlaying, data.queue, data.tracks, localTracks, shuffleEnabled, repeatMode) {
         QueueSnapshot(
             currentTrackId = data.currentTrackId,
             trackIds = data.queue,
@@ -490,57 +489,26 @@ fun PixelodyBaseShell(
                         artist = track.artist,
                         durationSeconds = track.durationSeconds,
                         artworkUrl = track.artworkUrl,
-                        playbackStatus = if (track.id == data.currentTrackId) "playing" else "queued"
+                        playbackStatus = if (track.id == data.currentTrackId) { if (data.isPlaying) "playing" else "paused" } else "queued"
                     )
                 }
             }
         )
     }
 
-    val librarySnapshot = remember(currentHostProfile, data.tracks, localTracks, data.collections, currentQueueSnapshot) {
-        val allTracks = (data.tracks + localTracks).distinctBy { it.id }
+    val librarySnapshot = remember(currentHostProfile, data.tracks, data.hostTrackIds, localTracks, data.collections, currentQueueSnapshot) {
+        val allTracks = data.desktopTracks()
         LibrarySnapshot(
             host = currentHostProfile,
             tracks = allTracks,
             playlists = data.collections.filter { it.kindKey == BaseBrowseShape.Playlists.kindKey }.map { Playlist(it.id, it.name, it.trackIds, null) },
-            favorites = allTracks.filter { it.favorite }.map { it.id },
+            favorites = data.tracks.filter { it.favorite }.map { it.id },
             queue = currentQueueSnapshot,
             revision = 1L
         )
     }
 
-    val liveState = remember(currentHostProfile, data.currentTrackId, data.isPlaying, data.queue, data.tracks) {
-        LiveState(
-            revision = 1L,
-            hostId = currentHostProfile.hostId,
-            hostName = currentHostProfile.hostName,
-            visibility = "Local",
-            checkedAt = System.currentTimeMillis().toString(),
-            pollAfterMs = 5000L,
-            permissions = listOf("Playback", "Queue", "Library"),
-            playbackCurrentTrackId = data.currentTrackId,
-            playing = data.isPlaying,
-            queueTrackIds = data.queue,
-            favoriteTrackIds = data.tracks.filter { it.favorite }.map { it.id },
-            deviceRefresh = null
-        )
-    }
-
-    val savedHostProfile = remember(hostBaseUrl) {
-        hostBaseUrl?.let {
-            SavedHostProfile(
-                hostId = "host-01",
-                hostName = "Studio Workstation",
-                baseUrl = it,
-                baseUrls = listOf(it),
-                token = "session-token",
-                platform = "Desktop",
-                roles = listOf("LibraryHost"),
-                savedAt = System.currentTimeMillis(),
-                lastConnectedAt = System.currentTimeMillis()
-            )
-        }
-    }
+    val liveState = hostLiveState
 
     // Home's capsule and insights now come from SonicCapsuleTimelineEngine and
     // SessionCapsuleEngine, which record real plays. They used to be built here
@@ -820,7 +788,9 @@ fun PixelodyBaseShell(
                 pageNestedScrollConnection = remember { object: androidx.compose.ui.input.nestedscroll.NestedScrollConnection {} },
                 modifier = Modifier.fillMaxSize()) { page ->
             val pageDestination = BaseDestination.values()[page]
-            Box(Modifier.fillMaxSize().then(routeArrival(state.pushed))) {
+            // Root destinations move only with the horizontal pager. A newly composed
+            // page must not add the vertical reveal used by pushed detail routes.
+            Box(Modifier.fillMaxSize().then(if (state.pushed.isEmpty()) Modifier else routeArrival(state.pushed))) {
             when {
                 openCollection != null -> {
                     val detailKind = when (openCollection.kindKey.lowercase()) {
@@ -834,6 +804,8 @@ fun PixelodyBaseShell(
                         else -> PixelodyDetailKind.Playlist
                     }
                     LibraryScreen(
+                        jamSession = availableJamSession,
+                        onStartJam = { send(BaseIntent.ShowOverlay(BaseOverlay.JamHub)) },
                         shuffleMode = shuffleMode,
                         harmonicBaseKey = flowKey,
                         harmonicFilterMode = flowFilterMode,
@@ -920,6 +892,8 @@ fun PixelodyBaseShell(
                             else -> PixelodyDetailKind.Playlist
                         }
                         LibraryScreen(
+                            jamSession = availableJamSession,
+                            onStartJam = { send(BaseIntent.ShowOverlay(BaseOverlay.JamHub)) },
                             shuffleMode = shuffleMode,
                             harmonicBaseKey = flowKey,
                             harmonicFilterMode = flowFilterMode,
@@ -1059,6 +1033,8 @@ fun PixelodyBaseShell(
                 }
 
                 pageDestination == BaseDestination.Library -> LibraryScreen(
+                    jamSession = availableJamSession,
+                    onStartJam = { send(BaseIntent.ShowOverlay(BaseOverlay.JamHub)) },
                     shuffleMode = shuffleMode,
                     harmonicBaseKey = flowKey,
                     harmonicFilterMode = flowFilterMode,
@@ -1120,6 +1096,8 @@ fun PixelodyBaseShell(
                 )
 
                 pageDestination == BaseDestination.Search -> SearchScreen(
+                    cachedTrackIds = data.downloadedTrackIds,
+                    jamSession = availableJamSession,
                     shuffleMode = shuffleMode,
                     harmonicBaseKey = flowKey,
                     harmonicFilterMode = flowFilterMode,
@@ -1146,7 +1124,7 @@ fun PixelodyBaseShell(
                     onToggleFavorite = { track -> onToggleFavorite(track.id) },
                     onPlayBatchNext = { tracks -> onPlayTracks(tracks.map { it.id }) },
                     onAddBatchToQueue = { tracks -> tracks.forEach { onAddToQueue(it.id) } },
-                    onConnectDesktop = onRetryHost,
+                    onConnectDesktop = { if (savedHostProfile != null) onRetryHost() else openConnectionSetup() },
                     onStartJam = { send(BaseIntent.ShowOverlay(BaseOverlay.JamHub)) },
                     initialQuery = query,
                     onInitialQueryConsumed = { query = "" },
@@ -1169,6 +1147,7 @@ fun PixelodyBaseShell(
                 )
 
                 pageDestination == BaseDestination.Home -> HomeScreen(
+                    cachedTrackIds = data.downloadedTrackIds,
                     onOpenFlowCabinet = { showFlow = true },
                     snapshot = librarySnapshot,
                     liveState = liveState,
@@ -1236,7 +1215,7 @@ fun PixelodyBaseShell(
                     onPlayBatchTracks = { tracks -> onPlayTracks(tracks.map { it.id }) },
                     onLongClickTrack = { track -> send(BaseIntent.ShowOverlay(BaseOverlay.TrackActions(track.id))) },
                     onLongClickScope = { send(BaseIntent.ShowOverlay(BaseOverlay.SessionTray)) },
-                    onConnectDesktop = onRetryHost,
+                    onConnectDesktop = { if (savedHostProfile != null) onRetryHost() else openConnectionSetup() },
                     onStartJam = { send(BaseIntent.ShowOverlay(BaseOverlay.JamHub)) },
                     onOpenSmartCrateBuilder = { send(BaseIntent.ShowOverlay(BaseOverlay.SmartCrateBuilder)) },
                     sourceScope = when (data.source) {
@@ -1289,7 +1268,7 @@ fun PixelodyBaseShell(
                         onListeningDetails = { listeningDetailsFromPlayer = true; send(BaseIntent.Back); send(BaseIntent.Push(BasePush.SonicTimeline)) },
                         snapshot = librarySnapshot,
                         selectedTrack = currentTrack,
-                        isLocalTrack = currentTrack != null && data.phoneTrackIds.contains(currentTrack.id),
+                        isLocalTrack = currentTrack != null && (currentTrack.id in data.phoneTrackIds || currentTrack.id in data.downloadedTrackIds),
                         isPlaying = data.isPlaying,
                         connectionState = hostConnectionState,
                         playbackError = playbackError,
@@ -1588,6 +1567,13 @@ fun PixelodyBaseShell(
                 jamCoordinator = jamCoordinator,
                 jamSession = jamSession,
                 jamSyncStatus = jamSyncStatus,
+                availableJamSession = availableJamSession,
+                hostConnectionState = hostConnectionState,
+                joiningJam = joiningJam,
+                jamIssue = jamIssue,
+                onJoinDesktopJam = onJoinDesktopJam,
+                onConnectDesktop = { if (savedHostProfile != null) onRetryHost() else openConnectionSetup() },
+                hasSavedHost = savedHostProfile != null,
                 metadataStore = metadataStore
             )
         }
@@ -1785,10 +1771,33 @@ private fun BaseOverlayHost(
     jamCoordinator: JamSessionCoordinator,
     jamSession: JamSession,
     jamSyncStatus: JamSyncStatus,
+    availableJamSession: JamSession? = null,
+    hostConnectionState: HostConnectionState = HostConnectionState.Disconnected,
+    joiningJam: Boolean = false,
+    jamIssue: String = "",
+    onJoinDesktopJam: () -> Unit = {},
+    onConnectDesktop: () -> Unit = {},
+    hasSavedHost: Boolean = false,
     metadataStore: TrackMetadataStore? = null
 ) {
     val context = LocalContext.current
     val effectiveMetadataStore = metadataStore ?: remember { TrackMetadataStore(context.applicationContext) }
+    var pendingPlaylistExport by remember { mutableStateOf<String?>(null) }
+    val exportPlaylist = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("audio/x-mpegurl")) { uri ->
+        val contents = pendingPlaylistExport
+        pendingPlaylistExport = null
+        if (uri != null) {
+            val saved = runCatching {
+                checkNotNull(contents) { "Export interrupted; choose Export again" }
+                checkNotNull(context.contentResolver.openOutputStream(uri, "wt")) { "Document is not writable" }
+                    .bufferedWriter(Charsets.UTF_8).use { it.write(contents) }
+            }.isSuccess
+            android.widget.Toast.makeText(context,
+                if (saved) "Playlist saved" else "Couldn't save the playlist. Try another location.",
+                android.widget.Toast.LENGTH_LONG).show()
+        }
+        onDismiss()
+    }
     val haptic = LocalHapticFeedback.current
     fun resolveTrack(id: String?): Track? = if (id == null) null else (allTracks.firstOrNull { it.id == id } ?: data.track(id))
     if (overlay is BaseOverlay.JamHub) {
@@ -1799,25 +1808,18 @@ private fun BaseOverlayHost(
                 .clickable(role = Role.Button, onClick = onDismiss),
             contentAlignment = Alignment.BottomCenter
         ) {
-            JamSessionHubSheet(
-                session = jamSession,
-                syncStatus = jamSyncStatus,
-                isHost = jamCoordinator.isHost,
-                isDj = jamCoordinator.isDj,
-                onStartHosting = { jamCoordinator.startHosting() },
-                onJoinSession = { code -> jamCoordinator.joinSession(code) },
-                onLeaveSession = { jamCoordinator.leaveSession() },
-                onVoteTrack = { id, vote -> jamCoordinator.voteTrack(id, vote) },
-                onPromoteSuggestion = { id -> jamCoordinator.promoteSuggestion(id) },
-                onRemoveQueueItem = { id -> jamCoordinator.removeQueueItem(id) },
-                onClearQueue = { jamCoordinator.clearQueue() },
-                onSetDj = { devId -> jamCoordinator.setDj(devId) },
-                onKickParticipant = { devId -> jamCoordinator.kickParticipant(devId) },
-                onUpdatePolicy = { pol -> jamCoordinator.updatePolicy(pol) },
-                onResyncClock = { jamCoordinator.triggerClockResync() },
+            com.pixelody.app.feature.connection.DesktopJamSheet(
+                session = availableJamSession,
+                connectionState = hostConnectionState,
+                joining = joiningJam,
+                issue = jamIssue,
+                onJoin = onJoinDesktopJam,
+                onConnect = { onDismiss(); if (hasSavedHost) onRetryHost() else onConnectDesktop() },
+                hasSavedHost = hasSavedHost,
                 onClose = onDismiss,
                 modifier = Modifier.clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) {}
             )
+
         }
         return
     }
@@ -1976,13 +1978,14 @@ private fun BaseOverlayHost(
                         if (isPlaylist) {
                             BaseOverlayItem(
                                 label = "Export playlist (M3U8)",
-                                subtitle = "Generate standard M3U8 playlist",
+                                subtitle = "Save a standard M3U8 playlist file",
                                 trailing = "›"
                             ) {
                                 val playlistTracks = collection?.trackIds?.mapNotNull { data.track(it) }.orEmpty()
-                                val m3uText = M3uPlaylistManager.exportToM3u(collection?.name ?: "Playlist", playlistTracks)
-                                android.widget.Toast.makeText(overlayContext, "Exported ${playlistTracks.size} tracks to M3U8", android.widget.Toast.LENGTH_SHORT).show()
-                                onDismiss()
+                                val name = collection?.name ?: "Playlist"
+                                pendingPlaylistExport = M3uPlaylistManager.exportToM3u(name, playlistTracks)
+                                val filename = name.replace(Regex("[^\\p{L}\\p{N} _.-]"), "_").take(100).ifBlank { "Playlist" }
+                                exportPlaylist.launch("$filename.m3u8")
                             }
                             BaseOverlayItem(
                                 label = "Rename playlist",
@@ -2059,16 +2062,21 @@ private fun BaseOverlayHost(
                             BaseOverlayItem(
                                 label = candidate.label,
                                 trailing = if (data.source == candidate) "•" else ""
-                            ) { onSourceChange(candidate) }
+                            ) {
+                                when {
+                                    candidate == BaseSource.Jam -> send(BaseIntent.ShowOverlay(BaseOverlay.JamHub))
+                                    candidate == BaseSource.Host && !data.hostReachable -> { onDismiss(); onConnectDesktop() }
+                                    else -> { onSourceChange(candidate); onDismiss() }
+                                }
+                            }
                         }
                         BaseOverlayItem(
-                            label = if (data.hostReachable) "Host is connected" else "Host is not responding",
-                            subtitle = if (data.hostReachable) "" else "Tap to try again"
+                            label = if (data.hostReachable) "Desktop connected" else if (hasSavedHost) "Reconnect desktop" else "Connect desktop",
+                            subtitle = if (data.hostReachable) "" else "Phone music stays available"
                         ) {
                             if (!data.hostReachable) {
-                                // It says "Tap to try again". It used to only close the tray.
-                                onRetryHost()
                                 onDismiss()
+                                onConnectDesktop()
                             }
                         }
                         BaseOverlayItem(
@@ -2336,7 +2344,7 @@ private fun BaseOverlayHost(
                         BaseOverlayTitle(
                             title = if (overlay.crateId == null) "Name the crate" else "Rename",
                             subtitle = if (overlay.crateId == null) {
-                                "A crate is made by putting something in it, so this one starts with one thing already in slot 1."
+                                "The item you chose starts in slot 1."
                             } else {
                                 ""
                             }

@@ -13,6 +13,8 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
@@ -64,7 +66,7 @@ internal fun PageIdentity(tab: PixelodyTab, modifier: Modifier = Modifier) {
     }
 }
 
-/** Scalable, original linework: shelter + record, a lens, and three record sleeves. */
+/** Scalable, original linework: a home, a lens, and three record sleeves. */
 @Composable
 internal fun DestinationGlyph(tab: PixelodyTab, color: Color, size: Dp = 24.dp, selected: Boolean = true) {
     Canvas(Modifier.size(size)) {
@@ -76,10 +78,21 @@ internal fun DestinationGlyph(tab: PixelodyTab, color: Color, size: Dp = 24.dp, 
         fun segment(x: Float, y: Float, xx: Float, yy: Float) = drawLine(color, point(x,y), point(xx,yy), line, StrokeCap.Round)
         when (tab) {
             PixelodyTab.Home -> {
-                segment(.12f,.43f,.5f,.13f); segment(.5f,.13f,.88f,.43f)
-                segment(.23f,.43f,.23f,.86f); segment(.77f,.43f,.77f,.86f); segment(.23f,.86f,.77f,.86f)
-                drawCircle(color, w * .15f, point(.5f,.62f), style = stroke)
-                drawCircle(color, w * .032f, point(.5f,.62f))
+                val home = Path().apply {
+                    moveTo(w * .14f, h * .44f)
+                    lineTo(w * .5f, h * .12f)
+                    lineTo(w * .86f, h * .44f)
+                    lineTo(w * .78f, h * .44f)
+                    lineTo(w * .78f, h * .86f)
+                    lineTo(w * .6f, h * .86f)
+                    lineTo(w * .6f, h * .62f)
+                    lineTo(w * .4f, h * .62f)
+                    lineTo(w * .4f, h * .86f)
+                    lineTo(w * .22f, h * .86f)
+                    lineTo(w * .22f, h * .44f)
+                    close()
+                }
+                drawPath(home, color, style = Stroke(line, cap = StrokeCap.Round, join = StrokeJoin.Round))
             }
             PixelodyTab.Search -> {
                 drawCircle(color, w * .28f, point(.41f,.41f), style = stroke)

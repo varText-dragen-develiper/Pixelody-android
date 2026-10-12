@@ -178,6 +178,11 @@ fun BasePlaybackHost(
     val settingsStore = remember { MobileSettingsStore(context.applicationContext) }
     val offlineMediaStore = remember { OfflineMediaStore(context.applicationContext) }
     val savedHostStore = remember { SavedHostStore(context.applicationContext) }
+    var savedHostProfile by remember { mutableStateOf(savedHostStore.load()) }
+    var availableJamSession by remember { mutableStateOf<com.pixelody.app.data.model.JamSession?>(null) }
+    var hostLiveState by remember { mutableStateOf<com.pixelody.app.data.model.LiveState?>(null) }
+    var joiningJam by remember { mutableStateOf(false) }
+    var jamIssue by remember { mutableStateOf("") }
     val crateStore = remember { CrateStore(context.applicationContext) }
     val coverStore = remember { CoverStore(context.applicationContext) }
     val equalizerStore = remember { MobileEqualizerStore(context.applicationContext) }
@@ -329,8 +334,10 @@ fun BasePlaybackHost(
     fun recoverHostConnection(state: HostConnectionState, message: String) {
         hostReachable = false
         hostConnectionState = state
-        hostConnectionError = "$message Phone music is available. Reconnect when you're ready."
+        hostConnectionError = "$message Reconnect when you're ready."
         jamCoordinator.leaveSession()
+        availableJamSession = null
+        hostLiveState = null
         activeSource = sourceAfterConnectionLoss(activeSource)
         settingsStore.saveLastSourceScope(activeSource.key)
         player?.let { activePlayer ->
@@ -345,6 +352,7 @@ fun BasePlaybackHost(
         }
         if (state.endsHostAccess()) {
             savedHostStore.clear()
+            savedHostProfile = null
             hostBaseUrl = null
         }
     }
@@ -352,6 +360,7 @@ fun BasePlaybackHost(
     fun refreshHostLibrary(details: HostConnectionDetails? = incomingConnectionDetails) {
         if (isConnectingHost) return
         val profile = savedHostStore.load()
+        savedHostProfile = profile
         if (details == null && profile == null && !BuildConfig.ENABLE_DEMO_LIBRARY) {
             recoverHostConnection(HostConnectionState.Disconnected, "Desktop disconnected.")
             hostConnectionError = ""
@@ -367,6 +376,7 @@ fun BasePlaybackHost(
                     details != null -> {
                         val result = repository.connectHost(details)
                         savedHostStore.save(repository.savedProfileFor(result, details.baseUrls))
+                        savedHostProfile = savedHostStore.load()
                         onConnectionDetailsConsumed()
                         result.snapshot
                     }
@@ -400,9 +410,14 @@ fun BasePlaybackHost(
                 try {
                     val live = repository.fetchLiveState(baseUrl, profile.token, revision)
                     revision = live.revision
-                    if (!live.unchanged && jamCoordinator.session.value.active) {
-                        jamCoordinator.updateFromLiveState(live.state?.jamSession)
-                        if (!jamCoordinator.session.value.active && activeSource == BaseSource.Jam) {
+                    if (!live.unchanged) {
+                        hostLiveState = live.state
+                        val session = live.state?.jamSession
+                        availableJamSession = session
+                        if (jamCoordinator.session.value.active || session?.currentParticipant != null) {
+                            jamCoordinator.updateFromLiveState(session)
+                        }
+                        if (session?.active != true && activeSource == BaseSource.Jam) {
                             activeSource = BaseSource.Phone
                             settingsStore.saveLastSourceScope(activeSource.key)
                         }
@@ -425,6 +440,36 @@ fun BasePlaybackHost(
             return
         }
         refreshHostLibrary(details)
+    }
+
+    fun joinDesktopJam() {
+        val profile = savedHostProfile ?: return
+        if (joiningJam || hostConnectionState != HostConnectionState.Connected) return
+        joiningJam = true
+        jamIssue = ""
+        coroutineScope.launch {
+            try {
+                val result = repository.requestJamJoin(hostBaseUrl ?: profile.baseUrl, profile.token)
+                val session = repository.fetchJamSession(hostBaseUrl ?: profile.baseUrl, profile.token)
+                if (hostConnectionState != HostConnectionState.Connected || savedHostProfile?.token != profile.token) return@launch
+                if (!result.accepted && !result.approvalRequired) jamIssue = "The desktop did not accept the join. Check the session on your desktop and try again."
+                availableJamSession = session
+                hostLiveState = hostLiveState?.copy(jamSession = session)
+                jamCoordinator.updateFromLiveState(session)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                jamIssue = hostConnectionFailureMessage(error)
+                // A rejected join is not proof the library connection is lost.
+                if (connectionStateFor(error) in listOf(HostConnectionState.NetworkUnavailable,
+                        HostConnectionState.HostUnavailable, HostConnectionState.Revoked,
+                        HostConnectionState.AuthFailed, HostConnectionState.CredentialExpired)) {
+                    recoverHostConnection(connectionStateFor(error), jamIssue)
+                }
+            } finally {
+                joiningJam = false
+            }
+        }
     }
 
     // Load Host library on launch or when connection details change
@@ -679,7 +724,7 @@ fun BasePlaybackHost(
         covers = coverBook,
         phoneTrackIds = phoneTrackIds,
         hostTrackIds = hostTrackIds,
-        jamTrackIds = initialData.jamTrackIds,
+        jamTrackIds = availableJamSession?.takeIf { it.active }?.queue.orEmpty().map { it.trackId }.toSet(),
         downloadedTrackIds = cachedTrackIds,
         currentTrackId = currentTrackId,
         lastTrackId = lastTrackId,
@@ -1257,6 +1302,12 @@ fun BasePlaybackHost(
         onConnectHost = ::connectHostPayload,
         hostConnectionState = hostConnectionState,
         hostConnectionError = hostConnectionError,
+        savedHostProfile = savedHostProfile,
+        availableJamSession = availableJamSession,
+        hostLiveState = hostLiveState,
+        joiningJam = joiningJam,
+        jamIssue = jamIssue,
+        onJoinDesktopJam = ::joinDesktopJam,
         jamCoordinator = jamCoordinator,
         isLoadingLocalLibrary = isLoadingLocalLibrary,
         onCratesChange = { newCrates ->

@@ -69,6 +69,7 @@ import com.pixelody.app.data.model.CamelotKey
 import com.pixelody.app.data.model.EqualizerProfile
 import com.pixelody.app.data.model.HostConnectionState
 import com.pixelody.app.data.model.LibrarySnapshot
+import com.pixelody.app.ui.components.isTrackPlayableFromSources
 import com.pixelody.app.data.model.Track
 import com.pixelody.app.data.storage.DownloadQueueState
 import com.pixelody.app.feature.connection.hostSourceNeedsRecovery
@@ -153,6 +154,7 @@ internal fun LibraryScreen(
     onOpenCollection: (PixelodyDetailRoute) -> Unit = {},
     onCloseCollection: () -> Unit = {},
     connectionState: HostConnectionState = HostConnectionState.Disconnected,
+    jamSession: com.pixelody.app.data.model.JamSession? = null,
     connectionGuidance: String = "",
     hasSavedHost: Boolean = false,
     onRetryHost: () -> Unit = {},
@@ -160,6 +162,8 @@ internal fun LibraryScreen(
     onOpenTechnical: () -> Unit = {},
     sourceScope: SourceScope = SourceScope.All,
     onSourceScopeChange: (SourceScope) -> Unit = {},
+    onUsePhoneMusic: () -> Unit = { onSourceScopeChange(SourceScope.LocalPhone) },
+    onStartJam: () -> Unit = {},
     onCollectionActions: (String, String) -> Unit = { _, _ -> },
     recentTrackIds: List<String> = emptyList(),
     covers: CoverBook = CoverBook(),
@@ -213,9 +217,9 @@ internal fun LibraryScreen(
         (snapshot?.tracks.orEmpty() + localTracks).distinctBy { it.id }
     }
     val localTrackIds = remember(localTracks) { localTracks.map { it.id }.toSet() }
-    val jamTrackIds = remember(snapshot) { snapshot?.queue?.trackIds.orEmpty().toSet() }
-    val tracks = remember(allTracks, sourceScope, localTrackIds, jamTrackIds) {
-        filterTracksBySource(allTracks, sourceScope, localTrackIds, jamTrackIds)
+    val jamTrackIds = remember(jamSession) { jamSession?.takeIf { it.active }?.queue.orEmpty().map { it.trackId }.toSet() }
+    val tracks = remember(allTracks, snapshot?.tracks, sourceScope, localTrackIds, jamTrackIds) {
+        filterTracksBySource(allTracks, sourceScope, localTrackIds, jamTrackIds, snapshot?.tracks.orEmpty().map { it.id }.toSet())
     }
     val playlists = snapshot?.playlists.orEmpty()
     val trackById = remember(allTracks) { allTracks.associateBy { it.id } }
@@ -228,8 +232,8 @@ internal fun LibraryScreen(
     val queuedTracks = remember(snapshot, trackById) {
         snapshot?.queue?.trackIds.orEmpty().mapNotNull { trackById[it] }
     }
-    val playableTracks = remember(tracks) {
-        tracks.filterNot { it.missing || it.streamUrl.isBlank() }
+    val playableTracks = remember(tracks, connectionState, localTrackIds, cachedTrackIds) {
+        tracks.filterNot { !isTrackPlayableFromSources(it, connectionState == HostConnectionState.Connected, localTrackIds, cachedTrackIds) }
     }
     val losslessTracks = remember(playableTracks) {
         playableTracks.filter { it.lossless }
@@ -382,12 +386,12 @@ internal fun LibraryScreen(
     val sortedTracks = remember(filteredTracks, sortMode) {
         sortMode.sortTracks(filteredTracks)
     }
-    val playableVisibleTracks = sortedTracks.filterNot { it.missing || it.streamUrl.isBlank() }
+    val playableVisibleTracks = sortedTracks.filterNot { !isTrackPlayableFromSources(it, connectionState == HostConnectionState.Connected, localTrackIds, cachedTrackIds) }
     val libraryUnCachedCount = sortedTracks.count { it.id !in cachedTrackIds && !localTrackIds.contains(it.id) }
     val showsBatchDownloadBanner = filteredTracks.isNotEmpty() && !isMultiSelectMode &&
         libraryUnCachedCount > 0 && (selectedCollection.isNotBlank() || browseMode == "Favorites")
     val showsCollectionShortcuts = activeCollectionShortcuts.isNotEmpty() && browseModeDetailKind != null
-    val showsSourceRecovery = hostSourceNeedsRecovery(connectionState)
+    val showsSourceRecovery = hostSourceNeedsRecovery(connectionState) && sourceScope != SourceScope.LocalPhone && snapshot?.tracks?.isNotEmpty() == true
     LaunchedEffect(activeDetail) {
         if (activeDetail != null && sortedTracks.isNotEmpty()) {
             val totalItems = snapshotFlow { listState.layoutInfo.totalItemsCount }.first { it > 0 }
@@ -496,7 +500,7 @@ internal fun LibraryScreen(
                                 connectionState == HostConnectionState.Reconnecting,
                             canRetry = hasSavedHost,
                             onRetry = onRetryHost,
-                            onUsePhoneMusic = onOpenPhoneFiles,
+                            onUsePhoneMusic = onUsePhoneMusic,
                             onOpenConnectionTools = onOpenTechnical
                         )
                     }
@@ -510,7 +514,7 @@ internal fun LibraryScreen(
                     harmonicBaseKey?.let { append(" · Key ${it.code}") }
                 }, showLibraryTools, { showLibraryTools = !showLibraryTools }, "studio:library-controls", Modifier.padding(horizontal = 16.dp))
             }
-                if (snapshot != null && experienceMode == AppExperienceMode.Studio && showLibraryTools) {
+                if (snapshot != null && hasSavedHost && experienceMode == AppExperienceMode.Studio && showLibraryTools) {
                 item { HostStatusCard(snapshot = snapshot) }
             }
             if (experienceMode == AppExperienceMode.Studio && showLibraryTools) {
@@ -519,10 +523,13 @@ internal fun LibraryScreen(
                         selectedScope = sourceScope,
                         onSelectScope = onSourceScopeChange,
                         localCount = localTracks.size,
+                        allCount = allTracks.size,
                         hostConnected = connectionState == HostConnectionState.Connected,
                         hostCount = snapshot?.tracks?.size ?: 0,
-                        jamActive = snapshot?.queue != null,
-                        jamCount = queuedTracks.size,
+                        jamActive = jamSession?.active == true,
+                        jamCount = jamTrackIds.size,
+                        onStartJam = onStartJam,
+                        onConnectDesktop = onPairFixture,
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                     )
                 }

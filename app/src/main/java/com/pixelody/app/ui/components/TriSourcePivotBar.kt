@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -62,12 +63,14 @@ fun filterTracksBySource(
     tracks: List<Track>,
     scope: SourceScope,
     localTrackIds: Set<String>,
-    jamTrackIds: Set<String> = emptySet()
+    jamTrackIds: Set<String> = emptySet(),
+    hostTrackIds: Set<String>? = null
 ): List<Track> {
     return when (scope) {
         SourceScope.All -> tracks
         SourceScope.LocalPhone -> tracks.filter { it.id in localTrackIds || it.streamUrl.startsWith("content://") || it.streamUrl.startsWith("file://") }
-        SourceScope.DesktopHost -> tracks.filterNot { it.id in localTrackIds || it.streamUrl.startsWith("content://") || it.streamUrl.startsWith("file://") }
+        SourceScope.DesktopHost -> if (hostTrackIds != null) tracks.filter { it.id in hostTrackIds }
+            else tracks.filterNot { it.id in localTrackIds || it.streamUrl.startsWith("content://") || it.streamUrl.startsWith("file://") }
         SourceScope.JamMesh -> tracks.filter { it.id in jamTrackIds }
     }
 }
@@ -118,7 +121,7 @@ fun TriSourcePivotBar(
                 SourceScope.All -> if (allCount > 0) "$allCount" else "${effPhoneCount + effDesktopCount}"
                 SourceScope.LocalPhone -> "$effPhoneCount"
                 SourceScope.DesktopHost -> if (effHostConnected) "$effDesktopCount" else "Offline"
-                SourceScope.JamMesh -> if (jamCount > 0) "$jamCount" else if (jamActive) "Active" else "Mesh"
+                SourceScope.JamMesh -> if (jamCount > 0) "$jamCount" else if (jamActive) "Active" else "Off"
             }
 
             val statusDotColor = when (scope) {
@@ -143,19 +146,19 @@ fun TriSourcePivotBar(
 
             Surface(
                 modifier = Modifier
+                    .heightIn(min = 48.dp)
                     .clip(RoundedCornerShape(20.dp))
                     .combinedClickable(
                         onClickLabel = "Select ${scope.label}",
                         role = Role.Tab,
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onSelectScope(scope)
-                            // Smart 1-tap activation
                             if (scope == SourceScope.DesktopHost && !effHostConnected) {
                                 onConnectDesktop()
-                            } else if (scope == SourceScope.JamMesh && !jamActive && jamCount == 0) {
+                            } else if (scope == SourceScope.JamMesh) {
+                                if (jamActive) onSelectScope(scope)
                                 onStartJam()
-                            }
+                            } else onSelectScope(scope)
                         },
                         onLongClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)

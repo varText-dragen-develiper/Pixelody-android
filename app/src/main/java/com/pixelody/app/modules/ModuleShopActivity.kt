@@ -30,7 +30,7 @@ class ModuleShopActivity : ComponentActivity() {
         busy = true
         lifecycleScope.launch {
             try { state = withContext(Dispatchers.IO) { work() }; status = label }
-            catch (e: Exception) { status = "Could not complete this operation. Check the package or device storage. Existing notes were preserved." }
+            catch (e: Exception) { status = "Couldn't finish. Check the package and available storage. Your saved notes are still there." }
             finally { busy = false }
         }
     }
@@ -65,13 +65,13 @@ class ModuleShopActivity : ComponentActivity() {
                         TextButton(onClick = { if (dirty) { pending = "back"; confirmLeave = true } else finish() }) { Text("Back to Pixelody") }
                         Text("MODULES", style = MaterialTheme.typography.labelLarge)
                         Text("Your optional tools.", style = MaterialTheme.typography.headlineLarge)
-                        Text("Import a downloaded Pixelody module to add a tool. No shop is installed by default.")
+                        Text("Import a downloaded module to add a tool. The shop is optional.")
                         OutlinedButton(enabled = !busy, onClick = { if (dirty) { pending = "import"; confirmLeave = true } else action("import") }) { Text("Import downloaded module") }
                         if (state.shop != null) {
                             Card(Modifier.fillMaxWidth()) {
                                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                     Text(state.shop!!.getString("name"), style = MaterialTheme.typography.titleLarge)
-                                    Text("Connects to the Pixelody website when opened. Test Store purchases only; no real charges. Your music and notebook are not shared.")
+                                    Text("Opens the Pixelody website. Test purchases have no charge, and your music and notes aren't shared.")
                                     Button(enabled = !busy, onClick = { startActivity(android.content.Intent(this@ModuleShopActivity, WebShopActivity::class.java)) }) { Text("Open shop") }
                                     OutlinedButton(enabled = !busy, onClick = { operation("Shop module removed.") { store.removeShop() } }) { Text("Remove shop module") }
                                 }
@@ -86,7 +86,7 @@ class ModuleShopActivity : ComponentActivity() {
                             OutlinedButton(enabled = !busy, onClick = { if (dirty) { pending = "remove"; confirmLeave = true } else action("remove") }) { Text("Remove module") }
                             Text("Removing the module keeps saved notes. Reinstall to return to them.")
                         }
-                        if (state.installed != null) Text("A standalone notebook in this build. Album linking, syncing and placement inside a theme come later.", style = MaterialTheme.typography.bodySmall)
+                        if (state.installed != null) Text("Album links, syncing, and placement inside themes are still planned.", style = MaterialTheme.typography.bodySmall)
                     }
                     if (confirmLeave) AlertDialog(onDismissRequest = { confirmLeave = false }, title = { Text("Discard unsaved edits?") }, text = { Text("Previously saved notes will be kept.") }, confirmButton = { TextButton(onClick = { confirmLeave = false; action(pending) }) { Text("Discard edits") } }, dismissButton = { TextButton(onClick = { confirmLeave = false }) { Text("Keep editing") } })
                 }

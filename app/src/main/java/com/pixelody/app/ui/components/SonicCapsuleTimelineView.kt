@@ -856,7 +856,7 @@ private fun EmptyTimelineCard() {
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = "Start playing your favorite Hi-Res FLAC tracks or vinyl albums to record chronological memory nodes and generate daily AI liner notes.",
+                text = "Play some music to start your listening timeline.",
                 style = MaterialTheme.typography.bodySmall,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant

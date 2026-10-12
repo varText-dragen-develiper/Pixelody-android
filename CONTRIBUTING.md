@@ -1,7 +1,7 @@
-# Contributing To pixelody-android
+# Contributing to Pixelody-android
 
-Issue reports, design discussion, documentation fixes and pull requests are
-welcome.
+Found a problem, have an idea, or want to work on a fix? I’d appreciate the help,
+whether it’s a bug report, a guide update, a design idea, or a pull request.
 
 ## Contributor License Agreement
 

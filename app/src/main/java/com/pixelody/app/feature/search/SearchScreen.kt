@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import com.pixelody.app.data.model.CamelotKey
 import com.pixelody.app.data.model.EqualizerProfile
 import com.pixelody.app.data.model.LibrarySnapshot
+import com.pixelody.app.ui.components.isTrackPlayableFromSources
 import com.pixelody.app.data.model.Track
 import com.pixelody.app.feature.library.CollectionPreviewCard
 import com.pixelody.app.feature.library.CollectionShortcut
@@ -71,6 +72,8 @@ import com.pixelody.app.ui.components.performTick
 
 @Composable
 internal fun SearchScreen(
+    cachedTrackIds: Set<String> = emptySet(),
+    jamSession: com.pixelody.app.data.model.JamSession? = null,
     snapshot: LibrarySnapshot?,
     localTracks: List<Track>,
     selectedTrack: Track?,
@@ -123,26 +126,27 @@ internal fun SearchScreen(
         }
     }
     val hostTracks = snapshot?.tracks.orEmpty()
+    val hostConnected = snapshot?.host?.connectionState == com.pixelody.app.data.model.HostConnectionState.Connected
     val localTrackIds = remember(localTracks) { localTracks.map { it.id }.toSet() }
-    val jamTrackIds = remember(snapshot) { snapshot?.queue?.trackIds.orEmpty().toSet() }
-    val trackById = remember(hostTracks, localTracks) { (hostTracks + localTracks).associateBy { it.id } }
+    val jamTrackIds = remember(jamSession) { jamSession?.takeIf { it.active }?.queue.orEmpty().map { it.trackId }.toSet() }
+    val trackById = remember(hostTracks, localTracks, hostConnected, cachedTrackIds) { (hostTracks + localTracks).associateBy { it.id } }
     val favoriteIds = remember(snapshot, hostTracks, localTracks) {
         (snapshot?.favorites.orEmpty() + hostTracks.filter { it.favorite }.map { it.id } + localTracks.filter { it.favorite }.map { it.id }).toSet()
     }
     val queuedIds = remember(snapshot) { snapshot?.queue?.trackIds.orEmpty().toSet() }
     val favoriteTracks = remember(hostTracks, localTracks, favoriteIds) {
-        (hostTracks + localTracks).filter { it.id in favoriteIds || it.favorite }
+        (hostTracks + localTracks).distinctBy { it.id }.filter { it.id in favoriteIds || it.favorite }
     }
     val queuedTracks = remember(snapshot, trackById) {
         snapshot?.queue?.trackIds.orEmpty().mapNotNull { trackById[it] }
     }
-    val playableTracks = remember(hostTracks, localTracks) {
-        (hostTracks + localTracks).filterNot { it.missing || it.streamUrl.isBlank() }
+    val playableTracks = remember(hostTracks, localTracks, hostConnected, cachedTrackIds) {
+        (hostTracks + localTracks).distinctBy { it.id }.filterNot { !isTrackPlayableFromSources(it, hostConnected, localTrackIds, cachedTrackIds) }
     }
     val losslessTracks = remember(playableTracks) { playableTracks.filter { it.lossless } }
-    val suggestedTracks = remember(selectedTrack, queuedTracks, favoriteTracks, localTracks, hostTracks) {
+    val suggestedTracks = remember(selectedTrack, queuedTracks, favoriteTracks, localTracks, hostTracks, hostConnected, cachedTrackIds) {
         (listOfNotNull(selectedTrack) + queuedTracks + favoriteTracks + localTracks + hostTracks)
-            .filterNot { it.missing || it.streamUrl.isBlank() }
+            .filterNot { !isTrackPlayableFromSources(it, hostConnected, localTrackIds, cachedTrackIds) }
             .distinctBy { it.id }
             .take(12)
     }
@@ -180,12 +184,12 @@ internal fun SearchScreen(
                 )
             }
     }
-    val combinedTracks = remember(hostTracks, localTracks, query, sourceScope, intentFilter, favoriteIds, queuedIds, harmonicBaseKey, harmonicFilterMode, flowBpm, flowTolerance) {
+    val combinedTracks = remember(hostTracks, localTracks, query, sourceScope, intentFilter, favoriteIds, queuedIds, harmonicBaseKey, harmonicFilterMode, flowBpm, flowTolerance, jamTrackIds, hostConnected, cachedTrackIds) {
         val needle = query.trim().lowercase(Locale.US)
         val allTracks = (hostTracks + localTracks).distinctBy { it.id }
-        val sourceTracks = filterTracksBySource(allTracks, sourceScope, localTrackIds, jamTrackIds)
+        val sourceTracks = filterTracksBySource(allTracks, sourceScope, localTrackIds, jamTrackIds, hostTracks.map { it.id }.toSet())
         val intentTracks = when (intentFilter) {
-            "Playable" -> sourceTracks.filterNot { it.missing || it.streamUrl.isBlank() }
+            "Playable" -> sourceTracks.filterNot { !isTrackPlayableFromSources(it, hostConnected, localTrackIds, cachedTrackIds) }
             "Favorites" -> sourceTracks.filter { it.id in favoriteIds || it.favorite }
             "Lossless" -> sourceTracks.filter { it.lossless }
             "Queued" -> sourceTracks.filter { it.id in queuedIds }
@@ -229,10 +233,11 @@ internal fun SearchScreen(
                     selectedScope = sourceScope,
                     onSelectScope = onSourceScopeChange,
                     localCount = localTracks.size,
-                    hostConnected = snapshot != null,
+                    allCount = (hostTracks + localTracks).distinctBy { it.id }.size,
+                    hostConnected = hostConnected,
                     hostCount = hostTracks.size,
-                    jamActive = snapshot?.queue != null,
-                    jamCount = queuedTracks.size,
+                    jamActive = jamSession?.active == true,
+                    jamCount = jamTrackIds.size,
                     onLongClickScope = onLongClickScope,
                     onConnectDesktop = onConnectDesktop,
                     onStartJam = onStartJam

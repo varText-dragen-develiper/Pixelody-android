@@ -1,13 +1,13 @@
 # Pixelody for Android
 
-Pixelody for Android is a native companion to Pixelody for Windows. It connects to your Windows Pixelody host over your local network, lets you browse the library, controls playback, and takes part in J.A.M. (Joined Audio Mesh) sessions. It is not a standalone library host: the Windows app owns the music library.
+Pixelody for Android connects to your Windows library over the local network. Browse music, control playback, and join J.A.M. (Joined Audio Mesh) sessions. Keep the Windows host running for these features; hosting that library from your phone is still planned.
 
-This repository is the open-source edition of the Android app. It is licensed under the GNU General Public License v3.0 only (see [LICENSE](LICENSE) and [NOTICE](NOTICE)). The Pixelody name and logo have separate trademark guidance; see [TRADEMARKS.md](TRADEMARKS.md) for what that means if you fork or redistribute this code. The Windows app is at [Pixelody](https://github.com/varText-dragen-develiper/Pixelody).
+This repository is the open-source edition of the Android app. It is licensed under the GNU General Public License v3.0 only (see [LICENSE](LICENSE) and [NOTICE](NOTICE)). If you fork or redistribute it, read the name and logo guidance in [TRADEMARKS.md](TRADEMARKS.md). The Windows app is at [Pixelody](https://github.com/varText-dragen-develiper/Pixelody).
 
 ## Start here
 
 - [Getting started](docs/GETTING_STARTED.md): requirements, source build and first listening session.
-- [Android releases](https://github.com/varText-dragen-develiper/Pixelody-android/releases): exact binaries and release notes when published. No GitHub release was published as of October 2, 2026.
+- [Android releases](https://github.com/varText-dragen-develiper/Pixelody-android/releases): exact binaries and release notes when published. No Android GitHub release is published as of October 10, 2026.
 - [Support](SUPPORT.md) and [shared discussions](https://github.com/varText-dragen-develiper/Pixelody/discussions): report problems or share listening ideas.
 - [Release preparation](docs/RELEASE_PREPARATION.md): what still needs verification before distributing a binary.
 
@@ -38,4 +38,4 @@ The shared API fixtures that both apps test against are in [docs/api-contract-fi
 
 ## Contributing and security
 
-Pull requests are welcome. Follow the Contributor License Agreement requirements in [CONTRIBUTING.md](CONTRIBUTING.md). Report security problems privately as described in [SECURITY.md](SECURITY.md), not in a public issue.
+Want to help with a fix? Thanks for taking a look. Start with [CONTRIBUTING.md](CONTRIBUTING.md), including the Contributor License Agreement. Report security problems privately using [SECURITY.md](SECURITY.md).

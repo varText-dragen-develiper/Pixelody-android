@@ -18,7 +18,7 @@ enum class TapeFormulation(
     TypeI_Ferric(
         title = "Type I Normal",
         subtitle = "Ferric (Fe2O3)",
-        description = "Standard gamma-Fe2O3 magnetic formula with vintage tape hiss, punchy low-mids, and smooth early saturation.",
+        description = "More tape hiss, fuller low mids, and earlier saturation.",
         saturationCeiling = 0.85f,
         defaultDriveGain = 1.25f,
         highFreqRolloffHz = 14000f,
@@ -29,7 +29,7 @@ enum class TapeFormulation(
     TypeII_Chrome(
         title = "Type II High Bias",
         subtitle = "Chrome (CrO2)",
-        description = "Chromium dioxide coating featuring crisper transient treble response, higher headroom, and quieter baseline hiss.",
+        description = "Clearer treble, more headroom, and less hiss.",
         saturationCeiling = 0.95f,
         defaultDriveGain = 1.10f,
         highFreqRolloffHz = 17500f,
@@ -40,7 +40,7 @@ enum class TapeFormulation(
     TypeIV_Metal(
         title = "Type IV Metal",
         subtitle = "Pure Metal Particle",
-        description = "Pure metallic particulate suspension delivering maximum dynamic range, razor-sharp transients, and pristine highs.",
+        description = "More headroom, less saturation, and an extended high end.",
         saturationCeiling = 1.18f,
         defaultDriveGain = 1.00f,
         highFreqRolloffHz = 21000f,
@@ -51,7 +51,7 @@ enum class TapeFormulation(
     ReelToReel_15ips(
         title = "Studio Master 15 IPS",
         subtitle = "1/4\" Open Reel",
-        description = "High-speed 15 inches/sec open reel transport with legendary 40Hz magnetic head-bump and silky analog glue.",
+        description = "A 15 ips reel-style preset with a low-bass bump and light saturation.",
         saturationCeiling = 1.28f,
         defaultDriveGain = 0.95f,
         highFreqRolloffHz = 22500f,
@@ -62,7 +62,7 @@ enum class TapeFormulation(
     ReelToReel_30ips(
         title = "Mastering Deck 30 IPS",
         subtitle = "1/2\" Mastering Reel",
-        description = "Ultra-high-speed 30 inches/sec mastering tape with near-flat frequency linearity, lightning transient speed, and vanishing hiss.",
+        description = "A 30 ips reel-style preset with a flatter response and less hiss.",
         saturationCeiling = 1.42f,
         defaultDriveGain = 0.90f,
         highFreqRolloffHz = 25000f,
@@ -73,7 +73,7 @@ enum class TapeFormulation(
     DegradedLoFi(
         title = "Degraded Walkman",
         subtitle = "Worn Thrift-Store Tape",
-        description = "Heavily played vintage cassette with pronounced motor flutter, magnetic azimuth skew, and thick warm distortion.",
+        description = "A worn-tape preset with stronger flutter, azimuth shift, and distortion.",
         saturationCeiling = 0.68f,
         defaultDriveGain = 1.55f,
         highFreqRolloffHz = 8500f,

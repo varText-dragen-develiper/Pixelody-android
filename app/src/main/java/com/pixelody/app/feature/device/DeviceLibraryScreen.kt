@@ -93,7 +93,7 @@ internal fun DeviceLibraryScreen(
                 title = "Add your music",
                 subtitle = if (localTracks.isEmpty()) "No local files added yet" else "${localTracks.size} local track${if (localTracks.size == 1) "" else "s"} ready"
             ) {
-                Text("Choose a folder or specific files, or let Pixelody find audio on your phone. Access is requested only when you choose an action.", style = MaterialTheme.typography.bodyMedium)
+                Text("Choose files or a folder, or scan your phone for music. Pixelody will ask for the access it needs.", style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(12.dp))
                 Button(
                     onClick = {

@@ -16,7 +16,7 @@ enum class StemType(
     Vocals(
         title = "Vocals",
         subtitle = "Center Lead & Harmony",
-        description = "Isolates center-channel vocal formants, lead vocals, and backing choir with mid/side extraction.",
+        description = "Focus on the center-channel vocal range using mid/side extraction.",
         colorHex = 0xFF06B6D4, // Cyan
         defaultCenterHz = 2200f,
         lowFreqHz = 300f,
@@ -26,7 +26,7 @@ enum class StemType(
     Drums(
         title = "Drums",
         subtitle = "Percussion & Transients",
-        description = "Captures transient rhythmic snap, snares, hi-hats, and punchy acoustic/electronic kick attacks.",
+        description = "Focus on rhythmic transients such as kicks, snares, and hi-hats.",
         colorHex = 0xFFF59E0B, // Amber Gold
         defaultCenterHz = 650f,
         lowFreqHz = 180f,
@@ -36,7 +36,7 @@ enum class StemType(
     Bass(
         title = "Bass",
         subtitle = "Sub & Low Fundaments",
-        description = "Isolates sub-bass frequencies, 808s, bass guitar notes, and deep synthesizer low ends (<220Hz).",
+        description = "Focus on bass frequencies below 220 Hz.",
         colorHex = 0xFF8B5CF6, // Royal Violet
         defaultCenterHz = 90f,
         lowFreqHz = 20f,
@@ -46,7 +46,7 @@ enum class StemType(
     Instruments(
         title = "Instruments",
         subtitle = "Harmonic Bed & Air",
-        description = "Captures guitars, synthesizers, pianos, brass, stereo ambient reverbs, and high-frequency sparkle.",
+        description = "Focus on the instrumental range and stereo ambience.",
         colorHex = 0xFF10B981, // Emerald Green
         defaultCenterHz = 3500f,
         lowFreqHz = 240f,
@@ -74,42 +74,42 @@ enum class StemPreset(
     FullMix(
         title = "Full Studio Mix",
         subtitle = "Unity Balance",
-        description = "All 4 stem channels active at standard unity gain (0 dB).",
+        description = "All four parts at 0 dB.",
         vocalGainDb = 0f, drumsGainDb = 0f, bassGainDb = 0f, instGainDb = 0f,
         vocalMute = false, drumsMute = false, bassMute = false, instMute = false
     ),
     AcapellaExtract(
         title = "Acapella Extract",
         subtitle = "Vocals Only",
-        description = "Solos and boosts vocal formants while fully muting drums, bass, and backing instruments.",
+        description = "Solo and boost the vocal channel; mute the other parts.",
         vocalGainDb = 2.5f, drumsGainDb = -40f, bassGainDb = -40f, instGainDb = -40f,
         vocalMute = false, drumsMute = true, bassMute = true, instMute = true
     ),
     InstrumentalKaraoke(
         title = "Instrumental Karaoke",
         subtitle = "Vocals Removed",
-        description = "Mutes center lead vocals while preserving full punchy drums, bass, and musical instrumentation.",
+        description = "Mute the vocal channel and keep drums, bass, and instruments.",
         vocalGainDb = -40f, drumsGainDb = 0.5f, bassGainDb = 0.5f, instGainDb = 0.5f,
         vocalMute = true, drumsMute = false, bassMute = false, instMute = false
     ),
     DrumAndBass(
         title = "Drum & Bass Drop",
         subtitle = "Rhythm Section Only",
-        description = "Isolates the dynamic low-end engine: punchy percussion and sub-bass fundaments.",
+        description = "Keep drums and bass; mute vocals and instruments.",
         vocalGainDb = -40f, drumsGainDb = 1.5f, bassGainDb = 2.0f, instGainDb = -40f,
         vocalMute = true, drumsMute = false, bassMute = false, instMute = true
     ),
     VocalDuck(
         title = "Vocal Ducking",
         subtitle = "Backing Track",
-        description = "Attenuates vocals by -6dB for comfortable singing or podcast voiceover accompaniment.",
+        description = "Lower the vocal channel by 6 dB.",
         vocalGainDb = -6.0f, drumsGainDb = 0f, bassGainDb = 0f, instGainDb = 0f,
         vocalMute = false, drumsMute = false, bassMute = false, instMute = false
     ),
     BassBoostDrop(
         title = "Sub-Bass Heavy",
         subtitle = "+5dB Bass Punch",
-        description = "Drives sub-bass and kick drums for club sound system dynamics.",
+        description = "Boost bass and drums.",
         vocalGainDb = -1.0f, drumsGainDb = 1.0f, bassGainDb = 5.0f, instGainDb = 0f,
         vocalMute = false, drumsMute = false, bassMute = false, instMute = false
     )

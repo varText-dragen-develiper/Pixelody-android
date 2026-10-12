@@ -33,10 +33,13 @@ class ConnectionRecoveryRuntimeTest {
         val server = ServerSocket(0, 8, InetAddress.getByName("127.0.0.1"))
         val lost = AtomicBoolean(false)
         val revoked = AtomicBoolean(false)
+        val jamAvailable = AtomicBoolean(false)
+        val joined = AtomicBoolean(false)
         val observed = AtomicReference<BaseLayerData>()
         val saved = SavedHostStore(context)
         saved.clear()
         MobileSettingsStore(context).saveLastTrackId(null)
+        MobileSettingsStore(context).saveExperienceMode(com.pixelody.app.data.model.AppExperienceMode.Studio)
         val worker = thread(isDaemon = true, name = "recovery-test-host") {
             while (!server.isClosed) {
                 try {
@@ -46,11 +49,15 @@ class ConnectionRecoveryRuntimeTest {
                         while (!reader.readLine().isNullOrEmpty()) { /* consume headers */ }
                         val unavailable = request.contains("/api/v1/live") && lost.get()
                         val denied = request.contains("/api/v1/live") && revoked.get()
+                        val participant = if (joined.get()) """{"deviceId":"phone-fixture","name":"Phone fixture","role":"guest","status":"pending","permissions":[]}""" else "null"
+                        val session = """{"active":true,"sessionId":"fixture-jam","mode":"single-host","currentParticipant":$participant,"participants":[],"queue":[]}"""
                         val body = when {
                             denied -> """{"code":"auth_revoked","message":"Fixture access revoked"}"""
                             unavailable -> """{"code":"host_unavailable","message":"Fixture host stopped"}"""
                             request.contains("/api/v1/library/tracks") -> """{"revision":1,"tracks":[],"page":{"total":0,"nextOffset":null}}"""
-                            request.contains("/api/v1/live") -> """{"revision":1,"pollAfterMs":1000,"unchanged":false}"""
+                            request.contains("/api/v1/jam/session/join") -> { joined.set(true); """{"accepted":false,"approvalRequired":true}""" }
+                            request.contains("/api/v1/jam/session") -> session
+                            request.contains("/api/v1/live") -> """{"revision":1,"pollAfterMs":1000,"unchanged":false,"jamSession":${if (jamAvailable.get()) session else "null"}}"""
                             else -> """{"hostId":"fixture","hostName":"Recovery fixture","revision":1,"tracks":[],"playlists":[]}"""
                         }.toByteArray()
                         val status = if (denied) "401 Unauthorized" else if (unavailable) "503 Service Unavailable" else "200 OK"
@@ -86,6 +93,18 @@ class ConnectionRecoveryRuntimeTest {
                     }
                 }
                 awaitState("Connected host is browsable") { it.hostReachable && it.source == BaseSource.Host && saved.load() != null }
+                jamAvailable.set(true)
+                val device = UiDevice.getInstance(instrumentation)
+                device.wait(Until.findObject(By.text("Search")), 5000)!!.click()
+                device.waitForIdle(); Thread.sleep(400)
+                val sourcePhone = device.wait(Until.findObject(By.text("Phone")), 5000)!!.visibleBounds
+                device.swipe(device.displayWidth * 3 / 4, sourcePhone.centerY(), device.displayWidth * 2 / 5, sourcePhone.centerY(), 25)
+                Thread.sleep(1200) // Let the real live endpoint announce the session.
+                device.wait(Until.findObject(By.text("J.A.M.")), 5000)!!.click()
+                device.wait(Until.findObject(By.text("Join desktop J.A.M.")), 5000)?.click() ?: error("Missing real desktop join action")
+                assertTrue("Join must reach the host API", device.wait(Until.hasObject(By.text("Waiting for desktop approval")), 5000))
+                assertTrue(joined.get())
+                device.findObject(By.text("Back to music"))!!.click()
                 lost.set(true)
                 awaitState("Failed live poll returns to Phone") { !it.hostReachable && it.source == BaseSource.Phone }
                 assertNotNull("Transient loss preserves encrypted pairing", saved.load())
@@ -93,7 +112,6 @@ class ConnectionRecoveryRuntimeTest {
                 Thread.sleep(1800)
                 assertFalse("PC return does not silently reclaim the app", observed.get().hostReachable)
                 assertEquals(BaseSource.Phone, observed.get().source)
-                val device = UiDevice.getInstance(instrumentation)
                 val reconnect = device.wait(Until.findObject(By.text("Reconnect")), 3000)
                 assertNotNull("Recovery offers a visible action", reconnect)
                 reconnect.click()

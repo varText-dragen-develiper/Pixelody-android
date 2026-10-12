@@ -51,7 +51,8 @@ internal fun CreateScreen(
     onOpenProfile: () -> Unit,
     onOpenTechnical: () -> Unit,
     onStartHost: () -> Unit,
-    onStopHost: () -> Unit
+    onStopHost: () -> Unit,
+    hostingAvailable: Boolean = false
 ) {
     val haptic = LocalHapticFeedback.current
     LazyColumn(
@@ -61,8 +62,8 @@ internal fun CreateScreen(
     ) {
         item {
             ScreenHeader(
-                title = "Create",
-                subtitle = "Add music or start this phone as a portable source."
+                title = "Add music",
+                subtitle = "Choose phone files or connect your desktop."
             )
         }
         item {
@@ -142,7 +143,7 @@ internal fun CreateScreen(
                 }
             }
         }
-        item {
+        if (hostingAvailable) item {
             SectionCard(
                 title = "Host From This Device",
                 subtitle = if (androidHostStatus.running) {

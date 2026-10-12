@@ -47,13 +47,13 @@ class HomeContextEngine(
                 isUsbDac = true,
                 title = "Hi-Res Bit-Perfect DAC Active",
                 badge = "${currentTrack?.sampleRate ?: 96000}Hz / ${currentTrack?.bitDepth ?: 24}-bit",
-                description = "Direct hardware audio driver passthrough enabled."
+                description = "Direct output mode enabled."
             )
             isOffline -> HardwareAnchorState(
                 isOffline = true,
                 title = "Offline Local Media Mode",
                 badge = "${tracks.size} tracks",
-                description = "Zero network dependencies. Playing directly from device flash."
+                description = "Playing music stored on this device."
             )
             else -> null
         }

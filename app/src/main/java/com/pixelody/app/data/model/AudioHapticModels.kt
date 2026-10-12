@@ -12,31 +12,31 @@ enum class AudioHapticMode(
     SubBassRumble(
         title = "Sub-Bass Rumble",
         subtitle = "20Hz - 80Hz Low-End",
-        description = "Deep tactile pulses synchronized with sub-bass drops, 808s, and heavy low-frequency resonance.",
+        description = "Heavier pulses for bass drops and low frequencies.",
         accentColorHex = 0xFF6366F1 // Indigo
     ),
     BeatPunch(
         title = "Beat Punch",
         subtitle = "Rhythmic Transients",
-        description = "Crisp mechanical downbeat clicks and tactile punches tracking rhythmic kick drums and snare strikes.",
+        description = "Clicks and pulses for kicks and snares.",
         accentColorHex = 0xFF38BDF8 // Sky Blue
     ),
     FullSpectrum(
         title = "Full Spectrum",
         subtitle = "Multi-Band Tactile",
-        description = "Dynamic multi-tier feedback: heavy low-ticks on sub-bass, sharp clicks on snares, and micro-ticks on percussion.",
+        description = "Heavy bass pulses, snare clicks, and lighter percussion ticks.",
         accentColorHex = 0xFF10B981 // Emerald Green
     ),
     VinylAcoustic(
         title = "Vinyl Acoustic",
         subtitle = "Analog Texture",
-        description = "Subtle mechanical tonearm drop sensations, turntable platter inertia, and analog stylus groove textures.",
+        description = "Light feedback for tonearm drops and platter movement.",
         accentColorHex = 0xFFF59E0B // Amber
     ),
     Off(
         title = "Haptics Off",
         subtitle = "Silent",
-        description = "Audio-haptic tactile feedback is disabled.",
+        description = "Vibration feedback is off.",
         accentColorHex = 0xFF64748B // Slate
     )
 }
