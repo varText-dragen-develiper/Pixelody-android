@@ -38,11 +38,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pixelody.app.ui.components.TransportGlyphType
-import com.pixelody.app.ui.theme.compactSurfaceShape
 import com.pixelody.app.ui.components.PixelodyTransportGlyph
 import com.pixelody.app.ui.components.RemoteArtwork
 import com.pixelody.app.ui.components.performTick
-import com.pixelody.app.ui.theme.LocalPixelodyThemeVariant
 import androidx.compose.foundation.border
 import androidx.compose.ui.text.font.FontFamily
 
@@ -60,9 +58,8 @@ object StudioThemeUnitKit : ThemeUnitKit {
         modifier: Modifier
     ) {
         val haptic = LocalHapticFeedback.current
-        val theme = LocalPixelodyThemeVariant.current
         Card(
-            shape = theme.compactSurfaceShape(),
+            shape = MaterialTheme.shapes.medium,
             border = BorderStroke(
                 1.dp,
                 if (data.isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)

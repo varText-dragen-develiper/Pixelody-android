@@ -15,9 +15,10 @@ data class CoverEntry(
     val key: String,
     val imageUri: String? = null,
     val note: String = "",
-    val backgroundOpacity: Float? = null
+    val backgroundOpacity: Float? = null,
+    val imageStyle: ScreenImageStyle? = null
 ) {
-    val isEmpty: Boolean get() = imageUri.isNullOrBlank() && note.isBlank() && backgroundOpacity == null
+    val isEmpty: Boolean get() = imageUri.isNullOrBlank() && note.isBlank() && backgroundOpacity == null && imageStyle == null
 }
 
 data class CoverBook(val entries: Map<String, CoverEntry> = emptyMap()) {
@@ -41,6 +42,12 @@ data class CoverBook(val entries: Map<String, CoverEntry> = emptyMap()) {
     fun withBackgroundOpacity(screen: ScreenBackground, opacity: Float): CoverBook =
         updated(screen.key) { it.copy(backgroundOpacity = opacity.takeIf { value -> value.isFinite() }?.coerceIn(0f, 1f)) }
 
+    /** Apply a reviewed draft as one record; never expose a half-styled background. */
+    fun withStyledBackground(screen: ScreenBackground, uri: String, opacity: Float, style: ScreenImageStyle): CoverBook =
+        updated(screen.key) { it.copy(imageUri = uri, backgroundOpacity = opacity.takeIf(Float::isFinite)?.coerceIn(0f, 1f) ?: 0.6f, imageStyle = style) }
+
+    fun withoutBackground(screen: ScreenBackground): CoverBook = CoverBook(entries - screen.key)
+
     fun withNote(key: String, note: String): CoverBook =
         updated(key) { it.copy(note = note.trim()) }
 
@@ -51,7 +58,7 @@ data class CoverBook(val entries: Map<String, CoverEntry> = emptyMap()) {
 }
 
 /**
- * One line per entry: `key|imageUri|note|backgroundOpacity` (the optional fourth field extends v1), with the three reserved characters
+ * One line per entry: `key|imageUri|note|backgroundOpacity|imageStyle` (optional trailing fields extend v1), with reserved characters
  * percent-escaped so a note containing a pipe or a line break survives a round trip.
  * Anything that fails to decode is dropped rather than thrown, for the same reason
  * crates do it: a bad character should not become a crash on launch.
@@ -62,7 +69,7 @@ object CoverCodec {
 
     fun encode(book: CoverBook): String =
         (listOf(VERSION) + book.entries.values.map { entry ->
-            listOf(escape(entry.key), escape(entry.imageUri.orEmpty()), escape(entry.note), entry.backgroundOpacity?.toString().orEmpty())
+            listOf(escape(entry.key), escape(entry.imageUri.orEmpty()), escape(entry.note), entry.backgroundOpacity?.toString().orEmpty(), entry.imageStyle?.encoded().orEmpty())
                 .joinToString("|")
         }).joinToString("\n")
 
@@ -79,7 +86,8 @@ object CoverCodec {
                 key = key,
                 imageUri = unescape(fields[1]).ifBlank { null },
                 note = unescape(fields[2]),
-                backgroundOpacity = fields.getOrNull(3)?.toFloatOrNull()?.takeIf { it.isFinite() }?.coerceIn(0f, 1f)
+                backgroundOpacity = fields.getOrNull(3)?.toFloatOrNull()?.takeIf { it.isFinite() }?.coerceIn(0f, 1f),
+                imageStyle = ScreenImageStyle.decode(fields.getOrNull(4))
             ).takeUnless { it.isEmpty }
         }
         // Earlier collection menus wrote plural prefixes; shelves use canonical singular keys.

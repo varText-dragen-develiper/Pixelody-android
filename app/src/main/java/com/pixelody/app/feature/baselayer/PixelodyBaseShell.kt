@@ -554,8 +554,12 @@ fun PixelodyBaseShell(
         state.destination == BaseDestination.Library -> ScreenBackground.Library
         else -> ScreenBackground.Search
     }
-    val backgroundOpacity = backgroundScreen?.let { data.covers.backgroundOpacityFor(it) } ?: 1f
-    val backgroundImage = backgroundScreen?.let { data.covers.imageFor(it.key, null) }
+    // Studio owns custom images; authored themes always render their complete recipe.
+    val studioScreen = backgroundScreen.takeIf { activeTheme == PixelodyMobileTheme.Studio }
+    val backgroundOpacity = studioScreen?.let { data.covers.backgroundOpacityFor(it) } ?: 1f
+    val backgroundImage = studioScreen?.let { data.covers.imageFor(it.key, null) }
+    val imageStyle = studioScreen?.let { data.covers.entry(it.key)?.imageStyle }.takeIf { backgroundImage != null }
+    val imageShade = if (com.pixelody.app.ui.theme.LocalAppearanceSettings.current.highContrast) 0.9f else imageStyle?.surface?.shade ?: 0.78f
     LaunchedEffect(jamSession.active) {
         val ended = previousJamActive && !jamSession.active
         previousJamActive = jamSession.active
@@ -580,6 +584,14 @@ fun PixelodyBaseShell(
             }
         }
     }
+    com.pixelody.app.ui.theme.PixelodyTheme(
+        variant = activeTheme,
+        appearance = com.pixelody.app.ui.theme.LocalAppearanceSettings.current,
+        imageStyle = imageStyle,
+        applyTextScale = false
+    ) {
+    // Keep drafts above adaptive phone/rail branches so rotation cannot dispose them.
+    com.pixelody.app.feature.profile.StudioBackgroundEditor(data.covers, coverStore, onCoversChange, activeTheme) { onEditBackground, importingBackground ->
     Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Box(Modifier.matchParentSize().graphicsLayer { alpha = if (backgroundImage == null) backgroundOpacity else 1f }.pixelodyGround()) {
             when (activeTheme) {
@@ -646,7 +658,7 @@ fun PixelodyBaseShell(
         }
         Crossfade(targetState = backgroundImage to backgroundOpacity,
             modifier = Modifier.fillMaxSize(), animationSpec = tween(220), label = "Page background") { (image, opacity) ->
-            ScreenImageBackground(image, opacity)
+            ScreenImageBackground(image, opacity, shade = imageShade)
         }
         BaseLayerScaffold(
             modifier = if (playerMotion.presented || state.sheet != null) Modifier.clearAndSetSemantics {} else Modifier,
@@ -971,6 +983,7 @@ fun PixelodyBaseShell(
                             onResetDeveloperData(includeEdits)
                         } } else null,
                         covers = data.covers, coverStore = coverStore, onCoversChange = onCoversChange,
+                        onEditBackground = onEditBackground, importingBackground = importingBackground,
                         activeTheme = activeTheme,
                         onThemeChange = onThemeChange,
                         onThemeReset = onResetTheme,
@@ -1579,6 +1592,8 @@ fun PixelodyBaseShell(
         }
         androidx.compose.material3.SnackbarHost(connectionNotice,
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 144.dp))
+    }
+    }
     }
 }
 

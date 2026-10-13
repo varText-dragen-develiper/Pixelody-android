@@ -33,6 +33,14 @@ class CoverStore(
         prefs.edit().putString(KEY_BOOK, CoverCodec.encode(book)).apply()
     }
 
+    fun observe(onChange: (CoverBook) -> Unit): () -> Unit {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == null || key == KEY_BOOK) onChange(load())
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        return { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+
     /**
      * Copies [source] into app storage as a square-friendly JPEG no larger than
      * [MAX_EDGE] on its longest side. Returns the new `file:` address, or null if the
@@ -87,6 +95,15 @@ class CoverStore(
         } finally {
             bitmap?.recycle()
         }
+    }
+
+    /** Cancel may only remove an unreferenced file imported into this store. */
+    fun discardDraft(uri: String, book: CoverBook) {
+        if (book.entries.values.any { it.imageUri == uri }) return
+        val parsed = Uri.parse(uri)
+        if (parsed.scheme != "file") return
+        val candidate = File(parsed.path ?: return).canonicalFile
+        if (candidate.parentFile == coverDir.canonicalFile && candidate.name.startsWith("cover-")) candidate.delete()
     }
 
     /** Deletes picture files no entry points at any more. */

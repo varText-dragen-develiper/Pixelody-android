@@ -227,7 +227,7 @@ internal fun SectionCard(
 ) {
     val theme = LocalPixelodyThemeVariant.current
     Surface(
-        shape = theme.plate,
+        shape = if (theme == PixelodyMobileTheme.Studio) MaterialTheme.shapes.medium else theme.plate,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.32f)),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
         modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp)

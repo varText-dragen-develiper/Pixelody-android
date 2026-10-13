@@ -16,7 +16,7 @@ import com.pixelody.app.data.storage.SavedHostStore
 
 /** Viewport-bound image; constant readability shading keeps image visibility monotonic. */
 @Composable
-internal fun ScreenImageBackground(uri: String?, opacity: Float = 0.6f, modifier: Modifier = Modifier) {
+internal fun ScreenImageBackground(uri: String?, opacity: Float = 0.6f, modifier: Modifier = Modifier, shade: Float = 0.78f) {
     if (uri == null) return
     val context = LocalContext.current.applicationContext
     val credentials = remember { SavedHostStore(context) }
@@ -27,7 +27,7 @@ internal fun ScreenImageBackground(uri: String?, opacity: Float = 0.6f, modifier
         Box(modifier.fillMaxSize().alpha(opacity.coerceIn(0f, 1f))) {
             Image(it.asImageBitmap(), contentDescription = null,
                 modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background.copy(alpha = 0.70f)))
+            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background.copy(alpha = shade.coerceIn(0.78f, 0.95f))))
         }
     }
 }

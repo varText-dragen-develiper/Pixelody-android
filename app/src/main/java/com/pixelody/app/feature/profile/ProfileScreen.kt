@@ -47,6 +47,8 @@ internal fun ProfileScreen(
     onResetDeveloperData: (suspend (Boolean) -> Unit)? = null,
     covers: com.pixelody.app.data.model.CoverBook = com.pixelody.app.data.model.CoverBook(),
     coverStore: com.pixelody.app.data.storage.CoverStore? = null,
+    onEditBackground: (com.pixelody.app.data.model.ScreenBackground, String?) -> Unit = { _, _ -> },
+    importingBackground: Boolean = false,
     onCoversChange: (com.pixelody.app.data.model.CoverBook) -> Unit = {},
     activeTheme: PixelodyMobileTheme,
     onThemeChange: (PixelodyMobileTheme) -> Unit,
@@ -75,13 +77,13 @@ internal fun ProfileScreen(
     androidx.compose.runtime.LaunchedEffect(category) { listState.scrollToItem(0) }
     val modules = listOf(
         SettingsModule("themes", SettingsCategory.Appearance) {
-            ThemesSection(activeTheme, onThemeChange, onThemeReset)
+            ThemesSection(activeTheme, onThemeChange, onThemeReset, com.pixelody.app.data.model.ScreenBackground.entries.any { covers.entry(it.key)?.imageStyle != null && covers.hasCustomImage(it.key) })
         },
         SettingsModule("style", SettingsCategory.Appearance) {
-            AppearanceSection(settingsStore)
+            AppearanceSection(settingsStore, activeTheme)
         },
-        SettingsModule("backgrounds", SettingsCategory.Appearance) {
-            BackgroundSection(covers, coverStore, onCoversChange)
+        SettingsModule("backgrounds", SettingsCategory.Appearance, visible = coverStore != null) {
+            BackgroundSection(covers, onCoversChange, activeTheme, { onThemeChange(PixelodyMobileTheme.Studio) }, onEditBackground, importingBackground)
         },
         SettingsModule("logo", SettingsCategory.Appearance) {
             Column {
