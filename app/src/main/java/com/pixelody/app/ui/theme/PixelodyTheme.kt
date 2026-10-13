@@ -23,6 +23,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.platform.LocalDensity
+import com.pixelody.app.data.model.ScreenImageStyle
+import com.pixelody.app.data.model.ImageSurface
 
 /** Mobile theme identities. Shared Studio surfaces follow the current desktop;
  * other themes retain their authored kits. AppearanceSettings applies device-local
@@ -101,6 +103,7 @@ enum class PixelodyMobileTheme(
 val LocalPixelodyStyleSpec = staticCompositionLocalOf { AppearanceSettings().specFor(PixelodyMobileTheme.Studio) }
 
 val LocalPixelodyThemeVariant = staticCompositionLocalOf { PixelodyMobileTheme.Studio }
+val LocalAppearanceSettings = staticCompositionLocalOf { AppearanceSettings() }
 
 // ---------------------------------------------------------------------------
 // Colour schemes, generated from the spec
@@ -184,7 +187,7 @@ private fun schemeFor(s: PixelodyThemeSpec): ColorScheme = darkColorScheme(
  * and verifying their licences. System families stand in, and that substitution
  * is recorded rather than hidden.
  */
-private fun typographyOf(family: FontFamily?): Typography {
+private fun typographyOf(family: FontFamily?, headingsOnly: Boolean = false): Typography {
     fun a(style: TextStyle) =
         if (family == null) style else style.copy(fontFamily = family)
     return Typography(
@@ -197,16 +200,16 @@ private fun typographyOf(family: FontFamily?): Typography {
         headlineSmall = a(PixelodyDirection.Title),
 
         titleLarge = a(PixelodyDirection.Title),
-        titleMedium = a(PixelodyDirection.Body),
-        titleSmall = a(PixelodyDirection.Body),
+        titleMedium = if (headingsOnly) PixelodyDirection.Body else a(PixelodyDirection.Body),
+        titleSmall = if (headingsOnly) PixelodyDirection.Body else a(PixelodyDirection.Body),
 
-        bodyLarge = a(PixelodyDirection.Body),
-        bodyMedium = a(PixelodyDirection.Body),
-        bodySmall = a(PixelodyDirection.Body),
+        bodyLarge = if (headingsOnly) PixelodyDirection.Body else a(PixelodyDirection.Body),
+        bodyMedium = if (headingsOnly) PixelodyDirection.Body else a(PixelodyDirection.Body),
+        bodySmall = if (headingsOnly) PixelodyDirection.Body else a(PixelodyDirection.Body),
 
-        labelLarge = a(PixelodyDirection.Micro),
-        labelMedium = a(PixelodyDirection.Micro),
-        labelSmall = a(PixelodyDirection.Micro)
+        labelLarge = if (headingsOnly) PixelodyDirection.Micro else a(PixelodyDirection.Micro),
+        labelMedium = if (headingsOnly) PixelodyDirection.Micro else a(PixelodyDirection.Micro),
+        labelSmall = if (headingsOnly) PixelodyDirection.Micro else a(PixelodyDirection.Micro)
     )
 }
 
@@ -298,15 +301,18 @@ fun Modifier.pixelodyGround(): Modifier = this.background(
 fun PixelodyTheme(
     variant: PixelodyMobileTheme = PixelodyMobileTheme.Studio,
     appearance: AppearanceSettings = AppearanceSettings(),
+    imageStyle: ScreenImageStyle? = null,
+    applyTextScale: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val style = appearance.normalized()
+    val image = imageStyle.takeIf { variant == PixelodyMobileTheme.Studio }
+    val style = (image?.let { appearance.withImageStyle(it) } ?: appearance).forTheme(variant)
     val spec = style.specFor(variant)
     val density = LocalDensity.current
     val typography = when (style.typeface) {
-        StyleTypeface.Sans -> typographyOf(FontFamily.SansSerif)
-        StyleTypeface.Serif -> typographyOf(FontFamily.Serif)
-        StyleTypeface.Mono -> typographyOf(FontFamily.Monospace)
+        StyleTypeface.Sans -> typographyOf(FontFamily.SansSerif, image != null)
+        StyleTypeface.Serif -> typographyOf(FontFamily.Serif, image != null)
+        StyleTypeface.Mono -> typographyOf(FontFamily.Monospace, image != null)
         StyleTypeface.Theme -> when (variant) {
             PixelodyMobileTheme.CartridgeQuest -> CartridgeQuestTypography
             PixelodyMobileTheme.BulkheadTerminal -> BulkheadTerminalTypography
@@ -315,7 +321,14 @@ fun PixelodyTheme(
         }
     }
 
-    val shapes = when (variant) {
+    val shapes = when {
+        image?.surface == ImageSurface.Soft -> Shapes(
+            RoundedCornerShape(10.dp), RoundedCornerShape(16.dp), RoundedCornerShape(22.dp),
+            RoundedCornerShape(26.dp), RoundedCornerShape(30.dp))
+        image?.surface == ImageSurface.Crisp -> Shapes(
+            RoundedCornerShape(2.dp), RoundedCornerShape(4.dp), RoundedCornerShape(8.dp),
+            RoundedCornerShape(10.dp), RoundedCornerShape(12.dp))
+        else -> when (variant) {
         PixelodyMobileTheme.Studio -> Shapes(
             RoundedCornerShape(6.dp), RoundedCornerShape(10.dp), RoundedCornerShape(16.dp),
             RoundedCornerShape(20.dp), RoundedCornerShape(24.dp)
@@ -325,6 +338,7 @@ fun PixelodyTheme(
         PixelodyMobileTheme.LoFiCafe -> LoFiCafeShapes
         PixelodyMobileTheme.BulkheadTerminal -> SquareShapes
         PixelodyMobileTheme.Obsession -> SquareShapes
+        }
     }
 
     val unitKit = themeUnitKitFor(variant)
@@ -334,7 +348,8 @@ fun PixelodyTheme(
         LocalPixelodyThemeVariant provides variant,
         LocalThemeUnitKit provides unitKit,
         LocalPixelodyStyleSpec provides spec,
-        LocalDensity provides Density(density.density, density.fontScale * style.textPercent / 100f),
+        LocalAppearanceSettings provides style,
+        LocalDensity provides Density(density.density, if (applyTextScale) density.fontScale * style.textPercent / 100f else density.fontScale),
         LocalContentColor provides spec.ink
     ) {
         MaterialTheme(

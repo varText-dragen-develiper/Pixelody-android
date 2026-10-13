@@ -40,4 +40,10 @@ class ThemeLauncherIconTest {
         assertEquals(custom, resolveLogoMarkColor(PixelodyLogoColor.Grape, true, PixelodyMobileTheme.Studio, custom))
         assertEquals(PixelodyLogoColor.Grape.color, resolveLogoMarkColor(PixelodyLogoColor.Grape, false, PixelodyMobileTheme.Obsession, custom))
     }
+    @Test fun imageStyleFollowsAuthoredThemeBoundaryAndStillHonorsExplicitLogo() {
+        val image = ImageStyleEngine.analyze(IntArray(16) { 0xFFBB2200.toInt() }, 4).palettes.first()
+        val style = AppearanceSettings().withImageStyle(image)
+        assertEquals(ThemeLauncherIcon.Obsession.color, resolveLauncherIcon(automatic, PixelodyMobileTheme.Obsession, style).color)
+        assertEquals(PixelodyLogoColor.Grape.color, resolveLauncherIcon(LogoPreferences(PixelodyLogoColor.Grape, false), PixelodyMobileTheme.Studio, style).color)
+    }
 }

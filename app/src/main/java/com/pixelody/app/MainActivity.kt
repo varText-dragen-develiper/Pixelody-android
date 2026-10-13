@@ -21,6 +21,9 @@ import com.pixelody.app.ui.navigation.PixelodyDeepLink
 import com.pixelody.app.ui.navigation.PixelodyTab
 import com.pixelody.app.ui.theme.PixelodyMobileTheme
 import com.pixelody.app.ui.theme.PixelodyTheme
+import com.pixelody.app.ui.theme.withImageStyle
+import com.pixelody.app.data.storage.CoverStore
+import com.pixelody.app.data.model.ScreenBackground
 
 class MainActivity : ComponentActivity() {
     private val incomingConnectionDetails = mutableStateOf<HostConnectionDetails?>(null)
@@ -50,8 +53,17 @@ class MainActivity : ComponentActivity() {
                 val unsubscribe = settingsStore.observeLogoPreferences { logoPreferences = it }
                 onDispose { unsubscribe() }
             }
-            LaunchedEffect(mobileTheme, appearance, logoPreferences) {
-                BrandIconSwitcher.apply(applicationContext, resolveLauncherIcon(logoPreferences, mobileTheme, appearance))
+            val coverStore = remember { CoverStore(applicationContext) }
+            var homeBackground by remember { mutableStateOf(coverStore.load().entry(ScreenBackground.Home.key)) }
+            DisposableEffect(coverStore) {
+                val unsubscribe = coverStore.observe { homeBackground = it.entry(ScreenBackground.Home.key) }
+                onDispose { unsubscribe() }
+            }
+            // Home is the stable launcher identity; navigating pages must not churn aliases.
+            val homeStyle = homeBackground?.imageStyle?.takeIf { !homeBackground?.imageUri.isNullOrBlank() && mobileTheme == PixelodyMobileTheme.Studio }
+            val launcherAppearance = homeStyle?.let { appearance.withImageStyle(it) } ?: appearance
+            LaunchedEffect(mobileTheme, launcherAppearance, logoPreferences) {
+                BrandIconSwitcher.apply(applicationContext, resolveLauncherIcon(logoPreferences, mobileTheme, launcherAppearance))
             }
             PixelodyTheme(variant = mobileTheme, appearance = appearance) {
                 BasePlaybackHost(

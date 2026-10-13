@@ -31,11 +31,12 @@ import com.pixelody.app.ui.components.SectionCard
 import com.pixelody.app.ui.theme.PixelodyMobileTheme
 
 @Composable
-internal fun ThemesSection(activeTheme: PixelodyMobileTheme, onThemeChange: (PixelodyMobileTheme) -> Unit, onThemeReset: () -> Unit) {
+internal fun ThemesSection(activeTheme: PixelodyMobileTheme, onThemeChange: (PixelodyMobileTheme) -> Unit, onThemeReset: () -> Unit, hasCustomScreens: Boolean = false) {
     SectionCard(
         title = "Themes",
-        subtitle = "${activeTheme.displayName} selected"
+        subtitle = if (activeTheme == PixelodyMobileTheme.Studio && hasCustomScreens) "Pixelody Studio · Custom screens" else "${activeTheme.displayName} selected"
     ) {
+        Text("Complete looks, with their own colors, type and framing. Choose Pixelody Studio for image-led customization.", style = MaterialTheme.typography.bodySmall)
         PixelodyMobileTheme.values().forEach { theme ->
             ThemeChoiceRow(
                 theme = theme,

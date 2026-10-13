@@ -4,7 +4,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 
-/** Device-local overrides for shared surfaces and controls; authored theme motifs remain intact. */
+/** Studio's saved visual choices. Named themes only inherit accessibility preferences. */
 enum class StylePalette(val label: String, val primary: String, val secondary: String, val base: String) {
     Theme("Theme default", "91A7FF", "6ED8DD", "0B0D12"),
     Gold("Studio Gold", "D8B66A", "65D6A1", "050607"),
@@ -44,9 +44,13 @@ fun colorContrast(a: Color, b: Color): Float = (maxOf(a.luminance(), b.luminance
 fun isReadableAccent(accent: String, base: String): Boolean = colorContrast(hexColor(accent), lerp(hexColor(base), Color.White, 0.07f)) >= 4.5f
 fun readableAccentInk(accent: Color): Color = if (accent.luminance() > 0.179f) Color.Black else Color.White
 
+fun AppearanceSettings.forTheme(theme: PixelodyMobileTheme): AppearanceSettings =
+    if (theme == PixelodyMobileTheme.Studio) normalized()
+    else AppearanceSettings(textPercent = textPercent, highContrast = highContrast).normalized()
+
 /** Desktop Studio tokens originate in https://github.com/varText-dragen-develiper/pixelody/blob/main/src/studio-rebuild.css; presets in https://github.com/varText-dragen-develiper/pixelody/blob/main/src/renderer.js. */
 fun AppearanceSettings.specFor(theme: PixelodyMobileTheme): PixelodyThemeSpec {
-    val style = normalized()
+    val style = forTheme(theme)
     var spec = theme.spec
     if (theme == PixelodyMobileTheme.Studio) spec = spec.copy(
         groundTop = Color(0xFF0B0D12), groundBottom = Color(0xFF0B0D12),
@@ -64,7 +68,9 @@ fun AppearanceSettings.specFor(theme: PixelodyMobileTheme): PixelodyThemeSpec {
         spec = spec.copy(groundTop = base, groundBottom = base,
             panel = lerp(base, Color.White, 0.045f), panelDeep = lerp(base, Color.White, 0.07f),
             primary = primary, onPrimary = readableAccentInk(primary),
-            secondary = secondary, onSecondary = readableAccentInk(secondary))
+            secondary = secondary, onSecondary = readableAccentInk(secondary),
+            tertiary = secondary, onTertiary = readableAccentInk(secondary),
+            traceHead = lerp(base, Color.White, 0.16f), traceCeiling = lerp(base, Color.White, 0.16f))
     }
     if (style.highContrast) spec = spec.copy(ink = Color.White,
         traceHead = Color(0xFF9CA7BD), traceCeiling = Color(0xFF9CA7BD))

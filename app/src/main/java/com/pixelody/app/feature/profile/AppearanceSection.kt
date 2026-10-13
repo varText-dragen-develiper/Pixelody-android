@@ -17,7 +17,7 @@ import com.pixelody.app.ui.theme.*
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun AppearanceSection(settingsStore: MobileSettingsStore) {
+internal fun AppearanceSection(settingsStore: MobileSettingsStore, activeTheme: PixelodyMobileTheme) {
     var style by remember { mutableStateOf(settingsStore.loadAppearance()) }
     var expanded by rememberSaveable { mutableStateOf(false) }
     var editingColors by rememberSaveable { mutableStateOf(false) }
@@ -26,18 +26,20 @@ internal fun AppearanceSection(settingsStore: MobileSettingsStore) {
         onDispose { unsubscribe() }
     }
     fun update(value: AppearanceSettings) { style = value.normalized(); settingsStore.saveAppearance(style) }
-    SectionCard(title = "Style", subtitle = "${style.palette.label} · ${style.textPercent}% text · ${style.typeface.label}") {
+    val studio = activeTheme == PixelodyMobileTheme.Studio
+    SectionCard(title = if (studio) "Studio style" else "Readability", subtitle = if (studio) "${style.palette.label} · ${style.textPercent}% text · ${style.typeface.label}" else "${style.textPercent}% text · Theme appearance") {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary, MaterialTheme.colorScheme.surfaceContainerHigh).forEach {
                 Box(Modifier.size(24.dp).background(it, MaterialTheme.shapes.small))
             }
         }
         OutlinedButton(onClick = { expanded = !expanded }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-            Text(if (expanded) "Close style controls" else "Customize style")
+            Text(if (expanded) "Close style controls" else if (studio) "Customize style" else "Text and contrast")
         }
         if (expanded) {
+            if (studio) {
             Text("Palette", style = MaterialTheme.typography.titleSmall)
-            Text("Desktop palettes for shared surfaces and controls. Each theme keeps its own artwork and motifs.", style = MaterialTheme.typography.bodySmall)
+            Text("Your Studio base style. Image-led Custom styles take over on the screens you personalize below.", style = MaterialTheme.typography.bodySmall)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 StylePalette.values().forEach { palette ->
                     FilterChip(selected = style.palette == palette, onClick = {
@@ -48,6 +50,7 @@ internal fun AppearanceSection(settingsStore: MobileSettingsStore) {
                 }
             }
             OutlinedButton(onClick = { editingColors = true }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Edit custom colors") }
+            }
             Text("Text size", style = MaterialTheme.typography.titleSmall)
             Text("Adds to your phone's text size setting.", style = MaterialTheme.typography.bodySmall)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -58,6 +61,7 @@ internal fun AppearanceSection(settingsStore: MobileSettingsStore) {
                         border = FilterChipDefaults.filterChipBorder(enabled = true, selected = style.textPercent == percent, selectedBorderColor = MaterialTheme.colorScheme.primary), modifier = Modifier.heightIn(min = 48.dp))
                 }
             }
+            if (studio) {
             Text("Typeface", style = MaterialTheme.typography.titleSmall)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 StyleTypeface.values().forEach { typeface ->
@@ -67,17 +71,18 @@ internal fun AppearanceSection(settingsStore: MobileSettingsStore) {
                         border = FilterChipDefaults.filterChipBorder(enabled = true, selected = style.typeface == typeface, selectedBorderColor = MaterialTheme.colorScheme.primary), modifier = Modifier.heightIn(min = 48.dp))
                 }
             }
+            }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("High contrast", modifier = Modifier.weight(1f).padding(vertical = 12.dp))
                 Switch(modifier = Modifier.semantics { contentDescription = "High contrast" }, checked = style.highContrast, onCheckedChange = { update(style.copy(highContrast = it)) })
             }
             Text("Listening comes first.", style = MaterialTheme.typography.bodyLarge)
-            Text("Your colors and text update immediately and stay saved on this phone.", style = MaterialTheme.typography.bodySmall)
-            OutlinedButton(onClick = { settingsStore.resetAppearance(); style = settingsStore.loadAppearance() },
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Reset style to theme defaults") }
+            Text(if (studio) "Your choices stay saved on this phone. Custom screen styles keep their own colors, headings and framing." else "This theme keeps its colors, type and framing. Your Studio choices are saved for when you return.", style = MaterialTheme.typography.bodySmall)
+            OutlinedButton(onClick = { if (studio) settingsStore.resetAppearance() else settingsStore.saveAppearance(style.copy(textPercent = 100, highContrast = false)); style = settingsStore.loadAppearance() },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(if (studio) "Reset style to theme defaults" else "Reset readability") }
         }
     }
-    if (editingColors) CustomColorsDialog(if (style.palette != StylePalette.Custom && style.palette != StylePalette.Theme) style.copy(primary = style.palette.primary, secondary = style.palette.secondary, base = style.palette.base) else style, onDismiss = { editingColors = false }, onApply = {
+    if (editingColors && studio) CustomColorsDialog(if (style.palette != StylePalette.Custom && style.palette != StylePalette.Theme) style.copy(primary = style.palette.primary, secondary = style.palette.secondary, base = style.palette.base) else style, onDismiss = { editingColors = false }, onApply = {
         update(it); editingColors = false
     })
 }

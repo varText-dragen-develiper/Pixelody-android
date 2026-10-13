@@ -78,7 +78,7 @@ internal fun LogoColorSection(
             PixelodyMark(color = markColor, size = 44.dp)
             Spacer(modifier = Modifier.width(12.dp))
             Text(
-                text = "The home-screen icon follows your theme and palette. Custom colors use the closest available shade. Android themed icons can follow your wallpaper instead.",
+                text = "The home-screen icon follows your theme and palette, or your Custom Home style in Studio. Custom colors use the closest available shade. Android themed icons can follow your wallpaper instead.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
