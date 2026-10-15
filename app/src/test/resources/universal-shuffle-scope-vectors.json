@@ -1,0 +1,1361 @@
+{
+  "policyVersion": "universal-shuffle-v2.1",
+  "generatedFrom": "https://github.com/varText-dragen-develiper/pixelody/blob/main/src/shuffle/scopes.js",
+  "vectors": [
+    {
+      "operation": "save",
+      "bank": {
+        "schemaVersion": 2,
+        "scopes": [],
+        "evictions": []
+      },
+      "session": {
+        "schemaVersion": 2,
+        "policyVersion": "universal-shuffle-v2.1",
+        "configVersion": 1,
+        "sessionId": "metadata-scope-session",
+        "scopeId": "playlist:opaque/α",
+        "authorityId": "android-local",
+        "authorityEpoch": 0,
+        "revision": 0,
+        "membershipRevision": 0,
+        "mode": "flow",
+        "repeat": "off",
+        "options": {
+          "preset": "flow",
+          "shape": "auto",
+          "preserveAlbumRuns": false,
+          "contextTag": null
+        },
+        "cycle": {
+          "generation": 0,
+          "cycleId": "[\"playlist:opaque/α\",0]"
+        },
+        "rng": {
+          "algorithm": "fnv1a-utf16-mulberry32-fy-v1",
+          "state": 2616030163,
+          "draws": 0,
+          "seedHash": 2616030163
+        },
+        "entries": [
+          {
+            "entryId": "entry:A",
+            "trackId": "track:one",
+            "recordingId": null,
+            "artistId": null,
+            "albumArtistId": null,
+            "albumId": null,
+            "sourceIndex": 0,
+            "discNumber": null,
+            "trackNumber": null,
+            "available": true,
+            "genreId": null,
+            "contextTags": [],
+            "features": {
+              "tempo": {
+                "value": null,
+                "provenance": "unknown",
+                "version": 1,
+                "confidencePermille": null,
+                "unit": "milli-bpm"
+              },
+              "energy": {
+                "value": null,
+                "provenance": "unknown",
+                "version": 1,
+                "confidencePermille": null,
+                "unit": "permille"
+              },
+              "key": {
+                "value": null,
+                "provenance": "unknown",
+                "version": 1,
+                "confidencePermille": null,
+                "unit": "pitch-class-mode"
+              }
+            }
+          },
+          {
+            "entryId": "entry:B",
+            "trackId": "track:one",
+            "recordingId": null,
+            "artistId": null,
+            "albumArtistId": null,
+            "albumId": null,
+            "sourceIndex": 1,
+            "discNumber": null,
+            "trackNumber": null,
+            "available": true,
+            "genreId": null,
+            "contextTags": [],
+            "features": {
+              "tempo": {
+                "value": null,
+                "provenance": "unknown",
+                "version": 1,
+                "confidencePermille": null,
+                "unit": "milli-bpm"
+              },
+              "energy": {
+                "value": null,
+                "provenance": "unknown",
+                "version": 1,
+                "confidencePermille": null,
+                "unit": "permille"
+              },
+              "key": {
+                "value": null,
+                "provenance": "unknown",
+                "version": 1,
+                "confidencePermille": null,
+                "unit": "pitch-class-mode"
+              }
+            }
+          }
+        ],
+        "remaining": [
+          "entry:A",
+          "entry:B"
+        ],
+        "history": [],
+        "cursor": -1,
+        "occurrenceSequence": 0,
+        "generatedFuture": [],
+        "manual": [],
+        "exclusions": [],
+        "albumLock": null,
+        "pending": null,
+        "lastConfirmedPositionMs": 0,
+        "eventSequences": [],
+        "quarantine": {
+          "advanceId": null,
+          "entryIds": []
+        },
+        "undo": null,
+        "paused": true,
+        "diagnostics": [],
+        "imported": false
+      },
+      "context": {
+        "nowMs": 42
+      },
+      "expected": {
+        "status": "saved",
+        "bank": {
+          "schemaVersion": 2,
+          "scopes": [
+            {
+              "scopeId": "playlist:opaque/α",
+              "savedAtMs": 42,
+              "session": {
+                "schemaVersion": 2,
+                "policyVersion": "universal-shuffle-v2.1",
+                "configVersion": 1,
+                "sessionId": "metadata-scope-session",
+                "scopeId": "playlist:opaque/α",
+                "authorityId": "android-local",
+                "authorityEpoch": 0,
+                "revision": 0,
+                "membershipRevision": 0,
+                "mode": "flow",
+                "repeat": "off",
+                "options": {
+                  "preset": "flow",
+                  "shape": "auto",
+                  "preserveAlbumRuns": false,
+                  "contextTag": null
+                },
+                "cycle": {
+                  "generation": 0,
+                  "cycleId": "[\"playlist:opaque/α\",0]"
+                },
+                "rng": {
+                  "algorithm": "fnv1a-utf16-mulberry32-fy-v1",
+                  "state": 2616030163,
+                  "draws": 0,
+                  "seedHash": 2616030163
+                },
+                "entries": [
+                  {
+                    "entryId": "entry:A",
+                    "trackId": "track:one",
+                    "recordingId": null,
+                    "artistId": null,
+                    "albumArtistId": null,
+                    "albumId": null,
+                    "sourceIndex": 0,
+                    "discNumber": null,
+                    "trackNumber": null,
+                    "available": true,
+                    "genreId": null,
+                    "contextTags": [],
+                    "features": {
+                      "tempo": {
+                        "value": null,
+                        "provenance": "unknown",
+                        "version": 1,
+                        "confidencePermille": null,
+                        "unit": "milli-bpm"
+                      },
+                      "energy": {
+                        "value": null,
+                        "provenance": "unknown",
+                        "version": 1,
+                        "confidencePermille": null,
+                        "unit": "permille"
+                      },
+                      "key": {
+                        "value": null,
+                        "provenance": "unknown",
+                        "version": 1,
+                        "confidencePermille": null,
+                        "unit": "pitch-class-mode"
+                      }
+                    }
+                  },
+                  {
+                    "entryId": "entry:B",
+                    "trackId": "track:one",
+                    "recordingId": null,
+                    "artistId": null,
+                    "albumArtistId": null,
+                    "albumId": null,
+                    "sourceIndex": 1,
+                    "discNumber": null,
+                    "trackNumber": null,
+                    "available": true,
+                    "genreId": null,
+                    "contextTags": [],
+                    "features": {
+                      "tempo": {
+                        "value": null,
+                        "provenance": "unknown",
+                        "version": 1,
+                        "confidencePermille": null,
+                        "unit": "milli-bpm"
+                      },
+                      "energy": {
+                        "value": null,
+                        "provenance": "unknown",
+                        "version": 1,
+                        "confidencePermille": null,
+                        "unit": "permille"
+                      },
+                      "key": {
+                        "value": null,
+                        "provenance": "unknown",
+                        "version": 1,
+                        "confidencePermille": null,
+                        "unit": "pitch-class-mode"
+                      }
+                    }
+                  }
+                ],
+                "remaining": [
+                  "entry:A",
+                  "entry:B"
+                ],
+                "history": [],
+                "cursor": -1,
+                "occurrenceSequence": 0,
+                "generatedFuture": [],
+                "manual": [],
+                "exclusions": [],
+                "albumLock": null,
+                "pending": null,
+                "lastConfirmedPositionMs": 0,
+                "eventSequences": [],
+                "quarantine": {
+                  "advanceId": null,
+                  "entryIds": []
+                },
+                "undo": null,
+                "paused": true,
+                "diagnostics": [],
+                "imported": false
+              }
+            }
+          ],
+          "evictions": []
+        }
+      }
+    },
+    {
+      "operation": "restore",
+      "bank": {
+        "schemaVersion": 2,
+        "scopes": [
+          {
+            "scopeId": "playlist:opaque/α",
+            "savedAtMs": 42,
+            "session": {
+              "schemaVersion": 2,
+              "policyVersion": "universal-shuffle-v2.1",
+              "configVersion": 1,
+              "sessionId": "metadata-scope-session",
+              "scopeId": "playlist:opaque/α",
+              "authorityId": "android-local",
+              "authorityEpoch": 0,
+              "revision": 0,
+              "membershipRevision": 0,
+              "mode": "flow",
+              "repeat": "off",
+              "options": {
+                "preset": "flow",
+                "shape": "auto",
+                "preserveAlbumRuns": false,
+                "contextTag": null
+              },
+              "cycle": {
+                "generation": 0,
+                "cycleId": "[\"playlist:opaque/α\",0]"
+              },
+              "rng": {
+                "algorithm": "fnv1a-utf16-mulberry32-fy-v1",
+                "state": 2616030163,
+                "draws": 0,
+                "seedHash": 2616030163
+              },
+              "entries": [
+                {
+                  "entryId": "entry:A",
+                  "trackId": "track:one",
+                  "recordingId": null,
+                  "artistId": null,
+                  "albumArtistId": null,
+                  "albumId": null,
+                  "sourceIndex": 0,
+                  "discNumber": null,
+                  "trackNumber": null,
+                  "available": true,
+                  "genreId": null,
+                  "contextTags": [],
+                  "features": {
+                    "tempo": {
+                      "value": null,
+                      "provenance": "unknown",
+                      "version": 1,
+                      "confidencePermille": null,
+                      "unit": "milli-bpm"
+                    },
+                    "energy": {
+                      "value": null,
+                      "provenance": "unknown",
+                      "version": 1,
+                      "confidencePermille": null,
+                      "unit": "permille"
+                    },
+                    "key": {
+                      "value": null,
+                      "provenance": "unknown",
+                      "version": 1,
+                      "confidencePermille": null,
+                      "unit": "pitch-class-mode"
+                    }
+                  }
+                },
+                {
+                  "entryId": "entry:B",
+                  "trackId": "track:one",
+                  "recordingId": null,
+                  "artistId": null,
+                  "albumArtistId": null,
+                  "albumId": null,
+                  "sourceIndex": 1,
+                  "discNumber": null,
+                  "trackNumber": null,
+                  "available": true,
+                  "genreId": null,
+                  "contextTags": [],
+                  "features": {
+                    "tempo": {
+                      "value": null,
+                      "provenance": "unknown",
+                      "version": 1,
+                      "confidencePermille": null,
+                      "unit": "milli-bpm"
+                    },
+                    "energy": {
+                      "value": null,
+                      "provenance": "unknown",
+                      "version": 1,
+                      "confidencePermille": null,
+                      "unit": "permille"
+                    },
+                    "key": {
+                      "value": null,
+                      "provenance": "unknown",
+                      "version": 1,
+                      "confidencePermille": null,
+                      "unit": "pitch-class-mode"
+                    }
+                  }
+                }
+              ],
+              "remaining": [
+                "entry:A",
+                "entry:B"
+              ],
+              "history": [],
+              "cursor": -1,
+              "occurrenceSequence": 0,
+              "generatedFuture": [],
+              "manual": [],
+              "exclusions": [],
+              "albumLock": null,
+              "pending": null,
+              "lastConfirmedPositionMs": 0,
+              "eventSequences": [],
+              "quarantine": {
+                "advanceId": null,
+                "entryIds": []
+              },
+              "undo": null,
+              "paused": true,
+              "diagnostics": [],
+              "imported": false
+            }
+          }
+        ],
+        "evictions": []
+      },
+      "scopeId": "playlist:opaque/α",
+      "expected": {
+        "status": "restored",
+        "state": {
+          "schemaVersion": 2,
+          "policyVersion": "universal-shuffle-v2.1",
+          "configVersion": 1,
+          "sessionId": "metadata-scope-session",
+          "scopeId": "playlist:opaque/α",
+          "authorityId": "android-local",
+          "authorityEpoch": 0,
+          "revision": 0,
+          "membershipRevision": 0,
+          "mode": "flow",
+          "repeat": "off",
+          "options": {
+            "preset": "flow",
+            "shape": "auto",
+            "preserveAlbumRuns": false,
+            "contextTag": null
+          },
+          "cycle": {
+            "generation": 0,
+            "cycleId": "[\"playlist:opaque/α\",0]"
+          },
+          "rng": {
+            "algorithm": "fnv1a-utf16-mulberry32-fy-v1",
+            "state": 2616030163,
+            "draws": 0,
+            "seedHash": 2616030163
+          },
+          "entries": [
+            {
+              "entryId": "entry:A",
+              "trackId": "track:one",
+              "recordingId": null,
+              "artistId": null,
+              "albumArtistId": null,
+              "albumId": null,
+              "sourceIndex": 0,
+              "discNumber": null,
+              "trackNumber": null,
+              "available": true,
+              "genreId": null,
+              "contextTags": [],
+              "features": {
+                "tempo": {
+                  "value": null,
+                  "provenance": "unknown",
+                  "version": 1,
+                  "confidencePermille": null,
+                  "unit": "milli-bpm"
+                },
+                "energy": {
+                  "value": null,
+                  "provenance": "unknown",
+                  "version": 1,
+                  "confidencePermille": null,
+                  "unit": "permille"
+                },
+                "key": {
+                  "value": null,
+                  "provenance": "unknown",
+                  "version": 1,
+                  "confidencePermille": null,
+                  "unit": "pitch-class-mode"
+                }
+              }
+            },
+            {
+              "entryId": "entry:B",
+              "trackId": "track:one",
+              "recordingId": null,
+              "artistId": null,
+              "albumArtistId": null,
+              "albumId": null,
+              "sourceIndex": 1,
+              "discNumber": null,
+              "trackNumber": null,
+              "available": true,
+              "genreId": null,
+              "contextTags": [],
+              "features": {
+                "tempo": {
+                  "value": null,
+                  "provenance": "unknown",
+                  "version": 1,
+                  "confidencePermille": null,
+                  "unit": "milli-bpm"
+                },
+                "energy": {
+                  "value": null,
+                  "provenance": "unknown",
+                  "version": 1,
+                  "confidencePermille": null,
+                  "unit": "permille"
+                },
+                "key": {
+                  "value": null,
+                  "provenance": "unknown",
+                  "version": 1,
+                  "confidencePermille": null,
+                  "unit": "pitch-class-mode"
+                }
+              }
+            }
+          ],
+          "remaining": [
+            "entry:A",
+            "entry:B"
+          ],
+          "history": [],
+          "cursor": -1,
+          "occurrenceSequence": 0,
+          "generatedFuture": [],
+          "manual": [],
+          "exclusions": [],
+          "albumLock": null,
+          "pending": null,
+          "lastConfirmedPositionMs": 0,
+          "eventSequences": [],
+          "quarantine": {
+            "advanceId": null,
+            "entryIds": []
+          },
+          "undo": null,
+          "paused": true,
+          "diagnostics": [],
+          "imported": false
+        },
+        "preserved": null,
+        "diagnostics": []
+      }
+    },
+    {
+      "operation": "restore",
+      "bank": {
+        "schemaVersion": 2,
+        "scopes": [
+          {
+            "scopeId": "playlist:opaque/α",
+            "savedAtMs": 42,
+            "session": {
+              "schemaVersion": 2,
+              "policyVersion": "universal-shuffle-v2.1",
+              "configVersion": 1,
+              "sessionId": "metadata-scope-session",
+              "scopeId": "playlist:opaque/α",
+              "authorityId": "android-local",
+              "authorityEpoch": 0,
+              "revision": 0,
+              "membershipRevision": 0,
+              "mode": "flow",
+              "repeat": "off",
+              "options": {
+                "preset": "flow",
+                "shape": "auto",
+                "preserveAlbumRuns": false,
+                "contextTag": null
+              },
+              "cycle": {
+                "generation": 0,
+                "cycleId": "[\"playlist:opaque/α\",0]"
+              },
+              "rng": {
+                "algorithm": "fnv1a-utf16-mulberry32-fy-v1",
+                "state": 2616030163,
+                "draws": 0,
+                "seedHash": 2616030163
+              },
+              "entries": [
+                {
+                  "entryId": "entry:A",
+                  "trackId": "track:one",
+                  "recordingId": null,
+                  "artistId": null,
+                  "albumArtistId": null,
+                  "albumId": null,
+                  "sourceIndex": 0,
+                  "discNumber": null,
+                  "trackNumber": null,
+                  "available": true,
+                  "genreId": null,
+                  "contextTags": [],
+                  "features": {
+                    "tempo": {
+                      "value": null,
+                      "provenance": "unknown",
+                      "version": 1,
+                      "confidencePermille": null,
+                      "unit": "milli-bpm"
+                    },
+                    "energy": {
+                      "value": null,
+                      "provenance": "unknown",
+                      "version": 1,
+                      "confidencePermille": null,
+                      "unit": "permille"
+                    },
+                    "key": {
+                      "value": null,
+                      "provenance": "unknown",
+                      "version": 1,
+                      "confidencePermille": null,
+                      "unit": "pitch-class-mode"
+                    }
+                  }
+                },
+                {
+                  "entryId": "entry:B",
+                  "trackId": "track:one",
+                  "recordingId": null,
+                  "artistId": null,
+                  "albumArtistId": null,
+                  "albumId": null,
+                  "sourceIndex": 1,
+                  "discNumber": null,
+                  "trackNumber": null,
+                  "available": true,
+                  "genreId": null,
+                  "contextTags": [],
+                  "features": {
+                    "tempo": {
+                      "value": null,
+                      "provenance": "unknown",
+                      "version": 1,
+                      "confidencePermille": null,
+                      "unit": "milli-bpm"
+                    },
+                    "energy": {
+                      "value": null,
+                      "provenance": "unknown",
+                      "version": 1,
+                      "confidencePermille": null,
+                      "unit": "permille"
+                    },
+                    "key": {
+                      "value": null,
+                      "provenance": "unknown",
+                      "version": 1,
+                      "confidencePermille": null,
+                      "unit": "pitch-class-mode"
+                    }
+                  }
+                }
+              ],
+              "remaining": [
+                "entry:A",
+                "entry:B"
+              ],
+              "history": [],
+              "cursor": -1,
+              "occurrenceSequence": 0,
+              "generatedFuture": [],
+              "manual": [],
+              "exclusions": [],
+              "albumLock": null,
+              "pending": null,
+              "lastConfirmedPositionMs": 0,
+              "eventSequences": [],
+              "quarantine": {
+                "advanceId": null,
+                "entryIds": []
+              },
+              "undo": null,
+              "paused": true,
+              "diagnostics": [],
+              "imported": false
+            }
+          }
+        ],
+        "evictions": []
+      },
+      "scopeId": "missing",
+      "expected": {
+        "status": "missing",
+        "state": null,
+        "diagnostics": []
+      }
+    },
+    {
+      "operation": "evict",
+      "bank": {
+        "schemaVersion": 2,
+        "scopes": [
+          {
+            "scopeId": "playlist:opaque/α",
+            "savedAtMs": 42,
+            "session": {
+              "schemaVersion": 2,
+              "policyVersion": "universal-shuffle-v2.1",
+              "configVersion": 1,
+              "sessionId": "metadata-scope-session",
+              "scopeId": "playlist:opaque/α",
+              "authorityId": "android-local",
+              "authorityEpoch": 0,
+              "revision": 0,
+              "membershipRevision": 0,
+              "mode": "flow",
+              "repeat": "off",
+              "options": {
+                "preset": "flow",
+                "shape": "auto",
+                "preserveAlbumRuns": false,
+                "contextTag": null
+              },
+              "cycle": {
+                "generation": 0,
+                "cycleId": "[\"playlist:opaque/α\",0]"
+              },
+              "rng": {
+                "algorithm": "fnv1a-utf16-mulberry32-fy-v1",
+                "state": 2616030163,
+                "draws": 0,
+                "seedHash": 2616030163
+              },
+              "entries": [
+                {
+                  "entryId": "entry:A",
+                  "trackId": "track:one",
+                  "recordingId": null,
+                  "artistId": null,
+                  "albumArtistId": null,
+                  "albumId": null,
+                  "sourceIndex": 0,
+                  "discNumber": null,
+                  "trackNumber": null,
+                  "available": true,
+                  "genreId": null,
+                  "contextTags": [],
+                  "features": {
+                    "tempo": {
+                      "value": null,
+                      "provenance": "unknown",
+                      "version": 1,
+                      "confidencePermille": null,
+                      "unit": "milli-bpm"
+                    },
+                    "energy": {
+                      "value": null,
+                      "provenance": "unknown",
+                      "version": 1,
+                      "confidencePermille": null,
+                      "unit": "permille"
+                    },
+                    "key": {
+                      "value": null,
+                      "provenance": "unknown",
+                      "version": 1,
+                      "confidencePermille": null,
+                      "unit": "pitch-class-mode"
+                    }
+                  }
+                },
+                {
+                  "entryId": "entry:B",
+                  "trackId": "track:one",
+                  "recordingId": null,
+                  "artistId": null,
+                  "albumArtistId": null,
+                  "albumId": null,
+                  "sourceIndex": 1,
+                  "discNumber": null,
+                  "trackNumber": null,
+                  "available": true,
+                  "genreId": null,
+                  "contextTags": [],
+                  "features": {
+                    "tempo": {
+                      "value": null,
+                      "provenance": "unknown",
+                      "version": 1,
+                      "confidencePermille": null,
+                      "unit": "milli-bpm"
+                    },
+                    "energy": {
+                      "value": null,
+                      "provenance": "unknown",
+                      "version": 1,
+                      "confidencePermille": null,
+                      "unit": "permille"
+                    },
+                    "key": {
+                      "value": null,
+                      "provenance": "unknown",
+                      "version": 1,
+                      "confidencePermille": null,
+                      "unit": "pitch-class-mode"
+                    }
+                  }
+                }
+              ],
+              "remaining": [
+                "entry:A",
+                "entry:B"
+              ],
+              "history": [],
+              "cursor": -1,
+              "occurrenceSequence": 0,
+              "generatedFuture": [],
+              "manual": [],
+              "exclusions": [],
+              "albumLock": null,
+              "pending": null,
+              "lastConfirmedPositionMs": 0,
+              "eventSequences": [],
+              "quarantine": {
+                "advanceId": null,
+                "entryIds": []
+              },
+              "undo": null,
+              "paused": true,
+              "diagnostics": [],
+              "imported": false
+            }
+          }
+        ],
+        "evictions": []
+      },
+      "scopeId": "playlist:opaque/α",
+      "context": {
+        "nowMs": 99
+      },
+      "expected": {
+        "status": "evicted",
+        "bank": {
+          "schemaVersion": 2,
+          "scopes": [],
+          "evictions": [
+            {
+              "scopeId": "playlist:opaque/α",
+              "atMs": 99,
+              "unfinishedEntitlements": 2,
+              "completed": false,
+              "reason": "explicit-scope-eviction"
+            }
+          ]
+        },
+        "diagnostic": {
+          "scopeId": "playlist:opaque/α",
+          "atMs": 99,
+          "unfinishedEntitlements": 2,
+          "completed": false,
+          "reason": "explicit-scope-eviction"
+        }
+      }
+    },
+    {
+      "operation": "restore",
+      "bank": {
+        "schemaVersion": 2,
+        "scopes": [],
+        "evictions": [
+          {
+            "scopeId": "playlist:opaque/α",
+            "atMs": 99,
+            "unfinishedEntitlements": 2,
+            "completed": false,
+            "reason": "explicit-scope-eviction"
+          }
+        ]
+      },
+      "scopeId": "playlist:opaque/α",
+      "expected": {
+        "status": "explicitly-evicted",
+        "state": null,
+        "diagnostics": [
+          {
+            "scopeId": "playlist:opaque/α",
+            "atMs": 99,
+            "unfinishedEntitlements": 2,
+            "completed": false,
+            "reason": "explicit-scope-eviction"
+          }
+        ]
+      }
+    },
+    {
+      "operation": "save",
+      "bank": {
+        "schemaVersion": 99,
+        "opaque": "retain"
+      },
+      "session": {
+        "schemaVersion": 2,
+        "policyVersion": "universal-shuffle-v2.1",
+        "configVersion": 1,
+        "sessionId": "metadata-scope-session",
+        "scopeId": "playlist:opaque/α",
+        "authorityId": "android-local",
+        "authorityEpoch": 0,
+        "revision": 0,
+        "membershipRevision": 0,
+        "mode": "flow",
+        "repeat": "off",
+        "options": {
+          "preset": "flow",
+          "shape": "auto",
+          "preserveAlbumRuns": false,
+          "contextTag": null
+        },
+        "cycle": {
+          "generation": 0,
+          "cycleId": "[\"playlist:opaque/α\",0]"
+        },
+        "rng": {
+          "algorithm": "fnv1a-utf16-mulberry32-fy-v1",
+          "state": 2616030163,
+          "draws": 0,
+          "seedHash": 2616030163
+        },
+        "entries": [
+          {
+            "entryId": "entry:A",
+            "trackId": "track:one",
+            "recordingId": null,
+            "artistId": null,
+            "albumArtistId": null,
+            "albumId": null,
+            "sourceIndex": 0,
+            "discNumber": null,
+            "trackNumber": null,
+            "available": true,
+            "genreId": null,
+            "contextTags": [],
+            "features": {
+              "tempo": {
+                "value": null,
+                "provenance": "unknown",
+                "version": 1,
+                "confidencePermille": null,
+                "unit": "milli-bpm"
+              },
+              "energy": {
+                "value": null,
+                "provenance": "unknown",
+                "version": 1,
+                "confidencePermille": null,
+                "unit": "permille"
+              },
+              "key": {
+                "value": null,
+                "provenance": "unknown",
+                "version": 1,
+                "confidencePermille": null,
+                "unit": "pitch-class-mode"
+              }
+            }
+          },
+          {
+            "entryId": "entry:B",
+            "trackId": "track:one",
+            "recordingId": null,
+            "artistId": null,
+            "albumArtistId": null,
+            "albumId": null,
+            "sourceIndex": 1,
+            "discNumber": null,
+            "trackNumber": null,
+            "available": true,
+            "genreId": null,
+            "contextTags": [],
+            "features": {
+              "tempo": {
+                "value": null,
+                "provenance": "unknown",
+                "version": 1,
+                "confidencePermille": null,
+                "unit": "milli-bpm"
+              },
+              "energy": {
+                "value": null,
+                "provenance": "unknown",
+                "version": 1,
+                "confidencePermille": null,
+                "unit": "permille"
+              },
+              "key": {
+                "value": null,
+                "provenance": "unknown",
+                "version": 1,
+                "confidencePermille": null,
+                "unit": "pitch-class-mode"
+              }
+            }
+          }
+        ],
+        "remaining": [
+          "entry:A",
+          "entry:B"
+        ],
+        "history": [],
+        "cursor": -1,
+        "occurrenceSequence": 0,
+        "generatedFuture": [],
+        "manual": [],
+        "exclusions": [],
+        "albumLock": null,
+        "pending": null,
+        "lastConfirmedPositionMs": 0,
+        "eventSequences": [],
+        "quarantine": {
+          "advanceId": null,
+          "entryIds": []
+        },
+        "undo": null,
+        "paused": true,
+        "diagnostics": [],
+        "imported": false
+      },
+      "context": {
+        "nowMs": 42
+      },
+      "expected": {
+        "status": "unsupported",
+        "bank": {
+          "schemaVersion": 99,
+          "opaque": "retain"
+        },
+        "preserved": {
+          "schemaVersion": 99,
+          "opaque": "retain"
+        }
+      }
+    },
+    {
+      "operation": "restore",
+      "bank": {
+        "schemaVersion": 99,
+        "opaque": "retain"
+      },
+      "scopeId": "scope",
+      "expected": {
+        "status": "unsupported",
+        "preserved": {
+          "schemaVersion": 99,
+          "opaque": "retain"
+        },
+        "state": null
+      }
+    },
+    {
+      "operation": "evict",
+      "bank": {
+        "schemaVersion": 99,
+        "opaque": "retain"
+      },
+      "scopeId": "scope",
+      "expected": {
+        "status": "unsupported",
+        "bank": {
+          "schemaVersion": 99,
+          "opaque": "retain"
+        },
+        "preserved": {
+          "schemaVersion": 99,
+          "opaque": "retain"
+        }
+      }
+    },
+    {
+      "operation": "save",
+      "bank": {
+        "schemaVersion": 2,
+        "scopes": [],
+        "evictions": []
+      },
+      "session": {
+        "schemaVersion": 2,
+        "policyVersion": "universal-shuffle-v2.1",
+        "configVersion": 1,
+        "sessionId": "metadata-scope-session",
+        "scopeId": "playlist:opaque/α",
+        "authorityId": "android-local",
+        "authorityEpoch": 0,
+        "revision": 0,
+        "membershipRevision": 0,
+        "mode": "flow",
+        "repeat": "off",
+        "options": {
+          "preset": "flow",
+          "shape": "auto",
+          "preserveAlbumRuns": false,
+          "contextTag": null
+        },
+        "cycle": {
+          "generation": 0,
+          "cycleId": "[\"playlist:opaque/α\",0]"
+        },
+        "rng": {
+          "algorithm": "fnv1a-utf16-mulberry32-fy-v1",
+          "state": 2616030163,
+          "draws": 0,
+          "seedHash": 2616030163
+        },
+        "entries": [
+          {
+            "entryId": "entry:A",
+            "trackId": "track:one",
+            "recordingId": null,
+            "artistId": null,
+            "albumArtistId": null,
+            "albumId": null,
+            "sourceIndex": 0,
+            "discNumber": null,
+            "trackNumber": null,
+            "available": true,
+            "genreId": null,
+            "contextTags": [],
+            "features": {
+              "tempo": {
+                "value": null,
+                "provenance": "unknown",
+                "version": 1,
+                "confidencePermille": null,
+                "unit": "milli-bpm"
+              },
+              "energy": {
+                "value": null,
+                "provenance": "unknown",
+                "version": 1,
+                "confidencePermille": null,
+                "unit": "permille"
+              },
+              "key": {
+                "value": null,
+                "provenance": "unknown",
+                "version": 1,
+                "confidencePermille": null,
+                "unit": "pitch-class-mode"
+              }
+            }
+          },
+          {
+            "entryId": "entry:B",
+            "trackId": "track:one",
+            "recordingId": null,
+            "artistId": null,
+            "albumArtistId": null,
+            "albumId": null,
+            "sourceIndex": 1,
+            "discNumber": null,
+            "trackNumber": null,
+            "available": true,
+            "genreId": null,
+            "contextTags": [],
+            "features": {
+              "tempo": {
+                "value": null,
+                "provenance": "unknown",
+                "version": 1,
+                "confidencePermille": null,
+                "unit": "milli-bpm"
+              },
+              "energy": {
+                "value": null,
+                "provenance": "unknown",
+                "version": 1,
+                "confidencePermille": null,
+                "unit": "permille"
+              },
+              "key": {
+                "value": null,
+                "provenance": "unknown",
+                "version": 1,
+                "confidencePermille": null,
+                "unit": "pitch-class-mode"
+              }
+            }
+          }
+        ],
+        "remaining": [
+          "entry:A",
+          "entry:B"
+        ],
+        "history": [],
+        "cursor": -1,
+        "occurrenceSequence": 0,
+        "generatedFuture": [],
+        "manual": [],
+        "exclusions": [],
+        "albumLock": null,
+        "pending": null,
+        "lastConfirmedPositionMs": 0,
+        "eventSequences": [],
+        "quarantine": {
+          "advanceId": null,
+          "entryIds": []
+        },
+        "undo": null,
+        "paused": true,
+        "diagnostics": [],
+        "imported": false
+      },
+      "context": {
+        "nowMs": 1.5
+      },
+      "expected": {
+        "status": "saved",
+        "bank": {
+          "schemaVersion": 2,
+          "scopes": [
+            {
+              "scopeId": "playlist:opaque/α",
+              "savedAtMs": 0,
+              "session": {
+                "schemaVersion": 2,
+                "policyVersion": "universal-shuffle-v2.1",
+                "configVersion": 1,
+                "sessionId": "metadata-scope-session",
+                "scopeId": "playlist:opaque/α",
+                "authorityId": "android-local",
+                "authorityEpoch": 0,
+                "revision": 0,
+                "membershipRevision": 0,
+                "mode": "flow",
+                "repeat": "off",
+                "options": {
+                  "preset": "flow",
+                  "shape": "auto",
+                  "preserveAlbumRuns": false,
+                  "contextTag": null
+                },
+                "cycle": {
+                  "generation": 0,
+                  "cycleId": "[\"playlist:opaque/α\",0]"
+                },
+                "rng": {
+                  "algorithm": "fnv1a-utf16-mulberry32-fy-v1",
+                  "state": 2616030163,
+                  "draws": 0,
+                  "seedHash": 2616030163
+                },
+                "entries": [
+                  {
+                    "entryId": "entry:A",
+                    "trackId": "track:one",
+                    "recordingId": null,
+                    "artistId": null,
+                    "albumArtistId": null,
+                    "albumId": null,
+                    "sourceIndex": 0,
+                    "discNumber": null,
+                    "trackNumber": null,
+                    "available": true,
+                    "genreId": null,
+                    "contextTags": [],
+                    "features": {
+                      "tempo": {
+                        "value": null,
+                        "provenance": "unknown",
+                        "version": 1,
+                        "confidencePermille": null,
+                        "unit": "milli-bpm"
+                      },
+                      "energy": {
+                        "value": null,
+                        "provenance": "unknown",
+                        "version": 1,
+                        "confidencePermille": null,
+                        "unit": "permille"
+                      },
+                      "key": {
+                        "value": null,
+                        "provenance": "unknown",
+                        "version": 1,
+                        "confidencePermille": null,
+                        "unit": "pitch-class-mode"
+                      }
+                    }
+                  },
+                  {
+                    "entryId": "entry:B",
+                    "trackId": "track:one",
+                    "recordingId": null,
+                    "artistId": null,
+                    "albumArtistId": null,
+                    "albumId": null,
+                    "sourceIndex": 1,
+                    "discNumber": null,
+                    "trackNumber": null,
+                    "available": true,
+                    "genreId": null,
+                    "contextTags": [],
+                    "features": {
+                      "tempo": {
+                        "value": null,
+                        "provenance": "unknown",
+                        "version": 1,
+                        "confidencePermille": null,
+                        "unit": "milli-bpm"
+                      },
+                      "energy": {
+                        "value": null,
+                        "provenance": "unknown",
+                        "version": 1,
+                        "confidencePermille": null,
+                        "unit": "permille"
+                      },
+                      "key": {
+                        "value": null,
+                        "provenance": "unknown",
+                        "version": 1,
+                        "confidencePermille": null,
+                        "unit": "pitch-class-mode"
+                      }
+                    }
+                  }
+                ],
+                "remaining": [
+                  "entry:A",
+                  "entry:B"
+                ],
+                "history": [],
+                "cursor": -1,
+                "occurrenceSequence": 0,
+                "generatedFuture": [],
+                "manual": [],
+                "exclusions": [],
+                "albumLock": null,
+                "pending": null,
+                "lastConfirmedPositionMs": 0,
+                "eventSequences": [],
+                "quarantine": {
+                  "advanceId": null,
+                  "entryIds": []
+                },
+                "undo": null,
+                "paused": true,
+                "diagnostics": [],
+                "imported": false
+              }
+            }
+          ],
+          "evictions": []
+        }
+      }
+    }
+  ]
+}

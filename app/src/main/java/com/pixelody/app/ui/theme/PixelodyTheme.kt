@@ -1,0 +1,367 @@
+package com.pixelody.app.ui.theme
+
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
+import androidx.compose.material3.Typography
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
+import com.pixelody.app.ui.theme.units.LocalThemeUnitKit
+import com.pixelody.app.ui.theme.units.themeUnitKitFor
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.platform.LocalDensity
+import com.pixelody.app.data.model.ScreenImageStyle
+import com.pixelody.app.data.model.ImageSurface
+
+/** Mobile theme identities. Shared Studio surfaces follow the current desktop;
+ * other themes retain their authored kits. AppearanceSettings applies device-local
+ * overrides with explicit contrast checks rather than changing the source specs. */
+enum class PixelodyMobileTheme(
+    val id: String,
+    val displayName: String,
+    val badge: String,
+    val summary: String,
+    val spec: PixelodyThemeSpec,
+    /** Authored geometry, including the current desktop Studio's rounded windows. */
+    val plate: Shape
+) {
+    Studio(
+        id = "studio",
+        displayName = "Pixelody Studio",
+        badge = "STUDIO",
+        summary = "Quiet rounded windows, periwinkle controls, cyan accents.",
+        spec = PixelodyThemeSpecs.Studio,
+        plate = RoundedCornerShape(16.dp)
+    ),
+    CartridgeQuest(
+        id = "cartridge-quest",
+        displayName = "Cartridge Quest",
+        badge = "8BIT",
+        summary = "8/16-bit console adventure, cartridge stacks, hardware controls.",
+        spec = PixelodyThemeSpecs.CartridgeQuest,
+        // Manifest: corners "pixel-cut". A deeper cut reads as moulded plastic.
+        plate = ChamferedPlate(depthRatio = 0.42f)
+    ),
+    ObsidianGlass(
+        id = "obsidian-glass",
+        displayName = "Obsidian Glass",
+        badge = "GLASS",
+        summary = "Smoked acrylic glass, floating frosted pills, prism refraction.",
+        spec = PixelodyThemeSpecs.ObsidianGlass,
+        // Manifest: corners "soft". The only theme whose identity is the radius,
+        // so its plate is the shallowest cut in the set - nearly a square.
+        plate = ChamferedPlate(depthRatio = 0.12f)
+    ),
+    LoFiCafe(
+        id = "lo-fi-cafe",
+        displayName = "Lo-Fi Café",
+        badge = "CAFÉ",
+        summary = "Rainy walnut nook, dark wood structure, paper-soft content planes.",
+        spec = PixelodyThemeSpecs.LoFiCafe,
+        // Manifest: corners "soft", controls "ornamental".
+        plate = ChamferedPlate(depthRatio = 0.22f)
+    ),
+    BulkheadTerminal(
+        id = "bulkhead-terminal",
+        displayName = "Bulkhead Terminal",
+        badge = "TERM",
+        summary = "Industrial terminal HUD, phosphor ink, framed instrument geometry.",
+        spec = PixelodyThemeSpecs.BulkheadTerminal,
+        // Manifest: corners "framed". Identity comes from brackets and rules, so
+        // the cut is present but shallow and the frame does the talking.
+        plate = ChamferedPlate(depthRatio = 0.18f)
+    ),
+    Obsession(
+        id = "obsession",
+        displayName = "Obsession",
+        badge = "OBSESS",
+        summary = "Restrained thriller poster, bone type, crimson held back for state.",
+        spec = PixelodyThemeSpecs.Obsession,
+        // Manifest: corners "pixel-cut". The deepest cut in the set - this is the
+        // theme's original fracture geometry, the one asset of its own that ports.
+        plate = ChamferedPlate(depthRatio = 0.5f)
+    );
+
+    companion object {
+        // Retired themes remain internal for compatibility, but cannot be selected.
+        val selectableThemes: List<PixelodyMobileTheme> = listOf(Studio, ObsidianGlass, LoFiCafe, Obsession)
+    }
+
+    /** Read by the settings picker's accent chip. One source of truth. */
+    val accentColor: Color get() = AppearanceSettings().specFor(this).primary
+}
+
+/** Provides the active [PixelodyMobileTheme] down the Compose tree. */
+val LocalPixelodyStyleSpec = staticCompositionLocalOf { AppearanceSettings().specFor(PixelodyMobileTheme.Studio) }
+
+val LocalPixelodyThemeVariant = staticCompositionLocalOf { PixelodyMobileTheme.Studio }
+val LocalAppearanceSettings = staticCompositionLocalOf { AppearanceSettings() }
+
+// ---------------------------------------------------------------------------
+// Colour schemes, generated from the spec
+// ---------------------------------------------------------------------------
+
+/** Map effective theme tokens to every Material role, including container defaults.
+ * Appearance overrides are validated before reaching this mapping. */
+private fun schemeFor(s: PixelodyThemeSpec): ColorScheme = darkColorScheme(
+    primary = s.primary,
+    onPrimary = s.onPrimary,
+    primaryContainer = s.panelDeep,
+    onPrimaryContainer = s.ink,
+
+    secondary = s.secondary,
+    onSecondary = s.onSecondary,
+    secondaryContainer = s.panel,
+    onSecondaryContainer = s.ink,
+
+    tertiary = s.tertiary,
+    onTertiary = s.onTertiary,
+    tertiaryContainer = s.panelDeep,
+    onTertiaryContainer = s.ink,
+
+    background = s.groundTop,
+    onBackground = s.ink,
+
+    surface = s.groundTop,
+    onSurface = s.ink,
+
+    // The role that made this direction impossible inside Material: a second,
+    // quieter ink. There is no quieter ink. Hierarchy comes from mass and
+    // position, not from value, so this is ink at full strength.
+    surfaceVariant = s.panel,
+    onSurfaceVariant = s.ink,
+
+    // Trace at the head of the ramp, where it holds its 1.47:1. No boundary a
+    // control depends on may rely on it - see PixelodyDirection.TRACE_HOLDS_ABOVE.
+    outline = s.traceAt(0f),
+    outlineVariant = s.traceAt(0f),
+
+    error = s.error,
+    onError = s.onError,
+    errorContainer = s.errorContainer,
+    onErrorContainer = s.ink,
+
+    // The seven surface-container roles Material fills from its own dark tokens.
+    // Left at their defaults, every Card, Sheet and Menu would go on painting
+    // Material's greys no matter what the rest of this scheme says - M3's Card
+    // reads surfaceContainerHighest, not surface.
+    surfaceDim = s.groundTop,
+    surfaceBright = s.groundBottom,
+    surfaceContainerLowest = s.editorialBlack,
+    surfaceContainerLow = s.groundTop,
+    surfaceContainer = s.panel,
+    surfaceContainerHigh = s.panelDeep,
+    surfaceContainerHighest = s.panelDeep,
+
+    inverseSurface = s.ink,
+    inverseOnSurface = s.groundTop,
+    inversePrimary = s.groundTop,
+
+    scrim = s.editorialBlack
+)
+
+// ---------------------------------------------------------------------------
+// Typography Ranks
+// ---------------------------------------------------------------------------
+
+/**
+ * Four ranks across Material's fifteen slots, so existing
+ * `MaterialTheme.typography.*` calls snap on without a call site changing.
+ *
+ * A theme may author its letterforms. It may NOT author sizes or weights: those
+ * carry the 11sp legibility floor and the inverse optical law (W100 at display,
+ * W700 at micro), and both are direction-level, not theme-level. So a theme
+ * varies [family] and nothing else.
+ *
+ * The three source manifests that name a font file - GeistPixel-Circle.woff2,
+ * KenneyFuture.ttf, SpaceGrotesk-Variable.ttf - are not wired up. woff2 does not
+ * load in Compose at all, and shipping the other two means adding font assets
+ * and verifying their licences. System families stand in, and that substitution
+ * is recorded rather than hidden.
+ */
+private fun typographyOf(family: FontFamily?, headingsOnly: Boolean = false): Typography {
+    fun a(style: TextStyle) =
+        if (family == null) style else style.copy(fontFamily = family)
+    return Typography(
+        displayLarge = a(PixelodyDirection.Display),
+        displayMedium = a(PixelodyDirection.Display),
+        displaySmall = a(PixelodyDirection.Display),
+
+        headlineLarge = a(PixelodyDirection.Title),
+        headlineMedium = a(PixelodyDirection.Title),
+        headlineSmall = a(PixelodyDirection.Title),
+
+        titleLarge = a(PixelodyDirection.Title),
+        titleMedium = if (headingsOnly) PixelodyDirection.Body else a(PixelodyDirection.Body),
+        titleSmall = if (headingsOnly) PixelodyDirection.Body else a(PixelodyDirection.Body),
+
+        bodyLarge = if (headingsOnly) PixelodyDirection.Body else a(PixelodyDirection.Body),
+        bodyMedium = if (headingsOnly) PixelodyDirection.Body else a(PixelodyDirection.Body),
+        bodySmall = if (headingsOnly) PixelodyDirection.Body else a(PixelodyDirection.Body),
+
+        labelLarge = if (headingsOnly) PixelodyDirection.Micro else a(PixelodyDirection.Micro),
+        labelMedium = if (headingsOnly) PixelodyDirection.Micro else a(PixelodyDirection.Micro),
+        labelSmall = if (headingsOnly) PixelodyDirection.Micro else a(PixelodyDirection.Micro)
+    )
+}
+
+private val PixelodyTypography = typographyOf(null)
+
+private val CartridgeQuestTypography = Typography(
+    displayLarge = PixelodyDirection.Display.copy(fontFamily = FontFamily.Monospace),
+    displayMedium = PixelodyDirection.Display.copy(fontFamily = FontFamily.Monospace),
+    displaySmall = PixelodyDirection.Display.copy(fontFamily = FontFamily.Monospace),
+
+    headlineLarge = PixelodyDirection.Title.copy(fontFamily = FontFamily.Monospace),
+    headlineMedium = PixelodyDirection.Title.copy(fontFamily = FontFamily.Monospace),
+    headlineSmall = PixelodyDirection.Title.copy(fontFamily = FontFamily.Monospace),
+
+    titleLarge = PixelodyDirection.Title.copy(fontFamily = FontFamily.Monospace),
+    titleMedium = PixelodyDirection.Body.copy(fontFamily = FontFamily.Monospace),
+    titleSmall = PixelodyDirection.Body.copy(fontFamily = FontFamily.Monospace),
+
+    bodyLarge = PixelodyDirection.Body,
+    bodyMedium = PixelodyDirection.Body,
+    bodySmall = PixelodyDirection.Body.copy(fontFamily = FontFamily.Monospace),
+
+    labelLarge = PixelodyDirection.Micro.copy(fontFamily = FontFamily.Monospace),
+    labelMedium = PixelodyDirection.Micro.copy(fontFamily = FontFamily.Monospace),
+    labelSmall = PixelodyDirection.Micro.copy(fontFamily = FontFamily.Monospace)
+)
+
+/** Manifest: typography profile "technical". A terminal is monospaced throughout. */
+private val BulkheadTerminalTypography = typographyOf(FontFamily.Monospace)
+
+/** Manifest: typography profile "editorial". Stand-in for a text serif. */
+private val LoFiCafeTypography = typographyOf(FontFamily.Serif)
+
+// ---------------------------------------------------------------------------
+// Shapes
+// ---------------------------------------------------------------------------
+private val PixelodyShapes = Shapes(
+    extraSmall = RoundedCornerShape(0.dp),
+    small = RoundedCornerShape(0.dp),
+    medium = RoundedCornerShape(0.dp),
+    large = RoundedCornerShape(0.dp),
+    extraLarge = RoundedCornerShape(0.dp)
+)
+
+private val CartridgeQuestShapes = Shapes(
+    extraSmall = RoundedCornerShape(2.dp),
+    small = RoundedCornerShape(2.dp),
+    medium = RoundedCornerShape(4.dp),
+    large = RoundedCornerShape(6.dp),
+    extraLarge = RoundedCornerShape(8.dp)
+)
+
+private val ObsidianGlassShapes = Shapes(
+    extraSmall = RoundedCornerShape(8.dp),
+    small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(16.dp),
+    large = RoundedCornerShape(24.dp),
+    extraLarge = RoundedCornerShape(32.dp)
+)
+
+/** Manifest: corners "soft". Warmer than glass, nothing like a pill. */
+private val LoFiCafeShapes = Shapes(
+    extraSmall = RoundedCornerShape(3.dp),
+    small = RoundedCornerShape(5.dp),
+    medium = RoundedCornerShape(8.dp),
+    large = RoundedCornerShape(10.dp),
+    extraLarge = RoundedCornerShape(12.dp)
+)
+
+/** Manifest: corners "framed" and "pixel-cut" respectively - both square here,
+ *  because their geometry lives in [PixelodyMobileTheme.plate], not in a radius. */
+private val SquareShapes = PixelodyShapes
+
+// ---------------------------------------------------------------------------
+// Ground Ramps
+// ---------------------------------------------------------------------------
+fun PixelodyMobileTheme.groundColors(): List<Color> = listOf(spec.groundTop, spec.groundBottom)
+
+/**
+ * Paints the viewport ground ramp according to the selected theme.
+ * Always bind to the viewport height, never to scrolling content height.
+ */
+@Composable
+fun Modifier.pixelodyGround(): Modifier = this.background(
+    Brush.verticalGradient(LocalPixelodyStyleSpec.current.let { listOf(it.groundTop, it.groundBottom) })
+)
+
+@Composable
+fun PixelodyTheme(
+    variant: PixelodyMobileTheme = PixelodyMobileTheme.Studio,
+    appearance: AppearanceSettings = AppearanceSettings(),
+    imageStyle: ScreenImageStyle? = null,
+    applyTextScale: Boolean = true,
+    content: @Composable () -> Unit
+) {
+    val image = imageStyle.takeIf { variant == PixelodyMobileTheme.Studio }
+    val style = (image?.let { appearance.withImageStyle(it) } ?: appearance).forTheme(variant)
+    val spec = style.specFor(variant)
+    val density = LocalDensity.current
+    val typography = when (style.typeface) {
+        StyleTypeface.Sans -> typographyOf(FontFamily.SansSerif, image != null)
+        StyleTypeface.Serif -> typographyOf(FontFamily.Serif, image != null)
+        StyleTypeface.Mono -> typographyOf(FontFamily.Monospace, image != null)
+        StyleTypeface.Theme -> when (variant) {
+            PixelodyMobileTheme.CartridgeQuest -> CartridgeQuestTypography
+            PixelodyMobileTheme.BulkheadTerminal -> BulkheadTerminalTypography
+            PixelodyMobileTheme.LoFiCafe -> LoFiCafeTypography
+            else -> PixelodyTypography
+        }
+    }
+
+    val shapes = when {
+        image?.surface == ImageSurface.Soft -> Shapes(
+            RoundedCornerShape(10.dp), RoundedCornerShape(16.dp), RoundedCornerShape(22.dp),
+            RoundedCornerShape(26.dp), RoundedCornerShape(30.dp))
+        image?.surface == ImageSurface.Crisp -> Shapes(
+            RoundedCornerShape(2.dp), RoundedCornerShape(4.dp), RoundedCornerShape(8.dp),
+            RoundedCornerShape(10.dp), RoundedCornerShape(12.dp))
+        else -> when (variant) {
+        PixelodyMobileTheme.Studio -> Shapes(
+            RoundedCornerShape(6.dp), RoundedCornerShape(10.dp), RoundedCornerShape(16.dp),
+            RoundedCornerShape(20.dp), RoundedCornerShape(24.dp)
+        )
+        PixelodyMobileTheme.CartridgeQuest -> CartridgeQuestShapes
+        PixelodyMobileTheme.ObsidianGlass -> ObsidianGlassShapes
+        PixelodyMobileTheme.LoFiCafe -> LoFiCafeShapes
+        PixelodyMobileTheme.BulkheadTerminal -> SquareShapes
+        PixelodyMobileTheme.Obsession -> SquareShapes
+        }
+    }
+
+    val unitKit = themeUnitKitFor(variant)
+
+    CompositionLocalProvider(
+        LocalIndication provides PixelodyPressIndication,
+        LocalPixelodyThemeVariant provides variant,
+        LocalThemeUnitKit provides unitKit,
+        LocalPixelodyStyleSpec provides spec,
+        LocalAppearanceSettings provides style,
+        LocalDensity provides Density(density.density, if (applyTextScale) density.fontScale * style.textPercent / 100f else density.fontScale),
+        LocalContentColor provides spec.ink
+    ) {
+        MaterialTheme(
+            colorScheme = schemeFor(spec),
+            typography = typography,
+            shapes = shapes,
+            content = content
+        )
+    }
+}
