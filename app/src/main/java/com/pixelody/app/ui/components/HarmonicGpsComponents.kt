@@ -1,5 +1,7 @@
 package com.pixelody.app.ui.components
 
+import com.pixelody.app.data.model.knownCode
+import com.pixelody.app.data.model.knownColor
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -180,14 +182,14 @@ fun HarmonicGpsRouteCard(
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(6.dp))
-                                    .background(tel.key.harmonicColor.copy(alpha = 0.25f))
+                                    .background(tel.key.knownColor.copy(alpha = 0.25f))
                                     .padding(horizontal = 5.dp, vertical = 2.dp)
                             ) {
                                 Text(
-                                    text = tel.key.code,
+                                    text = tel.key.knownCode,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = tel.key.harmonicColor
+                                    color = tel.key.knownColor
                                 )
                             }
                             Text(
@@ -222,7 +224,7 @@ fun HarmonicGpsRouteCard(
                 )
                 HarmonicGpsMetricPill(
                     label = "STABILITY",
-                    value = "${(route.tempoProgressionStability * 100).toInt()}%",
+                    value = "${route.tempoProgressionStability?.let { "${(it * 100).toInt()}%" } ?: "Unknown"}",
                     color = Color(0xFF38BDF8)
                 )
             }
@@ -332,10 +334,10 @@ fun HarmonicGpsStepRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(
-                        text = step.fromKey.code,
+                        text = step.fromKey.knownCode,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        color = step.fromKey.harmonicColor
+                        color = step.fromKey.knownColor
                     )
                     Text(
                         text = "➔",
@@ -343,10 +345,10 @@ fun HarmonicGpsStepRow(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = step.toKey.code,
+                        text = step.toKey.knownCode,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        color = step.toKey.harmonicColor
+                        color = step.toKey.knownColor
                     )
                     Text(
                         text = "• ${step.modulationType}",
@@ -568,14 +570,14 @@ fun HarmonicGpsDestinationSheet(
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(8.dp))
-                                        .background(tel.key.harmonicColor.copy(alpha = 0.20f))
+                                        .background(tel.key.knownColor.copy(alpha = 0.20f))
                                         .padding(horizontal = 8.dp, vertical = 4.dp)
                                 ) {
                                     Text(
-                                        text = tel.key.code,
+                                        text = tel.key.knownCode,
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = tel.key.harmonicColor
+                                        color = tel.key.knownColor
                                     )
                                 }
 

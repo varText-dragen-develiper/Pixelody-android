@@ -116,6 +116,12 @@ enum class HarmonicRelation(
         advice = "Warm diagonal modal modulation across major/minor boundaries.",
         badgeColorHex = 0xFFEC4899 // Pink
     ),
+    Unknown(
+        title = "Key unavailable",
+        score = 0f,
+        advice = "Add musical key metadata to compare these tracks.",
+        badgeColorHex = 0xFF94A3B8
+    ),
     DissonantClash(
         title = "Harmonic Clash",
         score = 0.25f,
@@ -123,7 +129,7 @@ enum class HarmonicRelation(
         badgeColorHex = 0xFFEF4444 // Red
     );
 
-    val isHarmonic: Boolean get() = this != DissonantClash
+    val isHarmonic: Boolean get() = this != DissonantClash && this != Unknown
 }
 
 /**
@@ -198,22 +204,25 @@ data class DjEnvelopeFrame(
  */
 data class TrackDjTelemetry(
     val track: Track,
-    val bpm: Float,
-    val key: CamelotKey,
-    val detectedKeyConfidence: Float = 0.95f
+    val bpm: Float?,
+    val key: CamelotKey?,
+    val detectedKeyConfidence: Float? = null,
+    val keyProvenance: String = "unknown",
+    val bpmProvenance: String = "unknown",
+    val featureVersion: Int = 1
 )
 
 /**
  * Complete Harmonic Analysis result between two tracks.
  */
 data class HarmonicAnalysisResult(
-    val currentKey: CamelotKey,
-    val nextKey: CamelotKey,
+    val currentKey: CamelotKey?,
+    val nextKey: CamelotKey?,
     val relation: HarmonicRelation,
-    val currentBpm: Float,
-    val nextBpm: Float,
-    val bpmDelta: Float,
-    val pitchStretchPercent: Float,
+    val currentBpm: Float?,
+    val nextBpm: Float?,
+    val bpmDelta: Float?,
+    val pitchStretchPercent: Float?,
     val recommendedCurve: DjTransitionCurve,
     val overallCompatibilityScore: Float
 )

@@ -1,61 +1,48 @@
 package com.pixelody.app.core.lyrics
 
 import android.content.Context
-import android.net.Uri
 import com.pixelody.app.core.playback.HarmonicKeyEngine
 import com.pixelody.app.core.playback.MusicalPhraseEngine
-import com.pixelody.app.data.model.CamelotMode
 import com.pixelody.app.data.model.MusicalPhraseStructure
-import com.pixelody.app.data.model.PhraseZone
 import com.pixelody.app.data.model.Track
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
-import java.io.InputStream
-import java.security.MessageDigest
-import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToLong
 
 /**
- * AutoLyricsAlignmentEngine: Intelligent on-device automated lyric alignment and synthesis engine.
- *
- * Automatically synchronizes lyric text to audio by analyzing:
- * 1. Track metadata (Title, Artist, Album, Format)
- * 2. Harmonic telemetry and tempo (BPM via HarmonicKeyEngine)
- * 3. 16-bar downbeat phrase structures & zones (via MusicalPhraseEngine)
- * 4. Acoustic energy and peak envelope profiles (detecting vocal onset windows vs. instrumental breaks)
+ * Optional approximate timing for supplied words using known tagged tempo.
+ * This does not detect vocals, decode acoustic peaks, or recover missing lyrics.
  */
 object AutoLyricsAlignmentEngine {
 
     /**
-     * Resolves, aligns, and synchronizes lyrics for [track].
-     * If [rawText] is provided, aligns that text to the track's tempo, peaks, and phrase zones.
-     * If [rawText] is null or blank, automatically synthesizes and aligns contextual lyrics.
+     * Preserve supplied text untimed when tempo or duration is unavailable.
+     * Known tags permit heuristic bar timing, labeled AutoAligned.
      */
     suspend fun processAndAlign(
         track: Track,
         rawText: String? = null,
         context: Context? = null
     ): LyricsDocument = withContext(Dispatchers.Default) {
-        val durationMs = if (track.durationSeconds > 0) track.durationSeconds * 1000L else 180000L
+        val lines = parseRawLyricsIntoLines(rawText.orEmpty())
+        val untimed = LyricsDocument(lines = lines.map { LyricLine(text = it) }, title = track.title,
+            artist = track.artist, album = track.album, source = LyricsSource.None)
+        // Tags cannot recover words or vocal timings from music. Keep missing text
+        // and unavailable tempo/duration unknown instead of synthesizing telemetry.
+        if (lines.isEmpty() || track.durationSeconds <= 0) return@withContext untimed
+        val durationMs = track.durationSeconds * 1000L
         val telemetry = HarmonicKeyEngine.estimateTrackTelemetry(track)
-        val bpm = if (telemetry.bpm > 0f) telemetry.bpm else 120f
+        val bpm = telemetry.bpm ?: return@withContext untimed
         val phraseStructure = MusicalPhraseEngine.computePhraseStructure(bpm, durationMs, phraseLengthBars = 16)
 
-        // Read or estimate acoustic energy peaks across the timeline
+        // Empty until a real decoded-audio analysis provider is supplied.
         val peakProfile = extractOrSynthesizePeakProfile(track, durationMs, bpm, context)
-
-        val linesToAlign = if (!rawText.isNullOrBlank()) {
-            parseRawLyricsIntoLines(rawText)
-        } else {
-            generateContextualLyricLines(track, bpm, phraseStructure)
-        }
 
         alignLinesToAcoustics(
             track = track,
-            lines = linesToAlign,
+            lines = lines,
             structure = phraseStructure,
             peakProfile = peakProfile,
             durationMs = durationMs
@@ -63,85 +50,15 @@ object AutoLyricsAlignmentEngine {
     }
 
     /**
-     * Extracts acoustic peak envelope from local media or synthesizes a deterministic audio energy profile.
+     * Compatibility API: no acoustic evidence is available from metadata or encoded bytes.
      */
+    @Suppress("UNUSED_PARAMETER")
     fun extractOrSynthesizePeakProfile(
         track: Track,
         durationMs: Long,
         bpm: Float,
         context: Context?
-    ): FloatArray {
-        val samplePoints = 128
-        val peaks = FloatArray(samplePoints)
-
-        // Attempt fast sampling if context and local file are available
-        var extracted = false
-        if (context != null && track.streamUrl.isNotBlank()) {
-            extracted = runCatching {
-                sampleLocalAudioPeaks(context, track.streamUrl, samplePoints, peaks)
-            }.getOrDefault(false)
-        }
-
-        if (!extracted) {
-            // Deterministic acoustic peak synthesis based on BPM, downbeats, and track seed
-            val barDurationMs = ((60_000.0 / bpm.toDouble()) * 4.0).coerceAtLeast(500.0)
-            val seedInput = "${track.id}_${track.title}_${track.durationSeconds}_$bpm"
-            val hash = MessageDigest.getInstance("MD5").digest(seedInput.toByteArray())
-
-            for (i in 0 until samplePoints) {
-                val pointTimeMs = (i.toDouble() / samplePoints.toDouble()) * durationMs.toDouble()
-                val barProgress = (pointTimeMs % barDurationMs) / barDurationMs
-
-                // Emphasize downbeats (bars and beats)
-                val beatPulse = (1.0 - (barProgress * 4.0 % 1.0)).coerceIn(0.0, 1.0).toFloat()
-                val hashWeight = ((hash[i % hash.size].toInt() and 0xFF) / 255.0f) * 0.35f
-                peaks[i] = (0.35f + (beatPulse * 0.35f) + hashWeight).coerceIn(0.0f, 1.0f)
-            }
-        }
-
-        return peaks
-    }
-
-    private fun sampleLocalAudioPeaks(
-        context: Context,
-        streamUrl: String,
-        samplePoints: Int,
-        outPeaks: FloatArray
-    ): Boolean {
-        val stream: InputStream? = when {
-            streamUrl.startsWith("content://") -> context.contentResolver.openInputStream(Uri.parse(streamUrl))
-            streamUrl.startsWith("file://") || streamUrl.startsWith("/") -> {
-                val f = File(streamUrl.removePrefix("file://"))
-                if (f.exists() && f.canRead()) f.inputStream() else null
-            }
-            else -> null
-        }
-
-        stream?.use { input ->
-            val buffer = ByteArray(4096)
-            val totalBytes = input.available().coerceAtLeast(buffer.size)
-            val step = max(1, totalBytes / samplePoints)
-
-            for (i in 0 until samplePoints) {
-                val read = input.read(buffer)
-                if (read <= 0) break
-                var maxSample = 0
-                var stepIdx = 0
-                while (stepIdx < read) {
-                    val s = abs(buffer[stepIdx].toInt())
-                    if (s > maxSample) maxSample = s
-                    stepIdx += 2
-                }
-                outPeaks[i] = (maxSample / 128.0f).coerceIn(0.0f, 1.0f)
-                if (step > buffer.size) {
-                    input.skip((step - buffer.size).toLong())
-                }
-            }
-            return true
-        }
-        return false
-    }
-
+    ): FloatArray = floatArrayOf() // No decoded PCM analysis is available here.
     /**
      * Splits and sanitizes raw lyric text into structured lines.
      */
@@ -352,57 +269,11 @@ object AutoLyricsAlignmentEngine {
         return instrumentalKeywords.any { combined.contains(it) }
     }
 
-    /**
-     * Synthesizes authentic acoustic telemetry and musical phrase markers for tracks without external text,
-     * dynamically generating song-specific movements, hooks, and cadences driven by
-     * the track's title, artist, musical key (minor/major), tempo, and acoustic energy peaks.
-     */
+    /** Compatibility API: missing words remain unavailable. */
+    @Suppress("UNUSED_PARAMETER")
     fun generateContextualLyricLines(
         track: Track,
         bpm: Float,
         structure: MusicalPhraseStructure
-    ): List<String> {
-        val rawTitle = track.title.ifBlank { "Audio Track" }
-        val title = sanitizeMetadataString(rawTitle).ifBlank { rawTitle }
-        val rawArtist = track.artist.ifBlank { "Pixelody" }
-        val artist = sanitizeMetadataString(rawArtist).ifBlank { rawArtist }
-
-        val telemetry = HarmonicKeyEngine.estimateTrackTelemetry(track)
-        val isMinor = telemetry.key.mode == CamelotMode.Minor
-        val musicalKey = telemetry.key.musicalKey
-        val bpmInt = bpm.roundToLong().coerceIn(40, 240)
-
-        val keyTheme = if (isMinor) "Harmonic Resonance in $musicalKey" else "Luminous Cadence in $musicalKey"
-
-        return listOf(
-            "• Intro · $musicalKey · $bpmInt BPM •",
-            "[Atmospheric Entrance · $musicalKey]",
-            "[Harmonic Pulse · Downbeat Lock]",
-            "[Dynamic Resonance · Leading into $title]",
-            "• Verse 1 Phrase •",
-            "[Melodic Contour · $keyTheme]",
-            "[Acoustic Cadence · $artist]",
-            "[Rhythmic Pocket · $bpmInt BPM]",
-            "[Dynamic Energy Build · 16-Bar Cycle]",
-            "• Chorus · Energy Peak •",
-            "[$title · Harmonic Hook]",
-            "[Full Dynamic Climax in $musicalKey]",
-            "[Acoustic Peak · High Resonance]",
-            "[Harmonic Release]",
-            "• Verse 2 Development •",
-            "[Cadence Progression · $artist]",
-            "[Rhythmic Variation · Downbeat Lock]",
-            "[Harmonic Flow in $musicalKey]",
-            "• Harmonic Breakdown •",
-            "[Spatial Reverberation · Dynamic Rest]",
-            "[Atmospheric Drift in $musicalKey]",
-            "[Subtle Bass Pulse Recovery]",
-            "• Final Climax •",
-            "[$title · Peak Horizon]",
-            "[Full Dynamic Drive · $artist]",
-            "[Final Harmonic Ascension in $musicalKey]",
-            "• Outro •",
-            "[Dynamic Release · Decay to Air]"
-        )
-    }
+    ): List<String> = emptyList() // Metadata is not evidence of song words or vocal sections.
 }

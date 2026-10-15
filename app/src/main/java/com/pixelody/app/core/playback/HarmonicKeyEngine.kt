@@ -7,12 +7,12 @@ import com.pixelody.app.data.model.HarmonicAnalysisResult
 import com.pixelody.app.data.model.HarmonicRelation
 import com.pixelody.app.data.model.Track
 import com.pixelody.app.data.model.TrackDjTelemetry
-import java.security.MessageDigest
+import java.util.Locale
 import kotlin.math.abs
 
 /**
  * HarmonicKeyEngine: Advanced Camelot Wheel harmonic mixing arithmetic,
- * musical key parser, BPM analysis, and intelligent harmonic queue sorter.
+ * musical key parser, supplied tempo metadata, and intelligent harmonic queue sorter.
  */
 object HarmonicKeyEngine {
 
@@ -21,64 +21,29 @@ object HarmonicKeyEngine {
      */
     fun parseKey(rawInput: String?): CamelotKey? {
         if (rawInput.isNullOrBlank()) return null
-        val clean = rawInput.trim().replace("Key:", "", ignoreCase = true).trim()
-
-        // 1. Direct Camelot Code check (e.g., "8A", "8B", "11A", "K8A")
-        val camelotMatch = Regex("""^(?:K)?(1[0-2]|[1-9])([ABab])$""").matchEntire(clean)
-        if (camelotMatch != null) {
-            val num = camelotMatch.groupValues[1].toInt()
-            val mode = if (camelotMatch.groupValues[2].equals("A", ignoreCase = true)) CamelotMode.Minor else CamelotMode.Major
-            return CamelotKey.fromNumberAndMode(num, mode)
+        val clean = rawInput.trim().replace(Regex("^key\\s*:?\\s*", RegexOption.IGNORE_CASE), "")
+            .replace("♯", "#").replace("♭", "b")
+        Regex("^(?:K)?(1[0-2]|[1-9])([AB])$", RegexOption.IGNORE_CASE).matchEntire(clean)?.let {
+            return CamelotKey.fromNumberAndMode(it.groupValues[1].toInt(),
+                if (it.groupValues[2].equals("A", true)) CamelotMode.Minor else CamelotMode.Major)
         }
-
-        // 2. Standard Musical Key Parsing
-        val hasMinorKeyword = clean.contains("minor", ignoreCase = true) || clean.contains("min", ignoreCase = true)
-        val hasMajorKeyword = clean.contains("major", ignoreCase = true) || clean.contains("maj", ignoreCase = true)
-
-        val stripped = clean
-            .replace("minor", "", ignoreCase = true)
-            .replace("min", "", ignoreCase = true)
-            .replace("major", "", ignoreCase = true)
-            .replace("maj", "", ignoreCase = true)
-            .replace("♯", "#")
-            .replace("♭", "b")
-            .replace(" ", "")
-            .trim()
-
-        val isMinor = when {
-            hasMinorKeyword -> true
-            hasMajorKeyword -> false
-            stripped.endsWith("m", ignoreCase = false) -> true // e.g. "Am", "F#m", "Cm"
-            else -> false
-        }
-
-        val rootPitch = if (isMinor && stripped.endsWith("m", ignoreCase = false) && !hasMinorKeyword) {
-            stripped.dropLast(1)
-        } else {
-            stripped
-        }.replace("M", "")
-
-        return when (rootPitch.uppercase()) {
-            "AB", "G#" -> if (isMinor) CamelotKey.K1A else CamelotKey.K4B
-            "EB", "D#" -> if (isMinor) CamelotKey.K2A else CamelotKey.K5B
-            "BB", "A#" -> if (isMinor) CamelotKey.K3A else CamelotKey.K6B
-            "F" -> if (isMinor) CamelotKey.K4A else CamelotKey.K7B
-            "C" -> if (isMinor) CamelotKey.K5A else CamelotKey.K8B
-            "G" -> if (isMinor) CamelotKey.K6A else CamelotKey.K9B
-            "D" -> if (isMinor) CamelotKey.K7A else CamelotKey.K10B
-            "A" -> if (isMinor) CamelotKey.K8A else CamelotKey.K11B
-            "E" -> if (isMinor) CamelotKey.K9A else CamelotKey.K12B
-            "B", "CB" -> if (isMinor) CamelotKey.K10A else CamelotKey.K1B
-            "F#", "GB" -> if (isMinor) CamelotKey.K11A else CamelotKey.K2B
-            "DB", "C#" -> if (isMinor) CamelotKey.K12A else CamelotKey.K3B
-            else -> null
-        }
+        val match = Regex("^([A-Ga-g])([#b]?)(?:\\s*((?i:major|maj|minor|min)|m|M))?$").matchEntire(clean) ?: return null
+        val letter = match.groupValues[1].uppercase(Locale.ROOT)
+        val accidental = match.groupValues[2]
+        val mode = match.groupValues[3]
+        val minor = mode == "m" || mode.equals("min", true) || mode.equals("minor", true)
+        val pitch = ((mapOf("C" to 0, "D" to 2, "E" to 4, "F" to 5, "G" to 7, "A" to 9, "B" to 11).getValue(letter)
+            + when (accidental) { "#" -> 1; "b" -> -1; else -> 0 }) + 12) % 12
+        val number = if (minor) intArrayOf(5, 12, 7, 2, 9, 4, 11, 6, 1, 8, 3, 10)[pitch]
+            else intArrayOf(8, 3, 10, 5, 12, 7, 2, 9, 4, 11, 6, 1)[pitch]
+        return CamelotKey.fromNumberAndMode(number, if (minor) CamelotMode.Minor else CamelotMode.Major)
     }
 
     /**
      * Calculates the harmonic relationship and compatibility classification between two Camelot keys.
      */
-    fun calculateHarmonicRelation(currentKey: CamelotKey, nextKey: CamelotKey): HarmonicRelation {
+    fun calculateHarmonicRelation(currentKey: CamelotKey?, nextKey: CamelotKey?): HarmonicRelation {
+        if (currentKey == null || nextKey == null) return HarmonicRelation.Unknown
         if (currentKey == nextKey) {
             return HarmonicRelation.ExactMatch
         }
@@ -145,46 +110,20 @@ object HarmonicKeyEngine {
         telemetryCache.clear()
     }
 
-    /**
-     * Extracts or deterministically synthesizes DJ telemetry (Key + BPM) for a track.
-     */
-    fun estimateTrackTelemetry(track: Track): TrackDjTelemetry {
-        return telemetryCache.getOrPut(track) {
-            // Look for embedded key in track format, title, or album
-            val embeddedKeyMatch = Regex("""\b(?:Key[:\s]*)?(1[0-2]|[1-9])([ABab])\b""", RegexOption.IGNORE_CASE).find("${track.format} ${track.title} ${track.album}")
-            val explicitKey = parseKey(track.format) ?: parseKey(track.title) ?: embeddedKeyMatch?.let {
-                val num = it.groupValues[1].toInt()
-                val mode = if (it.groupValues[2].equals("A", ignoreCase = true)) CamelotMode.Minor else CamelotMode.Major
-                CamelotKey.fromNumberAndMode(num, mode)
-            }
-            val key = explicitKey ?: run {
-                // Deterministic hash based on track attributes
-                val hashInput = "${track.id}_${track.title}_${track.artist}_${track.durationSeconds}_${track.sampleRate}"
-                val hash = MessageDigest.getInstance("MD5").digest(hashInput.toByteArray())
-                val intVal = abs((hash[0].toInt() shl 24) or (hash[1].toInt() shl 16) or (hash[2].toInt() shl 8) or hash[3].toInt())
-                val number = (intVal % 12) + 1
-                val mode = if ((intVal / 12) % 2 == 0) CamelotMode.Minor else CamelotMode.Major
-                CamelotKey.fromNumberAndMode(number, mode)
-            }
-
-            // Look for embedded BPM
-            val bpmMatch = Regex("""(?:BPM[:\s]*)(\d{2,3})""", RegexOption.IGNORE_CASE).find("${track.title} ${track.album}")
-            val explicitBpm = bpmMatch?.groupValues?.get(1)?.toFloatOrNull()
-            val bpm = explicitBpm ?: run {
-                val hashInput = "bpm_${track.id}_${track.title}_${track.durationSeconds}"
-                val hash = MessageDigest.getInstance("MD5").digest(hashInput.toByteArray())
-                val intVal = abs((hash[0].toInt() shl 8) or (hash[1].toInt() and 0xFF))
-                // Typical dance/electronic/pop BPM range 95 - 138 BPM
-                95f + (intVal % 44)
-            }
-
-            TrackDjTelemetry(
-                track = track,
-                bpm = bpm,
-                key = key,
-                detectedKeyConfidence = if (explicitKey != null) 1.0f else 0.88f
-            )
-        }
+    /** Reads supplied tags or explicitly labeled metadata. It performs no audio analysis. */
+    fun estimateTrackTelemetry(track: Track): TrackDjTelemetry = telemetryCache.getOrPut(track) {
+        val text = "${track.title} ${track.album} ${track.format}"
+        val labeledKey = Regex("""\bKey\s*:?\s*((?:K)?(?:1[0-2]|[1-9])[AB]\b|[A-G][#b♯♭]?(?:\s*(?:major|minor|maj|min)\b|m\b|M\b)?)(?![\p{L}\p{N}])""", RegexOption.IGNORE_CASE)
+            .find(text)?.groupValues?.get(1)?.let(::parseKey)
+        val taggedKey = parseKey(track.musicalKey)
+        val key = taggedKey ?: parseKey(track.format) ?: parseKey(track.title) ?: labeledKey
+        val taggedBpm = track.bpm?.takeIf { it.isFinite() && it > 0f }
+        val labeledBpm = Regex("""\bBPM\s*:?\s*(\d{1,3}(?:\.\d+)?)(?![\d.])""", RegexOption.IGNORE_CASE)
+            .find(text)?.groupValues?.get(1)?.toFloatOrNull()?.takeIf { it.isFinite() && it > 0f }
+        TrackDjTelemetry(track = track, key = key, bpm = taggedBpm ?: labeledBpm,
+            detectedKeyConfidence = null,
+            keyProvenance = if (taggedKey != null) "tagged" else if (key != null) "derived" else "unknown",
+            bpmProvenance = if (taggedBpm != null) "tagged" else if (labeledBpm != null) "derived" else "unknown")
     }
 
     /**
@@ -192,15 +131,17 @@ object HarmonicKeyEngine {
      */
     fun analyzeTransition(deckA: TrackDjTelemetry, deckB: TrackDjTelemetry): HarmonicAnalysisResult {
         val relation = calculateHarmonicRelation(deckA.key, deckB.key)
-        val (bpmDelta, pitchStretch) = calculatePitchStretch(deckA.bpm, deckB.bpm)
+        val tempo = if (deckA.bpm != null && deckB.bpm != null) calculatePitchStretch(deckA.bpm, deckB.bpm) else null
+        val bpmDelta = tempo?.first
+        val pitchStretch = tempo?.second
 
         // BPM compatibility factor (penalize tempo stretch > ±5%)
-        val tempoScore = (1.0f - (abs(pitchStretch) / 10f)).coerceIn(0.2f, 1.0f)
+        val tempoScore = pitchStretch?.let { (1.0f - (abs(it) / 10f)).coerceIn(0.2f, 1.0f) } ?: 0f
         val overallScore = (relation.score * 0.7f) + (tempoScore * 0.3f)
 
         val recommendedCurve = when {
             relation == HarmonicRelation.DissonantClash -> {
-                if (abs(pitchStretch) > 4f) DjTransitionCurve.VinylBrake else DjTransitionCurve.FilterSweep
+                if (pitchStretch != null && abs(pitchStretch) > 4f) DjTransitionCurve.VinylBrake else DjTransitionCurve.FilterSweep
             }
             relation == HarmonicRelation.ExactMatch || relation == HarmonicRelation.RelativeMajorMinor -> {
                 DjTransitionCurve.EqualPower

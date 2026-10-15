@@ -25,6 +25,7 @@ import com.pixelody.app.data.model.Playlist
 import com.pixelody.app.data.model.QueueItem
 import com.pixelody.app.data.model.QueueSnapshot
 import com.pixelody.app.data.model.RepeatMode
+import com.pixelody.app.data.storage.TrackMetadataJson
 import com.pixelody.app.data.model.Track
 import com.pixelody.app.data.model.TrackPage
 import com.pixelody.app.data.model.TrustedDevice
@@ -586,7 +587,7 @@ private fun JSONArray?.toTrackList(baseUrl: String): List<Track> {
     if (this == null) return emptyList()
     return List(length()) { index ->
         val item = getJSONObject(index)
-        Track(
+        TrackMetadataJson.apply(item, Track(
             id = item.optString("id"),
             title = item.optString("title", "Untitled track"),
             artist = item.optString("artist", "Unknown artist"),
@@ -604,7 +605,7 @@ private fun JSONArray?.toTrackList(baseUrl: String): List<Track> {
             streamUrl = item.optNullableString("streamUrl")?.toAbsoluteUrl(baseUrl).orEmpty(),
             favorite = item.optBoolean("favorite"),
             missing = item.optBoolean("missing")
-        )
+        ))
     }
 }
 

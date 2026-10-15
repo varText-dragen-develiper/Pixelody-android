@@ -36,7 +36,14 @@ data class TrackDto(
     val streamUrl: String,
     val favorite: Boolean,
     val missing: Boolean,
-    val genre: String? = null
+    val genre: String? = null,
+    val albumArtist: String? = null,
+    val discNumber: Int? = null,
+    val trackNumber: Int? = null,
+    val albumId: String? = null,
+    val recordingId: String? = null,
+    val musicalKey: String? = null,
+    val bpm: Float? = null
 )
 
 data class PlaylistDto(
@@ -92,7 +99,10 @@ fun LibrarySnapshotDto.toModel(baseUrl: String): LibrarySnapshot {
                 streamUrl = stUrl?.let { if (it.startsWith("http://") || it.startsWith("https://")) it else "${baseUrl.trimEnd('/')}${if (it.startsWith("/")) it else "/$it"}" }.orEmpty(),
                 favorite = track.favorite,
                 missing = track.missing,
-                genre = track.genre.orEmpty()
+                genre = track.genre.orEmpty(),
+                albumArtist = track.albumArtist, discNumber = track.discNumber?.takeIf { it > 0 },
+                trackNumber = track.trackNumber?.takeIf { it > 0 }, albumId = track.albumId,
+                recordingId = track.recordingId, musicalKey = track.musicalKey, bpm = track.bpm
             )
         },
         playlists = playlists.map { playlist ->

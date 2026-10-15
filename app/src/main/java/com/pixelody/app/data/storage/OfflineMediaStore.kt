@@ -31,7 +31,15 @@ data class CachedTrack(
     val fileSizeBytes: Long,
     val cachedAt: Long = System.currentTimeMillis(),
     val lastAccessedAt: Long = cachedAt,
-    val isPinned: Boolean = false
+    val isPinned: Boolean = false,
+    val albumArtist: String? = null,
+    val discNumber: Int? = null,
+    val trackNumber: Int? = null,
+    val albumId: String? = null,
+    val recordingId: String? = null,
+    val musicalKey: String? = null,
+    val bpm: Float? = null,
+    val genre: String = ""
 ) {
     fun toTrack(): Track {
         return Track(
@@ -51,7 +59,8 @@ data class CachedTrack(
             artworkUrl = localArtworkPath?.let { "file://$it" },
             streamUrl = "file://$localFilePath",
             favorite = isPinned,
-            missing = false
+            missing = false, albumArtist = albumArtist, discNumber = discNumber, trackNumber = trackNumber,
+            albumId = albumId, recordingId = recordingId, musicalKey = musicalKey, bpm = bpm, genre = genre
         )
     }
 }
@@ -103,7 +112,12 @@ class OfflineMediaStore(private val context: Context) {
                             fileSizeBytes = obj.optLong("fileSizeBytes", localFile.length()),
                             cachedAt = cachedTimestamp,
                             lastAccessedAt = obj.optLong("lastAccessedAt", cachedTimestamp),
-                            isPinned = obj.optBoolean("isPinned", false)
+                            isPinned = obj.optBoolean("isPinned", false),
+                            albumArtist = obj.nullableTag("albumArtist"), discNumber = obj.nullablePosition("discNumber"),
+                            trackNumber = obj.nullablePosition("trackNumber"), albumId = obj.nullableTag("albumId"),
+                            recordingId = obj.nullableTag("recordingId"), musicalKey = obj.nullableTag("musicalKey"),
+                            bpm = if (obj.has("bpm") && !obj.isNull("bpm")) obj.optDouble("bpm").toFloat().takeIf { it.isFinite() } else null,
+                            genre = obj.optString("genre", "")
                         )
                     )
                 }
@@ -300,7 +314,9 @@ class OfflineMediaStore(private val context: Context) {
                 fileSizeBytes = targetAudioFile.length(),
                 cachedAt = now,
                 lastAccessedAt = now,
-                isPinned = isPinned
+                isPinned = isPinned, albumArtist = track.albumArtist, discNumber = track.discNumber,
+                trackNumber = track.trackNumber, albumId = track.albumId, recordingId = track.recordingId,
+                musicalKey = track.musicalKey, bpm = track.bpm, genre = track.genre
             )
 
             saveToCatalog(cached)
@@ -389,6 +405,7 @@ class OfflineMediaStore(private val context: Context) {
                 .put("cachedAt", t.cachedAt)
                 .put("lastAccessedAt", t.lastAccessedAt)
                 .put("isPinned", t.isPinned)
+            TrackMetadataJson.append(obj, t.toTrack())
             array.put(obj)
         }
         val tempFile = File(context.filesDir, "pixelody_offline_catalog.json.tmp")
@@ -397,3 +414,6 @@ class OfflineMediaStore(private val context: Context) {
         tempFile.renameTo(catalogFile)
     }
 }
+
+private fun JSONObject.nullableTag(key: String): String? = if (!has(key) || isNull(key)) null else optString(key).takeIf { it.isNotBlank() && it != "null" }
+private fun JSONObject.nullablePosition(key: String): Int? = if (!has(key) || isNull(key)) null else optInt(key).takeIf { it > 0 }

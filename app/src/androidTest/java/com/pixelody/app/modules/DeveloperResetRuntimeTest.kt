@@ -15,7 +15,7 @@ import org.junit.Test
 class DeveloperResetRuntimeTest {
     @Test fun resetClearsOnlyGeneratedDataUnlessTrackEditsAreSelected() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        check(context.packageName.endsWith(".studioqa")) { "Use only the isolated QA app" }
+        check(context.packageName.endsWith(".studioqa") || context.packageName.endsWith(".shuffleqa")) { "Use only the isolated QA app" }
         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
         fun tap(text: String) {
             val node = device.wait(Until.findObject(By.text(text)), 15000) ?: error("Missing $text")

@@ -34,16 +34,34 @@ class MobileSettingsStoreTest {
 
     @Test
     fun testSaveAndLoadAllPortedThemes() {
-        for (theme in PixelodyMobileTheme.values()) {
+        for (theme in PixelodyMobileTheme.selectableThemes) {
             store.saveTheme(theme)
             assertEquals(theme, store.loadTheme())
         }
     }
 
     @Test
+    fun retiredSavedThemesFallBackToStudioWithoutChangingOtherSettings() {
+        store.saveStorageQuotaBytes(123456L)
+        for (name in listOf("CartridgeQuest", "BulkheadTerminal", "MarathonTerminal")) {
+            fakePrefs.edit().putString(MobileSettingsStore.KEY_THEME, name).apply()
+            assertEquals(PixelodyMobileTheme.Studio, store.loadTheme())
+            assertEquals(123456L, store.loadStorageQuotaBytes())
+        }
+    }
+
+    @Test
+    fun retiredThemesCannotBeSavedAsActive() {
+        for (theme in PixelodyMobileTheme.values().filter { it !in PixelodyMobileTheme.selectableThemes }) {
+            store.saveTheme(theme)
+            assertEquals(PixelodyMobileTheme.Studio.name, fakePrefs.getString(MobileSettingsStore.KEY_THEME, null))
+        }
+    }
+
+    @Test
     fun testResetTheme() {
-        store.saveTheme(PixelodyMobileTheme.CartridgeQuest)
-        assertEquals(PixelodyMobileTheme.CartridgeQuest, store.loadTheme())
+        store.saveTheme(PixelodyMobileTheme.ObsidianGlass)
+        assertEquals(PixelodyMobileTheme.ObsidianGlass, store.loadTheme())
 
         store.resetTheme()
         assertEquals(PixelodyMobileTheme.Studio, store.loadTheme())

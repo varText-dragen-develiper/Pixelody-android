@@ -8,6 +8,7 @@ enum class SonicMood(
     val description: String,
     val accentColorHex: Long
 ) {
+    Unknown("Not measured", "Musical mood has not been measured.", 0xFF94A3B8),
     MorningAcoustic("Morning Warmth", "Bright acoustic melodies and uplifting organic instruments.", 0xFFF59E0B), // Warm Amber
     MiddayFocus("Midday Focus", "Rhythmic progressions and steady electronic focus beats.", 0xFF38BDF8), // Sky Blue
     SunsetGroove("Sunset Harmonics", "Smooth funk, deep grooves, and mellow harmonic transitions.", 0xFFEC4899), // Pink
@@ -26,6 +27,7 @@ enum class SonicArchetype(
     val archetypeCode: String,
     val glyphName: String
 ) {
+    Unknown("Listening history", "Recorded on this device", "", "WaveformBars"),
     ElectronicExplorer("Electronic Explorer", "Synthesizers, driving 4/4 kicks, and futuristic textures", "EXP", "LightningCheck"),
     VinylPurist("Vinyl Purist", "Analog grooves, organic warmth, and classic mastering", "VINYL", "VinylDisc"),
     DeepFlowArchitect("Deep Flow Architect", "High-retention extended focus and hypnotic ambient chords", "FLOW", "WaveformBars"),
@@ -60,7 +62,7 @@ data class ListeningMemoryEntry(
     val replayCount: Int = 1,
     val formatBadge: String = "",
     val isLossless: Boolean = false,
-    val detectedMood: SonicMood = SonicMood.MiddayFocus,
+    val detectedMood: SonicMood = SonicMood.Unknown,
     val timeOfDaySector: String = ""
 )
 
@@ -85,8 +87,8 @@ data class AudioDnaMetrics(
  */
 data class DailySonicCapsule(
     val dateString: String = "",
-    val archetype: SonicArchetype = SonicArchetype.HiResAudiophile,
-    val primaryMood: SonicMood = SonicMood.LateNightDrift,
+    val archetype: SonicArchetype = SonicArchetype.Unknown,
+    val primaryMood: SonicMood = SonicMood.Unknown,
     val aiNarrative: String = "",
     val audioDna: AudioDnaMetrics = AudioDnaMetrics(),
     val highlightTrackIds: List<String> = emptyList(),

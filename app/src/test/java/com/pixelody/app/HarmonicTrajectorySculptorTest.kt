@@ -10,6 +10,7 @@ import com.pixelody.app.data.model.HarmonicFlowProfile
 import com.pixelody.app.data.model.Track
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -63,7 +64,7 @@ class HarmonicTrajectorySculptorTest {
 
         val trajectory = HarmonicFlowCoordinator.calculateTrajectoryPoints(sculpted)
         // Energy of earlier tracks should generally be lower than later tracks
-        assertTrue(trajectory.first().energyLevel <= trajectory.last().energyLevel + 0.15f)
+        assertTrue(trajectory.first().energyLevel!! <= trajectory.last().energyLevel!! + 0.15f)
     }
 
     @Test
@@ -117,8 +118,8 @@ class HarmonicTrajectorySculptorTest {
         val telemetry = HarmonicFlowCoordinator.calculateCollectionTelemetry(collection)
 
         assertEquals(CamelotKey.K8A, telemetry.dominantKey)
-        assertTrue(telemetry.averageBpm in 120f..126f)
-        assertTrue(telemetry.harmonicCohesionPercent >= 70)
+        assertTrue(telemetry.averageBpm!! in 120f..126f)
+        assertTrue(telemetry.harmonicCohesionPercent!! >= 70)
         assertEquals(4, telemetry.trajectoryPoints.size)
         assertTrue(telemetry.keyRange.contains("8A"))
     }
@@ -127,7 +128,9 @@ class HarmonicTrajectorySculptorTest {
     fun testEmptyCollectionTelemetry() {
         val emptyTelemetry = HarmonicFlowCoordinator.calculateCollectionTelemetry(emptyList())
         assertEquals("N/A", emptyTelemetry.keyRange)
-        assertEquals(100, emptyTelemetry.harmonicCohesionPercent)
+        assertNull(emptyTelemetry.harmonicCohesionPercent)
+        assertNull(emptyTelemetry.averageBpm)
+        assertNull(emptyTelemetry.dominantKey)
         assertTrue(emptyTelemetry.trajectoryPoints.isEmpty())
     }
 }

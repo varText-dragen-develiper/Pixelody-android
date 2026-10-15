@@ -95,6 +95,11 @@ enum class PixelodyMobileTheme(
         plate = ChamferedPlate(depthRatio = 0.5f)
     );
 
+    companion object {
+        // Retired themes remain internal for compatibility, but cannot be selected.
+        val selectableThemes: List<PixelodyMobileTheme> = listOf(Studio, ObsidianGlass, LoFiCafe, Obsession)
+    }
+
     /** Read by the settings picker's accent chip. One source of truth. */
     val accentColor: Color get() = AppearanceSettings().specFor(this).primary
 }

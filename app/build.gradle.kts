@@ -12,8 +12,8 @@ android {
         applicationId = "com.pixelody.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.2.1"
         buildConfigField("boolean", "ENABLE_DEMO_LIBRARY", "false")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -43,7 +43,11 @@ android {
 
     buildTypes {
         debug {
-            if (providers.gradleProperty("moduleTestBuild").orNull == "true") {
+            if (providers.gradleProperty("universalShuffleTestBuild").orNull == "true") {
+                applicationIdSuffix = ".shuffleqa"
+                versionNameSuffix = "-shuffle-test"
+                resValue("string", "app_name", "Pixelody shuffle test")
+            } else if (providers.gradleProperty("moduleTestBuild").orNull == "true") {
                 buildConfigField("boolean", "ENABLE_DEMO_LIBRARY", "true")
                 applicationIdSuffix = ".modules"
                 versionNameSuffix = "-module-test"

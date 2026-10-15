@@ -170,6 +170,7 @@ fun SonicCapsuleTimelineView(
                             ) {
                                 PixelodyTransportGlyph(
                                     glyph = when (capsule.archetype) {
+                                        SonicArchetype.Unknown -> TransportGlyphType.WaveformBars
                                         SonicArchetype.ElectronicExplorer -> TransportGlyphType.LightningCheck
                                         SonicArchetype.VinylPurist -> TransportGlyphType.VinylDisc
                                         SonicArchetype.DeepFlowArchitect -> TransportGlyphType.WaveformBars

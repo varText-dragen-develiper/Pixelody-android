@@ -41,7 +41,10 @@ data class BaseLayerData(
     val queue: List<String> = emptyList(),
     val hostReachable: Boolean = true,
     val source: BaseSource = BaseSource.All,
-    val lens: BaseLens = BaseLens.Everything
+    val lens: BaseLens = BaseLens.Everything,
+    val queueEntryIds: List<String> = emptyList(),
+    val currentEntryId: String? = null,
+    val queueDecisionCues: List<com.pixelody.app.core.playback.TransitionCue?> = emptyList()
 ) {
     private val byId: Map<String, Track> by lazy { tracks.associateBy { it.id } }
 

@@ -60,7 +60,7 @@ fun SessionCapsuleCard(
     val capsuleHasData = dailyCapsule?.hasData ?: insights.hasData
     val streak = dailyCapsule?.streakDays ?: insights.streakDays
     val moodTitle = dailyCapsule?.primaryMood?.title ?: insights.timeOfDayMood
-    val archetype = dailyCapsule?.archetype ?: SonicArchetype.HiResAudiophile
+    val archetype = dailyCapsule?.archetype ?: SonicArchetype.Unknown
     val losslessRatio = dailyCapsule?.audioDna?.losslessRatio ?: insights.losslessRatio
     val sessionMins = dailyCapsule?.audioDna?.totalListeningMinutes ?: insights.sessionMinutes
     val tracksCount = dailyCapsule?.audioDna?.tracksPlayedCount ?: insights.tracksPlayed
@@ -73,6 +73,7 @@ fun SessionCapsuleCard(
     val moodColor = dailyCapsule?.primaryMood?.let { Color(it.accentColorHex) } ?: MaterialTheme.colorScheme.primary
 
     val archetypeGlyph = when (archetype) {
+        SonicArchetype.Unknown -> TransportGlyphType.WaveformBars
         SonicArchetype.ElectronicExplorer -> TransportGlyphType.LightningCheck
         SonicArchetype.VinylPurist -> TransportGlyphType.VinylDisc
         SonicArchetype.DeepFlowArchitect -> TransportGlyphType.WaveformBars

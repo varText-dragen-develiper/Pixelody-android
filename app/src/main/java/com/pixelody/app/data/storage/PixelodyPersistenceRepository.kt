@@ -18,16 +18,16 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
 
-class PixelodyDatabaseHelper(context: Context) : SQLiteOpenHelper(
+class PixelodyDatabaseHelper(context: Context, databaseName: String = DATABASE_NAME) : SQLiteOpenHelper(
     context,
-    DATABASE_NAME,
+    databaseName,
     null,
     DATABASE_VERSION
 ) {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
             """
-            CREATE TABLE $TABLE_SMART_CRATES (
+            CREATE TABLE IF NOT EXISTS $TABLE_SMART_CRATES (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 rules_json TEXT NOT NULL,
@@ -40,7 +40,7 @@ class PixelodyDatabaseHelper(context: Context) : SQLiteOpenHelper(
 
         db.execSQL(
             """
-            CREATE TABLE $TABLE_CACHED_TRACKS (
+            CREATE TABLE IF NOT EXISTS $TABLE_CACHED_TRACKS (
                 id TEXT PRIMARY KEY,
                 title TEXT NOT NULL,
                 artist TEXT NOT NULL,
@@ -63,7 +63,7 @@ class PixelodyDatabaseHelper(context: Context) : SQLiteOpenHelper(
 
         db.execSQL(
             """
-            CREATE TABLE $TABLE_CUSTOM_DSP (
+            CREATE TABLE IF NOT EXISTS $TABLE_CUSTOM_DSP (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 category TEXT NOT NULL,
@@ -75,7 +75,7 @@ class PixelodyDatabaseHelper(context: Context) : SQLiteOpenHelper(
 
         db.execSQL(
             """
-            CREATE TABLE $TABLE_CAPSULES (
+            CREATE TABLE IF NOT EXISTS $TABLE_CAPSULES (
                 date_key TEXT PRIMARY KEY,
                 archetype TEXT NOT NULL,
                 lossless_minutes INTEGER NOT NULL,
@@ -89,12 +89,18 @@ class PixelodyDatabaseHelper(context: Context) : SQLiteOpenHelper(
         )
     }
 
+    override fun onOpen(db: SQLiteDatabase) {
+        super.onOpen(db)
+        if (!db.isReadOnly) ensureTrackMetadataTable(db)
+    }
+
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_SMART_CRATES")
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_CACHED_TRACKS")
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_CUSTOM_DSP")
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_CAPSULES")
-        onCreate(db)
+        // No registered upgrade yet: fail closed rather than delete owner data.
+        throw android.database.sqlite.SQLiteException("Unsupported Pixelody schema $oldVersion -> $newVersion; data retained")
+    }
+
+    private fun ensureTrackMetadataTable(db: SQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS $TABLE_TRACK_METADATA (id TEXT PRIMARY KEY, metadata_json TEXT NOT NULL)")
     }
 
     companion object {
@@ -103,6 +109,7 @@ class PixelodyDatabaseHelper(context: Context) : SQLiteOpenHelper(
 
         const val TABLE_SMART_CRATES = "smart_crates"
         const val TABLE_CACHED_TRACKS = "cached_tracks"
+        const val TABLE_TRACK_METADATA = "cached_track_metadata_v1"
         const val TABLE_CUSTOM_DSP = "custom_dsp_presets"
         const val TABLE_CAPSULES = "capsule_history"
     }
@@ -112,8 +119,10 @@ class PixelodyDatabaseHelper(context: Context) : SQLiteOpenHelper(
  * PixelodyPersistenceRepository: High-performance SQLite persistence manager for
  * smart crates, local media cache, DSP presets, and sonic capsule archives.
  */
-class PixelodyPersistenceRepository(context: Context) {
-    private val dbHelper = PixelodyDatabaseHelper(context)
+class PixelodyPersistenceRepository(context: Context, databaseName: String = PixelodyDatabaseHelper.DATABASE_NAME) {
+    private val dbHelper = PixelodyDatabaseHelper(context, databaseName)
+
+    fun close() = dbHelper.close()
 
     /** Removes generated listening archives only; library and authored data stay intact. */
     suspend fun clearListeningArchives() = withContext(Dispatchers.IO) {
@@ -191,7 +200,7 @@ class PixelodyPersistenceRepository(context: Context) {
             val db = dbHelper.writableDatabase
             db.beginTransaction()
             try {
-                for (t in tracks) {
+                for ((sourceIndex, t) in tracks.withIndex()) {
                     val values = ContentValues().apply {
                         put("id", t.id)
                         put("title", t.title)
@@ -211,11 +220,13 @@ class PixelodyPersistenceRepository(context: Context) {
                         put("last_scanned", System.currentTimeMillis())
                     }
                     db.insertWithOnConflict(
-                        PixelodyDatabaseHelper.TABLE_CACHED_TRACKS,
-                        null,
-                        values,
-                        SQLiteDatabase.CONFLICT_REPLACE
+                        PixelodyDatabaseHelper.TABLE_CACHED_TRACKS, null, values, SQLiteDatabase.CONFLICT_REPLACE
                     )
+                    val metadataValues = ContentValues().apply {
+                        put("id", t.id)
+                        put("metadata_json", TrackMetadataJson.append(JSONObject(), t).put("sourceOrder", sourceIndex).toString())
+                    }
+                    db.insertWithOnConflict(PixelodyDatabaseHelper.TABLE_TRACK_METADATA, null, metadataValues, SQLiteDatabase.CONFLICT_REPLACE)
                 }
                 db.setTransactionSuccessful()
             } finally {
@@ -226,8 +237,21 @@ class PixelodyPersistenceRepository(context: Context) {
 
     suspend fun loadCachedScannedTracks(): List<Track> = withContext(Dispatchers.IO) {
         val tracks = mutableListOf<Track>()
+        val sourceOrder = mutableMapOf<String, Int>()
         runCatching {
             val db = dbHelper.readableDatabase
+            val metadata = mutableMapOf<String, JSONObject>()
+            // A legacy read-only database can lack the optional table; keep the original catalog readable.
+            runCatching {
+                db.query(PixelodyDatabaseHelper.TABLE_TRACK_METADATA, arrayOf("id", "metadata_json"), null, null, null, null, null).use { entries ->
+                    while (entries.moveToNext()) runCatching {
+                        val id = entries.getString(0)
+                        val tags = JSONObject(entries.getString(1))
+                        metadata[id] = tags
+                        if (tags.has("sourceOrder") && tags.optInt("sourceOrder", -1) >= 0) sourceOrder[id] = tags.getInt("sourceOrder")
+                    }
+                }
+            }
             db.query(
                 PixelodyDatabaseHelper.TABLE_CACHED_TRACKS,
                 null,
@@ -271,7 +295,7 @@ class PixelodyPersistenceRepository(context: Context) {
                     val favorite = cursor.getInt(favCol) == 1
 
                     tracks.add(
-                        Track(
+                        TrackMetadataJson.apply(metadata[id] ?: JSONObject(), Track(
                             id = id,
                             title = title,
                             artist = artist,
@@ -289,12 +313,12 @@ class PixelodyPersistenceRepository(context: Context) {
                             streamUrl = streamUrl,
                             favorite = favorite,
                             missing = false
-                        )
+                        ))
                     )
                 }
             }
         }
-        tracks
+        if (tracks.isNotEmpty() && tracks.all { sourceOrder.containsKey(it.id) }) tracks.sortedBy { sourceOrder[it.id] } else tracks
     }
 
     // --- Custom DSP Presets Persistence ---

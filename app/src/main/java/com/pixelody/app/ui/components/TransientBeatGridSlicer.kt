@@ -72,7 +72,7 @@ enum class BeatLoopLength(val label: String, val beats: Float) {
  */
 @Composable
 fun TransientBeatGridSlicer(
-    bpm: Int,
+    bpm: Int?,
     positionMs: Long,
     durationMs: Long,
     isPlaying: Boolean,
@@ -80,7 +80,11 @@ fun TransientBeatGridSlicer(
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
-    val effectiveBpm = if (bpm in 40..240) bpm else 124
+    if (bpm == null || bpm !in 40..240) {
+        Text("Tempo unavailable — add tempo metadata to use beat loops.")
+        return
+    }
+    val effectiveBpm = bpm
     val beatDurationMs = (60_000f / effectiveBpm.toFloat())
 
     var isLoopActive by remember { mutableStateOf(false) }

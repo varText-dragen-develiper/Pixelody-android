@@ -1,5 +1,7 @@
 package com.pixelody.app.ui.components
 
+import com.pixelody.app.data.model.knownCode
+import com.pixelody.app.data.model.knownColor
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -204,7 +206,7 @@ fun FlippableCrateView(
                             },
                         shape = RoundedCornerShape(12.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant,
-                        border = BorderStroke(2.dp, tel.key.harmonicColor.copy(alpha = 0.60f)),
+                        border = BorderStroke(2.dp, tel.key.knownColor.copy(alpha = 0.60f)),
                         shadowElevation = 8.dp
                     ) {
                         Box(modifier = Modifier.padding(10.dp)) {
@@ -214,13 +216,13 @@ fun FlippableCrateView(
                             ) {
                                 Surface(
                                     shape = RoundedCornerShape(6.dp),
-                                    color = tel.key.harmonicColor.copy(alpha = 0.25f)
+                                    color = tel.key.knownColor.copy(alpha = 0.25f)
                                 ) {
                                     Text(
-                                        text = tel.key.code,
+                                        text = tel.key.knownCode,
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Black,
-                                        color = tel.key.harmonicColor,
+                                        color = tel.key.knownColor,
                                         modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
                                     )
                                 }

@@ -226,6 +226,8 @@ fun PixelodyBaseShell(
     onInsertIntoQueue: (String, Int) -> Unit = { _, _ -> },
     onRemoveQueueItem: (String) -> Unit = {},
     onRemoveQueueItemAt: (Int) -> Unit = { index -> data.queue.getOrNull(index)?.let(onRemoveQueueItem) },
+    onPlayQueueEntry: ((String) -> Unit)? = null,
+    onRestoreQueueEntry: ((String, String, Int) -> Unit)? = null,
     onClearQueue: () -> Unit = {},
     onResetDeveloperData: (suspend (Boolean) -> Unit)? = null,
     equalizerRuntimeState: EqualizerRuntimeState = EqualizerRuntimeState(),
@@ -260,6 +262,7 @@ fun PixelodyBaseShell(
     onResume: () -> Unit = {},
     onToggleShuffle: () -> Unit = {},
     onShuffleModeChange: (FlowShuffleMode) -> Unit = {},
+    onShuffleAction: (String) -> Unit = {},
     onShuffleTracks: (List<String>) -> Unit = onPlayTracks,
     repeatMode: RepeatMode = RepeatMode.Off,
     onToggleRepeat: () -> Unit = {},
@@ -393,8 +396,8 @@ fun PixelodyBaseShell(
     fun playFrom(trackId: String, pool: List<String>) {
         val effectivePool = if (pool.contains(trackId)) pool else (listOf(trackId) + pool)
         val index = effectivePool.indexOf(trackId)
-        val ids = if (shuffleMode == FlowShuffleMode.Off) effectivePool.drop(index.coerceAtLeast(0))
-            else listOf(trackId) + effectivePool.filterNot { it == trackId }
+        val ids = if (shuffleMode == FlowShuffleMode.Off) effectivePool.drop(index.coerceAtLeast(0)) + effectivePool.take(index.coerceAtLeast(0))
+            else listOf(trackId) + effectivePool.filterIndexed { occurrence, _ -> occurrence != index }
         onPlayTracks(ids)
     }
 
@@ -474,22 +477,23 @@ fun PixelodyBaseShell(
         displayedHostProfile(savedHostProfile, hostConnectionState)
     }
 
-    val currentQueueSnapshot = remember(data.currentTrackId, data.isPlaying, data.queue, data.tracks, localTracks, shuffleEnabled, repeatMode) {
+    val currentQueueSnapshot = remember(data.currentTrackId, data.isPlaying, data.currentEntryId, data.queue, data.queueEntryIds, data.tracks, localTracks, shuffleEnabled, repeatMode) {
         QueueSnapshot(
             currentTrackId = data.currentTrackId,
             trackIds = data.queue,
             shuffle = shuffleEnabled,
             repeatMode = repeatMode,
-            items = (listOfNotNull(data.currentTrackId) + data.queue).mapNotNull { id ->
+            items = (listOfNotNull(data.currentTrackId) + data.queue).mapIndexedNotNull { index, id ->
                 resolveTrack(id)?.let { track ->
                     QueueItem(
-                        queueItemId = "qi-${track.id}",
+                        queueItemId = if (index == 0 && data.currentTrackId != null) data.currentEntryId ?: "legacy-current"
+                            else data.queueEntryIds.getOrNull(index - if (data.currentTrackId != null) 1 else 0) ?: "legacy-queue-$index",
                         trackId = track.id,
                         title = track.title,
                         artist = track.artist,
                         durationSeconds = track.durationSeconds,
                         artworkUrl = track.artworkUrl,
-                        playbackStatus = if (track.id == data.currentTrackId) { if (data.isPlaying) "playing" else "paused" } else "queued"
+                        playbackStatus = if (index == 0 && data.currentTrackId != null) { if (data.isPlaying) "playing" else "paused" } else "queued"
                     )
                 }
             }
@@ -1471,6 +1475,24 @@ fun PixelodyBaseShell(
                         canWriteQueue = true,
                         selectedTrack = currentTrack,
                         queue = queueTracks,
+                        queueEntryIds = queueEntries.map { (position, _) -> data.queueEntryIds.getOrNull(position).orEmpty() },
+                        decisionCues = queueEntries.map { (position, _) -> data.queueDecisionCues.getOrNull(position) },
+                        onReshuffle = { onShuffleAction("reshuffle-remaining") },
+                        onNewCycle = { onShuffleAction("new-cycle") },
+                        onDisableLearning = { onShuffleAction("disable-learning") },
+                        onEnableLearning = { onShuffleAction("enable-learning") },
+                        onResetLearning = { onShuffleAction("reset-learning") },
+                        onExportLearning = { onShuffleAction("export-learning") },
+                        onImportLearning = { onShuffleAction("import-learning") },
+                        onDeleteLearning = { onShuffleAction("delete-learning") },
+                        onForgetOtherQueues = { onShuffleAction("evict-other-scopes") },
+                        onPlayQueueItem = { index ->
+                            queueEntries.getOrNull(index)?.first?.let { position ->
+                                val entryId = data.queueEntryIds.getOrNull(position)
+                                if (entryId != null && onPlayQueueEntry != null) onPlayQueueEntry(entryId)
+                                else onPlayTracks(data.queue.drop(position))
+                            }
+                        },
                         isLocalQueue = true,
                         isPlaying = data.isPlaying,
                         shuffleMode = shuffleMode,
@@ -1484,14 +1506,17 @@ fun PixelodyBaseShell(
                         onAddRemoteQueue = { track -> onAddToQueue(track.id) },
                         onRemoveTrack = { track, index ->
                             queueEntries.getOrNull(index)?.first?.let { position ->
-                                queueUndoManager.recordDismissal(track, position)
-                                onRemoveQueueItemAt(position)
+                                val entryId = data.queueEntryIds.getOrNull(position)
+                                queueUndoManager.recordDismissal(track, position, entryId)
+                                onRemoveQueueItem(entryId ?: track.id)
                             }
                         },
                         undoState = queueUndoState,
                         onUndoQueueRemoval = {
                             queueUndoManager.popUndo()?.let { entry ->
-                                onInsertIntoQueue(entry.track.id, entry.index)
+                                if (entry.entryId != null && onRestoreQueueEntry != null)
+                                    onRestoreQueueEntry(entry.track.id, entry.entryId, entry.index)
+                                else onInsertIntoQueue(entry.track.id, entry.index)
                             }
                         },
                         onDismissUndo = { queueUndoManager.clear() },
@@ -1684,7 +1709,7 @@ private fun BasePlayerSheet(
                     if (data.queue.isEmpty()) {
                         item { BaseEmptyNote("Nothing queued.") }
                     }
-                    itemsIndexed(data.queue, key = { index, id -> "$index-$id" }) { index, id ->
+                    itemsIndexed(data.queue, key = { index, _ -> "$index:${data.queueEntryIds.getOrNull(index).orEmpty()}" }) { index, id ->
                         BaseTrackRow(
                             data = data,
                             trackId = id,

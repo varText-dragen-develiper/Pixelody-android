@@ -26,6 +26,7 @@ internal fun FlowEntry(mode: FlowShuffleMode, key: CamelotKey?, bpm: Float?, onC
     modifier: Modifier = Modifier) {
     val modeLabel = when (mode) {
         FlowShuffleMode.Off -> "In order"
+        FlowShuffleMode.Balanced -> "Balanced"
         FlowShuffleMode.SmartFlow -> "Smart"
         FlowShuffleMode.AlbumPreserving -> "Albums"
         FlowShuffleMode.PureRandom -> "Random"
@@ -80,6 +81,7 @@ internal fun FlowListeningSheet(
                             Text(choice.displayName, style = MaterialTheme.typography.titleSmall)
                             Text(when (choice) {
                                 FlowShuffleMode.Off -> "Keep the current order"
+                                FlowShuffleMode.Balanced -> "Variety now, with unplayed music remembered across sessions"
                                 FlowShuffleMode.SmartFlow -> "Variety with genre and known key connections"
                                 FlowShuffleMode.AlbumPreserving -> "Keep each album together"
                                 FlowShuffleMode.PureRandom -> "Let every song surprise you"

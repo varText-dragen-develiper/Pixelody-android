@@ -19,8 +19,8 @@ data class TemporalSonicCapsule(
     val title: String,
     val recordedAtEpochMs: Long,
     val timeOfDayLabel: String,
-    val dominantKey: CamelotKey,
-    val averageBpm: Float,
+    val dominantKey: CamelotKey?,
+    val averageBpm: Float?,
     val totalTracks: Int,
     val tracks: List<Track>,
     val atmosphereTag: String

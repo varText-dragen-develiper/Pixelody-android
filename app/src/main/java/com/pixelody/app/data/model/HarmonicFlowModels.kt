@@ -57,12 +57,12 @@ data class QueueSlotHarmonicAffinity(
     val slotIndex: Int,
     val fromTrackId: String,
     val toTrackId: String,
-    val fromKey: CamelotKey,
-    val toKey: CamelotKey,
+    val fromKey: CamelotKey?,
+    val toKey: CamelotKey?,
     val relation: HarmonicRelation,
     val compatibilityScore: Float,
-    val bpmDelta: Float,
-    val pitchStretchPercent: Float,
+    val bpmDelta: Float?,
+    val pitchStretchPercent: Float?,
     val isClash: Boolean,
     val recommendedCurve: DjTransitionCurve,
     val suggestedBridgeKey: CamelotKey? = null
@@ -74,10 +74,11 @@ data class QueueSlotHarmonicAffinity(
 data class HarmonicTrajectoryPoint(
     val trackId: String,
     val title: String,
-    val key: CamelotKey,
-    val bpm: Float,
-    val normalizedWheelPosition: Float, // 0.0 to 1.0 around the circle
-    val energyLevel: Float // Relative energy score based on tempo and key mode
+    val key: CamelotKey?,
+    val bpm: Float?,
+    val normalizedWheelPosition: Float?, // Unavailable when key metadata is absent
+    val energyLevel: Float?, // Weak tempo heuristic, not measured energy
+    val energyProvenance: String = "unknown"
 )
 
 /**
@@ -136,9 +137,9 @@ data class EnergyContourPoint(
  */
 data class CollectionHarmonicTelemetry(
     val keyRange: String,
-    val dominantKey: CamelotKey,
-    val averageBpm: Float,
-    val harmonicCohesionPercent: Int,
+    val dominantKey: CamelotKey?,
+    val averageBpm: Float?,
+    val harmonicCohesionPercent: Int?,
     val trajectoryPoints: List<HarmonicTrajectoryPoint>
 )
 

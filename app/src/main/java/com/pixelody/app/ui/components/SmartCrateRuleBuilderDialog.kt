@@ -118,7 +118,7 @@ fun SmartCrateRuleBuilderDialog(
         if (selectedBpmBucket != BpmBucket.All) {
             filtered = filtered.filter { track ->
                 val tele = HarmonicKeyEngine.estimateTrackTelemetry(track)
-                tele.bpm >= selectedBpmBucket.minBpm && tele.bpm <= selectedBpmBucket.maxBpm
+                tele.bpm?.let { it >= selectedBpmBucket.minBpm && it <= selectedBpmBucket.maxBpm } == true
             }
         }
 
@@ -137,7 +137,7 @@ fun SmartCrateRuleBuilderDialog(
                     .thenByDescending { it.bitDepth ?: 16 }
             )
             SortStrategy.HarmonicFlow -> {
-                val startKey = selectedCamelotKey ?: list.firstOrNull()?.let { HarmonicKeyEngine.estimateTrackTelemetry(it).key } ?: CamelotKey.K8A
+                val startKey = selectedCamelotKey ?: list.firstOrNull()?.let { HarmonicKeyEngine.estimateTrackTelemetry(it).key }
                 list.sortedByDescending { track ->
                     val tele = HarmonicKeyEngine.estimateTrackTelemetry(track)
                     HarmonicKeyEngine.calculateHarmonicRelation(startKey, tele.key).score

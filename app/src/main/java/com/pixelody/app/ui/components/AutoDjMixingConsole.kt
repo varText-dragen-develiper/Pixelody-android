@@ -1,5 +1,8 @@
 package com.pixelody.app.ui.components
 
+import com.pixelody.app.data.model.knownCode
+import com.pixelody.app.data.model.knownMusicalKey
+import com.pixelody.app.data.model.knownBpm
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -193,7 +196,7 @@ fun AutoDjMixingConsole(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "${key.code} • ${key.musicalKey}",
+                            text = "${key.knownCode} • ${key.knownMusicalKey}",
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
@@ -345,7 +348,8 @@ fun AutoDjMixingConsole(
                     )
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "${rel.title} • ${(harmonicAnalysis.overallCompatibilityScore * 100).toInt()}% Match",
+                            text = if (rel == com.pixelody.app.data.model.HarmonicRelation.Unknown) "Key unavailable" else
+                                "${rel.title} • ${(harmonicAnalysis.overallCompatibilityScore * 100).toInt()}% Metadata match",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = Color(rel.badgeColorHex)
@@ -735,7 +739,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawWheelSector(
         isAntiAlias = true
     }
     drawContext.canvas.nativeCanvas.drawText(
-        key.code,
+        key.knownCode,
         textX,
         textY + 7f,
         paint
@@ -813,7 +817,7 @@ fun DeckTelemetryCard(
                         modifier = Modifier.padding(top = 4.dp)
                     ) {
                         Text(
-                            text = "${telemetry.key.code} • ${telemetry.key.musicalKey}",
+                            text = "${telemetry.key.knownCode} • ${telemetry.key.knownMusicalKey}",
                             style = MaterialTheme.typography.labelSmall,
                             color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.Bold,
@@ -824,7 +828,7 @@ fun DeckTelemetryCard(
                     // BPM Readout
                     Column(horizontalAlignment = Alignment.End) {
                         Text(
-                            text = "${telemetry.bpm.toInt()} BPM",
+                            text = "${telemetry.bpm.knownBpm}",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold
                         )
@@ -926,11 +930,12 @@ fun DjTransitionGraph(
  */
 @Composable
 fun PhraseQuantizationBar(
-    bpm: Float,
+    bpm: Float?,
     currentDurationSeconds: Int,
     progress: Float,
     modifier: Modifier = Modifier
 ) {
+    if (bpm == null) { Text("Tempo unavailable"); return }
     val durationMs = (currentDurationSeconds * 1000L).coerceAtLeast(1000L)
     val structure = remember(bpm, durationMs) {
         MusicalPhraseEngine.computePhraseStructure(bpm, durationMs, phraseLengthBars = 16)
@@ -1203,7 +1208,7 @@ fun LoudnessAndTempoBanner(
     val gainA = remember(loudnessA) { AcousticTimbreEngine.calculateTargetGain(loudnessA.integratedLufs) }
     val gainB = remember(loudnessB) { AcousticTimbreEngine.calculateTargetGain(loudnessB.integratedLufs) }
     val warpedBpm = remember(deckA.bpm, deckB.bpm, progress) {
-        AcousticTimbreEngine.calculateWarpedTempo(deckA.bpm, deckB.bpm, progress)
+        if (deckA.bpm != null && deckB.bpm != null) AcousticTimbreEngine.calculateWarpedTempo(deckA.bpm, deckB.bpm, progress) else null
     }
 
     Surface(
@@ -1239,7 +1244,7 @@ fun LoudnessAndTempoBanner(
                 color = Color(0xFF4ADE80).copy(alpha = 0.15f)
             ) {
                 Text(
-                    text = "${"%.1f".format(warpedBpm)} BPM (S-Curve)",
+                    text = "${warpedBpm?.let { "%.1f BPM (S-Curve)".format(it) } ?: "Tempo unavailable"}",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF4ADE80),

@@ -86,7 +86,18 @@ internal fun QueueScreen(
     onSaveQueueAsPlaylist: (() -> Unit)? = null,
     onClose: () -> Unit = onOpenPlayer,
     experienceMode: com.pixelody.app.data.model.AppExperienceMode = com.pixelody.app.data.model.AppExperienceMode.Essential,
-    onShowDoc: ((String) -> Unit)? = null
+    onShowDoc: ((String) -> Unit)? = null,
+    queueEntryIds: List<String> = emptyList(),
+    onPlayQueueItem: ((Int) -> Unit)? = null,
+    decisionCues: List<com.pixelody.app.core.playback.TransitionCue?> = emptyList(),
+    onNewCycle: () -> Unit = {},
+    onDisableLearning: () -> Unit = {},
+    onEnableLearning: () -> Unit = {},
+    onResetLearning: () -> Unit = {},
+    onExportLearning: () -> Unit = {},
+    onImportLearning: () -> Unit = {},
+    onDeleteLearning: () -> Unit = {},
+    onForgetOtherQueues: () -> Unit = {}
 ) {
     val haptic = LocalHapticFeedback.current
     val theme = LocalPixelodyThemeVariant.current
@@ -183,11 +194,33 @@ internal fun QueueScreen(
                     }
                 }
             }
+            if (isLocalQueue) {
+                item {
+                    SectionCard(title = "Shuffle memory", subtitle = "Reshuffle keeps unplayed music. A new cycle starts the pool again.") {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = onReshuffle) { Text("Reshuffle remaining") }
+                            TextButton(onClick = onNewCycle) { Text("New cycle") }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = onDisableLearning) { Text("Pause learning") }
+                            TextButton(onClick = onEnableLearning) { Text("Enable learning") }
+                            TextButton(onClick = onResetLearning) { Text("Reset learning") }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = onExportLearning) { Text("Export learning") }
+                            TextButton(onClick = onImportLearning) { Text("Import learning") }
+                            TextButton(onClick = onDeleteLearning) { Text("Delete learning data") }
+                        }
+                        TextButton(onClick = onForgetOtherQueues) { Text("Forget other saved queues and their unplayed pools") }
+                    }
+                }
+            }
             if ((!isLocalQueue && snapshot == null) || queue.isEmpty()) {
                 item { EmptyState(text = "No queue is available.") }
             } else {
-                itemsIndexed(queue, key = { index, track -> "$index-${track.id}" }) { index, track ->
-                    val cue = plannedMap[track.id]
+                // A Repeat All preview can show this entry again in the next cycle.
+                itemsIndexed(queue, key = { index, _ -> "$index:${queueEntryIds.getOrNull(index).orEmpty()}" }) { index, track ->
+                    val cue = decisionCues.getOrNull(index) ?: plannedMap[track.id]
                     Column {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -196,10 +229,12 @@ internal fun QueueScreen(
                             Box(modifier = Modifier.weight(1f)) {
                                 TrackRow(
                                     track = track,
+                                    // This list contains future occurrences. A deliberate
+                                    // duplicate of the current catalog track is still future.
                                     selected = false,
-                                    onClick = { onPlayTrack(track) },
+                                    onClick = { onPlayQueueItem?.invoke(index) ?: onPlayTrack(track) },
                                     transitionCue = cue,
-                                    isPlaying = isPlaying && selectedTrack?.id == track.id,
+                                    isPlaying = false,
                                     isFavorite = track.favorite,
                                     onToggleFavorite = onToggleFavorite?.let { cb -> { cb(track) } },
                                     onLongClick = onLongClickTrack?.let { cb -> { cb(track) } },
@@ -231,6 +266,14 @@ internal fun QueueScreen(
                                     )
                                 }
                             }
+                        }
+                        cue?.let { reason ->
+                            Text(
+                                text = "${reason.badge} · ${reason.description}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
+                            )
                         }
                         if (!isLocalQueue && canWriteQueue) {
                             TextButton(onClick = { onAddRemoteQueue(track) }) {

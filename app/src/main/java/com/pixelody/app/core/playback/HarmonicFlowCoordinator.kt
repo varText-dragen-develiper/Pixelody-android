@@ -68,7 +68,7 @@ object HarmonicFlowCoordinator {
             val isClash = analysis.relation == HarmonicRelation.DissonantClash
 
             // If clashing, find an ideal intermediate bridge key (e.g. adjacent to both)
-            val suggestedBridgeKey = if (isClash) {
+            val suggestedBridgeKey = if (isClash && from.key != null && to.key != null) {
                 findIdealBridgeKey(from.key, to.key)
             } else null
 
@@ -95,10 +95,8 @@ object HarmonicFlowCoordinator {
     fun calculateTrajectoryPoints(tracks: List<Track>): List<HarmonicTrajectoryPoint> {
         return tracks.map { track ->
             val telemetry = HarmonicKeyEngine.estimateTrackTelemetry(track)
-            val normalizedWheel = ((telemetry.key.number - 1) % 12) / 12f
-            val baseEnergy = (telemetry.bpm - 70f) / 110f // normalize 70-180 BPM to ~0.0-1.0
-            val modeBonus = if (telemetry.key.mode == CamelotMode.Major) 0.15f else 0.0f
-            val energyScore = (baseEnergy + modeBonus).coerceIn(0.1f, 1.0f)
+            val normalizedWheel = telemetry.key?.let { ((it.number - 1) % 12) / 12f }
+            val energyScore = telemetry.bpm?.let { ((it - 70f) / 110f).coerceIn(0f, 1f) }
 
             HarmonicTrajectoryPoint(
                 trackId = track.id,
@@ -106,7 +104,8 @@ object HarmonicFlowCoordinator {
                 key = telemetry.key,
                 bpm = telemetry.bpm,
                 normalizedWheelPosition = normalizedWheel,
-                energyLevel = energyScore
+                energyLevel = energyScore,
+                energyProvenance = if (energyScore != null) "tempo-heuristic" else "unknown"
             )
         }
     }
@@ -201,8 +200,10 @@ object HarmonicFlowCoordinator {
                 }
 
                 // BPM proximity bonus
-                val bpmDiff = abs(candTelemetry.bpm - currentTelemetry.bpm)
-                score -= min(bpmDiff * 0.5f, 25f)
+                if (candTelemetry.bpm != null && currentTelemetry.bpm != null) {
+                    val bpmDiff = abs(candTelemetry.bpm - currentTelemetry.bpm)
+                    score -= min(bpmDiff * 0.5f, 25f)
+                }
 
                 score
             } ?: remaining.first()
@@ -304,8 +305,7 @@ object HarmonicFlowCoordinator {
                 val candEnergy = calculateTrajectoryPoints(listOf(candidate)).first().energyLevel
 
                 // Energy deviation penalty
-                val energyDiff = abs(candEnergy - targetEnergy)
-                val energyPenalty = energyDiff * 60f
+                val energyPenalty = candEnergy?.let { abs(it - targetEnergy) * 60f } ?: 0f
 
                 // Harmonic relation score (higher is better, so invert for minBy)
                 val rel = HarmonicKeyEngine.calculateHarmonicRelation(currentTelemetry.key, candTelemetry.key)
@@ -334,35 +334,32 @@ object HarmonicFlowCoordinator {
         if (tracks.isEmpty()) {
             return CollectionHarmonicTelemetry(
                 keyRange = "N/A",
-                dominantKey = CamelotKey.K8A,
-                averageBpm = 120f,
-                harmonicCohesionPercent = 100,
+                dominantKey = null,
+                averageBpm = null,
+                harmonicCohesionPercent = null,
                 trajectoryPoints = emptyList()
             )
         }
 
         val trajectory = calculateTrajectoryPoints(tracks)
         val telemetries = tracks.map { HarmonicKeyEngine.estimateTrackTelemetry(it) }
-        val avgBpm = telemetries.map { it.bpm }.average().toFloat()
+        val avgBpm = telemetries.mapNotNull { it.bpm }.takeIf { it.isNotEmpty() }?.average()?.toFloat()
 
         // Dominant key (mode of keys)
-        val dominantKey = telemetries.groupBy { it.key }
+        val dominantKey = telemetries.mapNotNull { it.key }.groupBy { it }
             .maxByOrNull { it.value.size }
-            ?.key ?: telemetries.first().key
+            ?.key
 
-        // Key span range
-        val keyNumbers = telemetries.map { it.key.number }.distinct().sorted()
-        val keyRange = if (keyNumbers.size == 1) {
-            "${dominantKey.code}"
-        } else {
-            "${keyNumbers.first()}${dominantKey.mode.code} - ${keyNumbers.last()}${dominantKey.mode.code}"
-        }
+        // List supplied keys rather than inventing the dominant mode for a mixed-mode span.
+        val keyRange = telemetries.mapNotNull { it.key }.distinct()
+            .sortedWith(compareBy<CamelotKey> { it.number }.thenBy { it.mode.code })
+            .joinToString(", ") { it.code }.ifBlank { "Unknown" }
 
         // Harmonic cohesion score across adjacent pairs
         val roadmap = calculateQueueRoadmap(tracks)
-        val cohesionScore = if (roadmap.isNotEmpty()) {
-            (roadmap.map { it.compatibilityScore }.average() * 100f).toInt().coerceIn(10, 100)
-        } else 100
+        val cohesionScore = roadmap.filter { it.relation != HarmonicRelation.Unknown }.takeIf { it.isNotEmpty() }?.let {
+            (it.map { slot -> slot.relation.score }.average() * 100f).toInt().coerceIn(0, 100)
+        }
 
         return CollectionHarmonicTelemetry(
             keyRange = keyRange,

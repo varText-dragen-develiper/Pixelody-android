@@ -1,5 +1,8 @@
 package com.pixelody.app.ui.components
 
+import com.pixelody.app.data.model.knownCode
+import com.pixelody.app.data.model.knownColor
+import com.pixelody.app.data.model.knownPercent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -195,7 +198,7 @@ fun HarmonicFlowHud(
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Text(
-                                text = "${deckA.key.code} -> ${deckB.key.code}",
+                                text = "${deckA.key.knownCode} -> ${deckB.key.knownCode}",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Black,
                                 color = if (isNearTransition) Color(0xFFF59E0B) else MaterialTheme.colorScheme.onSurface,
@@ -228,7 +231,7 @@ fun HarmonicFlowHud(
                     }
                 } else {
                     Text(
-                        text = "${deckA.key.code} • ${activeProfile.tag} • QUEUE END",
+                        text = "${deckA.key.knownCode} • ${activeProfile.tag} • QUEUE END",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -296,7 +299,7 @@ fun QueueSlotHarmonicRibbon(
             border = BorderStroke(0.5.dp, badgeColor.copy(alpha = 0.5f))
         ) {
             Text(
-                text = "${affinity.fromKey.code} -> ${affinity.toKey.code} • ${affinity.relation.title}",
+                text = "${affinity.fromKey.knownCode} -> ${affinity.toKey.knownCode} • ${affinity.relation.title}",
                 style = MaterialTheme.typography.labelSmall,
                 fontSize = 8.sp,
                 fontWeight = FontWeight.Bold,
@@ -320,7 +323,7 @@ fun QueueSlotHarmonicRibbon(
             Surface(
                 onClick = {
                     haptic.performConfirm()
-                    onInsertBridge(affinity.fromKey, affinity.toKey)
+                    if (affinity.fromKey != null && affinity.toKey != null) onInsertBridge(affinity.fromKey, affinity.toKey)
                 },
                 shape = RoundedCornerShape(4.dp),
                 color = Color(0xFFA78BFA).copy(alpha = 0.2f),
@@ -426,7 +429,7 @@ fun HarmonicTrajectorySparkline(
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                     )
                     Text(
-                        text = "${telemetry.dominantKey.code} · ${telemetry.harmonicCohesionPercent}% FLOW",
+                        text = "${telemetry.dominantKey.knownCode} · ${telemetry.harmonicCohesionPercent.knownPercent} FLOW",
                         style = MaterialTheme.typography.labelSmall,
                         fontSize = 8.5.sp,
                         fontWeight = FontWeight.Bold,
@@ -452,7 +455,7 @@ fun HarmonicTrajectorySparkline(
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                    if (displayPoints.size < 2) return@Canvas
+                    if (displayPoints.size < 2 || displayPoints.any { it.energyLevel == null }) return@Canvas
                     val stepX = size.width / (displayPoints.size - 1).coerceAtLeast(1)
                     val curvePath = Path()
                     val fillPath = Path()
@@ -460,7 +463,7 @@ fun HarmonicTrajectorySparkline(
                     val coordinates = displayPoints.mapIndexed { index, pt ->
                         val x = index * stepX
                         val availableH = size.height - 8.dp.toPx()
-                        val y = size.height - 4.dp.toPx() - (pt.energyLevel * availableH)
+                        val y = size.height - 4.dp.toPx() - (pt.energyLevel!! * availableH)
                         Offset(x, y)
                     }
 
@@ -507,7 +510,7 @@ fun HarmonicTrajectorySparkline(
                     // Draw each harmonic grain bead with subtle glow
                     coordinates.forEachIndexed { index, offset ->
                         val pt = displayPoints[index]
-                        val beadColor = if (pt.key.mode == CamelotMode.Major) Color(0xFF38BDF8) else Color(0xFFA78BFA)
+                        val beadColor = if (pt.key?.mode == CamelotMode.Major) Color(0xFF38BDF8) else Color(0xFFA78BFA)
 
                         // Outer halo
                         drawCircle(
@@ -743,24 +746,24 @@ fun HarmonicTrajectorySculptor(
                     )
 
                     // 2. Draw Current Queue Trajectory (Solid Gradient Curve + Key Pips)
-                    if (actualPoints.isNotEmpty()) {
+                    if (actualPoints.isNotEmpty() && actualPoints.all { it.energyLevel != null }) {
                         val actualPath = Path()
                         val actualStepX = w / (actualPoints.size - 1).coerceAtLeast(1)
 
                         actualPoints.forEachIndexed { i, pt ->
                             val ax = i * actualStepX
-                            val ay = h - (pt.energyLevel * h)
+                            val ay = h - (pt.energyLevel!! * h)
 
                             if (i == 0) actualPath.moveTo(ax, ay) else {
                                 val prevAx = (i - 1) * actualStepX
-                                val prevAy = h - (actualPoints[i - 1].energyLevel * h)
+                                val prevAy = h - (actualPoints[i - 1].energyLevel!! * h)
                                 val midAx = (prevAx + ax) / 2f
                                 actualPath.cubicTo(midAx, prevAy, midAx, ay, ax, ay)
                             }
 
                             // Key Node Pip
                             drawCircle(
-                                color = pt.key.harmonicColor,
+                                color = pt.key.knownColor,
                                 radius = 3.dp.toPx(),
                                 center = Offset(ax, ay)
                             )
@@ -769,7 +772,7 @@ fun HarmonicTrajectorySculptor(
                         drawPath(
                             path = actualPath,
                             brush = Brush.horizontalGradient(
-                                actualPoints.map { it.key.harmonicColor }
+                                actualPoints.map { it.key.knownColor }
                             ),
                             style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
                         )
@@ -853,19 +856,19 @@ fun CollectionHarmonicCardBadge(
                 modifier = Modifier
                     .size(5.dp)
                     .clip(CircleShape)
-                    .background(telemetry.dominantKey.harmonicColor)
+                    .background(telemetry.dominantKey.knownColor)
             )
             Text(
                 text = telemetry.keyRange,
                 style = MaterialTheme.typography.labelSmall,
                 fontSize = 7.5.sp,
                 fontWeight = FontWeight.Bold,
-                color = telemetry.dominantKey.harmonicColor
+                color = telemetry.dominantKey.knownColor
             )
         }
 
         Text(
-            text = "${telemetry.harmonicCohesionPercent}% Flow",
+            text = "${telemetry.harmonicCohesionPercent.knownPercent} Flow",
             style = MaterialTheme.typography.labelSmall,
             fontSize = 7.5.sp,
             fontWeight = FontWeight.Medium,

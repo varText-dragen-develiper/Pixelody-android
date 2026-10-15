@@ -111,7 +111,14 @@ data class Track(
     val streamUrl: String = "",
     val favorite: Boolean = false,
     val missing: Boolean = false,
-    val genre: String = ""
+    val genre: String = "",
+    val albumArtist: String? = null,
+    val discNumber: Int? = null,
+    val trackNumber: Int? = null,
+    val albumId: String? = null,
+    val recordingId: String? = null,
+    val musicalKey: String? = null,
+    val bpm: Float? = null
 )
 
 data class TrackPage(

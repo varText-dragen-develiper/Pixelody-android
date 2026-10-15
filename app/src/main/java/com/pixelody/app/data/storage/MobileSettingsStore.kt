@@ -50,12 +50,13 @@ class MobileSettingsStore(private val prefs: SharedPreferences) {
         val rawTheme = prefs.getString(KEY_THEME, null).orEmpty()
         // The theme was renamed before public release; keep older saved choices.
         val themeName = if (rawTheme == LEGACY_MARATHON_TERMINAL) PixelodyMobileTheme.BulkheadTerminal.name else rawTheme
-        return PixelodyMobileTheme.values().firstOrNull { it.name == themeName }
+        return PixelodyMobileTheme.selectableThemes.firstOrNull { it.name == themeName }
             ?: PixelodyMobileTheme.Studio
     }
 
     fun saveTheme(theme: PixelodyMobileTheme) {
-        prefs.edit().putString(KEY_THEME, theme.name).apply()
+        val selected = theme.takeIf { it in PixelodyMobileTheme.selectableThemes } ?: PixelodyMobileTheme.Studio
+        prefs.edit().putString(KEY_THEME, selected.name).apply()
     }
 
     fun resetTheme() {

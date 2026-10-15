@@ -1,5 +1,7 @@
 package com.pixelody.app.ui.components
 
+import com.pixelody.app.data.model.knownCode
+import com.pixelody.app.data.model.knownTitle
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -110,7 +112,7 @@ fun HarmonicDiggingRingLens(
     val haptic = LocalHapticFeedback.current
     var isExpanded by remember { mutableStateOf(false) }
 
-    val trackKey = currentTrack?.let { HarmonicKeyEngine.estimateTrackTelemetry(it).key } ?: CamelotKey.K8A
+    val trackKey = currentTrack?.let { HarmonicKeyEngine.estimateTrackTelemetry(it).key }
     val activeKey = selectedBaseKey ?: trackKey
 
     Surface(
@@ -161,7 +163,7 @@ fun HarmonicDiggingRingLens(
                             .background(if (selectedBaseKey != null) Color(0xFFA78BFA) else Color(0xFF71717A))
                     )
                     Text(
-                        text = if (selectedBaseKey != null) "HARMONIC LENS: ${activeKey.fullTitle}" else "HARMONIC CAMELOT DIGGING LENS",
+                        text = if (selectedBaseKey != null) "HARMONIC LENS: ${activeKey.knownTitle}" else "HARMONIC CAMELOT DIGGING LENS",
                         style = MaterialTheme.typography.labelSmall,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Black,
@@ -245,7 +247,7 @@ fun HarmonicDiggingRingLens(
                             border = BorderStroke(1.dp, Color(0xFF10B981))
                         ) {
                             Text(
-                                text = "MATCH NOW PLAYING (${trackKey.code})",
+                                text = "MATCH NOW PLAYING (${trackKey.knownCode})",
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontSize = 8.5.sp,

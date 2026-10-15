@@ -11,6 +11,7 @@ object FlowBrowseFilter {
     private val tempo = Regex("""\bBPM\s*:?\s*(\d{2,3}(?:\.\d+)?)\b|\b(\d{2,3}(?:\.\d+)?)\s*BPM\b""", RegexOption.IGNORE_CASE)
 
     fun knownKey(track: Track): CamelotKey? {
+        track.musicalKey?.let { HarmonicKeyEngine.parseKey(it) }?.let { return it }
         val fields = listOf(track.format, track.title, track.album)
         return fields.firstNotNullOfOrNull { raw ->
             HarmonicKeyEngine.parseKey(raw) ?: camelot.find(raw)?.let {
@@ -19,7 +20,8 @@ object FlowBrowseFilter {
         }
     }
 
-    fun knownBpm(track: Track): Float? = listOf(track.format, track.title, track.album)
+    fun knownBpm(track: Track): Float? = track.bpm?.takeIf { it.isFinite() && it in 20f..300f }
+        ?: listOf(track.format, track.title, track.album)
         .firstNotNullOfOrNull { raw -> tempo.find(raw)?.let { match ->
             (match.groupValues[1].ifBlank { match.groupValues[2] }).toFloatOrNull()
                 ?.takeIf { it in 20f..300f }

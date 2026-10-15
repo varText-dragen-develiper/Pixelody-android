@@ -8,7 +8,8 @@ import kotlinx.coroutines.flow.asStateFlow
 data class DismissedQueueEntry(
     val track: Track,
     val index: Int,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val entryId: String? = null
 )
 
 data class QueueUndoState(
@@ -23,8 +24,8 @@ class QueueUndoManager {
 
     private val undoStack = mutableListOf<DismissedQueueEntry>()
 
-    fun recordDismissal(track: Track, index: Int) {
-        val entry = DismissedQueueEntry(track, index)
+    fun recordDismissal(track: Track, index: Int, entryId: String? = null) {
+        val entry = DismissedQueueEntry(track, index, entryId = entryId)
         undoStack.add(entry)
         _undoState.value = QueueUndoState(
             lastDismissed = entry,

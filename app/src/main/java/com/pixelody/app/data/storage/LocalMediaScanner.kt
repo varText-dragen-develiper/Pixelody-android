@@ -12,6 +12,7 @@ import android.provider.MediaStore
 import android.provider.OpenableColumns
 import androidx.documentfile.provider.DocumentFile
 import com.pixelody.app.data.model.Track
+import com.pixelody.app.core.playback.AlbumSequenceMetadata
 import java.io.File
 import java.security.MessageDigest
 import java.util.Locale
@@ -23,7 +24,10 @@ data class LocalTechnicalMetadata(
     val bitrate: Int? = null,
     val channels: Int = 0,
     val embeddedArtwork: ByteArray? = null,
-    val genre: String = ""
+    val genre: String = "",
+    val albumArtist: String? = null,
+    val discNumber: Int? = null,
+    val trackNumber: Int? = null
 )
 
 fun isLocalTrack(track: Track?): Boolean {
@@ -45,7 +49,8 @@ fun scanEntireDeviceForAudio(context: Context): List<Track> {
         MediaStore.Audio.Media.DURATION,
         MediaStore.Audio.Media.MIME_TYPE,
         MediaStore.Audio.Media.DISPLAY_NAME,
-        MediaStore.Audio.Media.ALBUM_ID
+        MediaStore.Audio.Media.ALBUM_ID,
+        MediaStore.Audio.Media.TRACK
     )
     val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 OR ${MediaStore.Audio.Media.DURATION} > 10000"
     val sortOrder = "${MediaStore.Audio.Media.TITLE} ASC"
@@ -60,6 +65,7 @@ fun scanEntireDeviceForAudio(context: Context): List<Track> {
             val mimeCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.MIME_TYPE)
             val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DISPLAY_NAME)
             val albumIdCol = cursor.getColumnIndex(MediaStore.Audio.Media.ALBUM_ID)
+            val trackCol = cursor.getColumnIndex(MediaStore.Audio.Media.TRACK)
 
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idCol)
@@ -67,13 +73,14 @@ fun scanEntireDeviceForAudio(context: Context): List<Track> {
                 val title = cursor.getString(titleCol)?.takeIf { it.isNotBlank() }
                     ?: cursor.getString(nameCol)?.substringBeforeLast('.')
                     ?: "Track $id"
-                val artist = cursor.getString(artistCol)?.takeIf { it.isNotBlank() && it != "<unknown>" } ?: "On this phone"
-                val album = cursor.getString(albumCol)?.takeIf { it.isNotBlank() && it != "<unknown>" } ?: "Device files"
+                val artist = cursor.getString(artistCol)?.takeIf { it.isNotBlank() && it != "<unknown>" }.orEmpty()
+                val album = cursor.getString(albumCol)?.takeIf { it.isNotBlank() && it != "<unknown>" }.orEmpty()
                 val durationMs = cursor.getLong(durationCol)
                 val durationSeconds = (durationMs / 1000L).toInt()
                 val mimeType = cursor.getString(mimeCol).orEmpty()
                 val format = mimeType.substringAfterLast('/').uppercase(Locale.US).ifBlank { "AUDIO" }
                 val albumId = if (albumIdCol >= 0) cursor.getLong(albumIdCol) else -1L
+                val packedTrack = if (trackCol >= 0 && !cursor.isNull(trackCol)) cursor.getInt(trackCol) else 0
                 val artworkUri = if (albumId > 0) {
                     ContentUris.withAppendedId(Uri.parse("content://media/external/audio/albumart"), albumId).toString()
                 } else null
@@ -101,7 +108,11 @@ fun scanEntireDeviceForAudio(context: Context): List<Track> {
                         streamUrl = contentUri.toString(),
                         favorite = false,
                         missing = false,
-                        genre = localMetadata.genre
+                        genre = localMetadata.genre,
+                        albumArtist = localMetadata.albumArtist,
+                        discNumber = localMetadata.discNumber ?: (packedTrack / 1000).takeIf { it > 0 },
+                        trackNumber = localMetadata.trackNumber ?: (packedTrack % 1000).takeIf { it > 0 },
+                        albumId = albumId.takeIf { it > 0 }?.let { "mediastore:external:$it" }
                     )
                 )
             }
@@ -143,8 +154,8 @@ fun scanFolderForTracks(context: Context, treeUri: Uri): List<Track> {
 
 fun localTrackFromUri(context: Context, uri: Uri): Track? {
     var title = context.displayNameFor(uri).substringBeforeLast('.')
-    var artist = "On this phone"
-    var album = "Device files"
+    var artist = ""
+    var album = ""
     var durationSeconds = 0
     var format = uri.toString().substringAfterLast('.', "").uppercase(Locale.US)
     var sampleRate = 0
@@ -204,7 +215,9 @@ fun localTrackFromUri(context: Context, uri: Uri): Track? {
         streamUrl = uri.toString(),
         favorite = false,
         missing = false,
-        genre = technicalMetadata.genre
+        genre = technicalMetadata.genre,
+        albumArtist = technicalMetadata.albumArtist, discNumber = technicalMetadata.discNumber,
+        trackNumber = technicalMetadata.trackNumber
     )
 }
 
@@ -269,7 +282,10 @@ fun readLocalTechnicalMetadata(context: Context, uri: Uri): LocalTechnicalMetada
                     ?.takeIf { it > 0 },
                 channels = channels,
                 embeddedArtwork = retriever.embeddedPicture,
-                genre = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_GENRE).orEmpty()
+                genre = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_GENRE).orEmpty(),
+                albumArtist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST)?.takeIf { it.isNotBlank() && it != "<unknown>" },
+                discNumber = AlbumSequenceMetadata.parsePosition(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DISC_NUMBER)),
+                trackNumber = AlbumSequenceMetadata.parsePosition(retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER))
             )
         } finally {
             retriever.release()

@@ -15,11 +15,11 @@ data class HarmonicGpsStep(
     val stepIndex: Int,
     val fromTrack: Track,
     val toTrack: Track,
-    val fromKey: CamelotKey,
-    val toKey: CamelotKey,
+    val fromKey: CamelotKey?,
+    val toKey: CamelotKey?,
     val relation: HarmonicRelation,
     val modulationType: String,
-    val bpmDelta: Float,
+    val bpmDelta: Float?,
     val recommendedCurve: DjTransitionCurve,
     val transitionAdvice: String
 )
@@ -34,7 +34,7 @@ data class HarmonicGpsRoute(
     val steps: List<HarmonicGpsStep>,
     val totalHops: Int,
     val averageHarmonicCohesionScore: Float,
-    val tempoProgressionStability: Float,
+    val tempoProgressionStability: Float?,
     val estimatedJourneyDurationSeconds: Int
 )
 
@@ -64,8 +64,9 @@ object HarmonicGpsEngine {
         pool: List<Track>,
         maxHops: Int = 5
     ): HarmonicGpsRoute? {
+        if (HarmonicKeyEngine.estimateTrackTelemetry(origin).key == null ||
+            HarmonicKeyEngine.estimateTrackTelemetry(destination).key == null) return null
         if (origin.id == destination.id) {
-            val originTel = HarmonicKeyEngine.estimateTrackTelemetry(origin)
             return HarmonicGpsRoute(
                 originTrack = origin,
                 destinationTrack = destination,
@@ -73,7 +74,7 @@ object HarmonicGpsEngine {
                 steps = emptyList(),
                 totalHops = 0,
                 averageHarmonicCohesionScore = 1.0f,
-                tempoProgressionStability = 1.0f,
+                tempoProgressionStability = null,
                 estimatedJourneyDurationSeconds = origin.durationSeconds
             )
         }
@@ -82,7 +83,7 @@ object HarmonicGpsEngine {
         val nodeMap = mutableMapOf<String, Track>()
         nodeMap[origin.id] = origin
         nodeMap[destination.id] = destination
-        pool.filterNot { it.missing || it.streamUrl.isBlank() }.forEach { nodeMap[it.id] = it }
+        pool.filterNot { it.missing || it.streamUrl.isBlank() || HarmonicKeyEngine.estimateTrackTelemetry(it).key == null }.forEach { nodeMap[it.id] = it }
 
         val allNodes = nodeMap.values.toList()
         val telemetryCache = allNodes.associate { it.id to HarmonicKeyEngine.estimateTrackTelemetry(it) }
@@ -156,10 +157,10 @@ object HarmonicGpsEngine {
     private fun calculateEdgeCost(
         trackA: Track,
         trackB: Track,
-        keyA: CamelotKey,
-        keyB: CamelotKey,
-        bpmA: Float,
-        bpmB: Float
+        keyA: CamelotKey?,
+        keyB: CamelotKey?,
+        bpmA: Float?,
+        bpmB: Float?
     ): Float {
         val relation = HarmonicKeyEngine.calculateHarmonicRelation(keyA, keyB)
         var cost = (1.0f - relation.score) * 100f
@@ -169,8 +170,10 @@ object HarmonicGpsEngine {
         }
 
         // BPM difference penalty
-        val bpmDiff = abs(bpmA - bpmB)
-        cost += (bpmDiff * 0.75f).coerceAtMost(35f)
+        if (bpmA != null && bpmB != null) {
+            val bpmDiff = abs(bpmA - bpmB)
+            cost += (bpmDiff * 0.75f).coerceAtMost(35f)
+        }
 
         // Artist anti-clump penalty
         if (trackA.artist.isNotBlank() && trackA.artist.equals(trackB.artist, ignoreCase = true)) {
@@ -183,7 +186,8 @@ object HarmonicGpsEngine {
         return cost
     }
 
-    private fun calculateKeyHeuristic(currentKey: CamelotKey, destKey: CamelotKey): Float {
+    private fun calculateKeyHeuristic(currentKey: CamelotKey?, destKey: CamelotKey?): Float {
+        if (currentKey == null || destKey == null) return 0f
         if (currentKey == destKey) return 0f
         val numDiff = abs(currentKey.number - destKey.number)
         val circularDiff = minOf(numDiff, 12 - numDiff)
@@ -254,13 +258,14 @@ object HarmonicGpsEngine {
             )
             steps.add(step)
             totalCohesion += analysis.overallCompatibilityScore
-            totalBpmDelta += abs(analysis.bpmDelta)
+            totalBpmDelta += analysis.bpmDelta?.let { abs(it) } ?: 0f
         }
 
         val stepCount = steps.size.coerceAtLeast(1)
         val avgCohesion = totalCohesion / stepCount.toFloat()
-        val avgBpmDelta = totalBpmDelta / stepCount.toFloat()
-        val tempoStability = (1.0f - (avgBpmDelta / 20f)).coerceIn(0.2f, 1.0f)
+        val knownTempoSteps = steps.count { it.bpmDelta != null }
+        val tempoStability = if (knownTempoSteps == 0) null else
+            (1.0f - (totalBpmDelta / knownTempoSteps / 20f)).coerceIn(0.2f, 1.0f)
         val totalDuration = waypoints.sumOf { it.durationSeconds }
 
         return HarmonicGpsRoute(
@@ -275,8 +280,10 @@ object HarmonicGpsEngine {
         )
     }
 
-    private fun determineModulationLabel(keyA: CamelotKey, keyB: CamelotKey, relation: HarmonicRelation): String {
+    private fun determineModulationLabel(keyA: CamelotKey?, keyB: CamelotKey?, relation: HarmonicRelation): String {
+        if (keyA == null || keyB == null) return "Key unavailable"
         return when (relation) {
+            HarmonicRelation.Unknown -> "Key unavailable"
             HarmonicRelation.ExactMatch -> "Direct Harmonic Match (Same Key)"
             HarmonicRelation.RelativeMajorMinor -> if (keyB.mode == CamelotMode.Major) "Relative Major Shift" else "Relative Minor Shift"
             HarmonicRelation.AdjacentStep -> {

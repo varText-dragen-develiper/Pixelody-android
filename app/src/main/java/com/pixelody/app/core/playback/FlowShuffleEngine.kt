@@ -13,12 +13,14 @@ import kotlin.random.Random
  */
 enum class FlowShuffleMode(val displayName: String, val badge: String) {
     Off("Shuffle Off", "Off"),
+    Balanced("Balanced Shuffle", "Balanced"),
     SmartFlow("Flow Shuffle", "Flow"),
     AlbumPreserving("Album Shuffle", "Album"),
     PureRandom("Pure Random", "Random");
 
     fun next(): FlowShuffleMode = when (this) {
-        Off -> SmartFlow
+        Off -> Balanced
+        Balanced -> SmartFlow
         SmartFlow -> AlbumPreserving
         AlbumPreserving -> PureRandom
         PureRandom -> Off
@@ -58,7 +60,7 @@ object FlowShuffleEngine {
         // its original media items, so real track IDs and metadata never change.
         val positions = aliases.associate { it.id to it.id.removePrefix("flow-occurrence-").toInt() }
         val planned = planQueue(currentTrack?.copy(id = "flow-current-anchor"), aliases, mode,
-            aliases.size, random, checkActive).mapNotNull { positions[it.track.id] }
+            aliases.size, random, checkActive = checkActive).mapNotNull { positions[it.track.id] }
         val plannedSet = planned.toSet()
         return planned + upcoming.indices.filterNot { it in plannedSet }
     }
@@ -77,6 +79,7 @@ object FlowShuffleEngine {
                 com.pixelody.app.data.model.HarmonicRelation.EnergyBoost -> 2
                 com.pixelody.app.data.model.HarmonicRelation.EnergyDrop -> 1
                 com.pixelody.app.data.model.HarmonicRelation.DissonantClash -> -3
+                com.pixelody.app.data.model.HarmonicRelation.Unknown -> 0
             }
         }
         return 0
@@ -98,18 +101,6 @@ object FlowShuffleEngine {
     }
 
     /**
-     * Groups tracks into cohesive album units for Album-Preserving Shuffle.
-     */
-    private fun groupAlbumUnits(tracks: List<Track>): List<List<Track>> {
-        val map = linkedMapOf<String, MutableList<Track>>()
-        for (track in tracks) {
-            val key = if (track.album.isNotBlank()) "${normalize(track.artist)} / ${normalize(track.album)}" else "id:${track.id}"
-            map.getOrPut(key) { mutableListOf() }.add(track)
-        }
-        return map.values.toList()
-    }
-
-    /**
      * Plans a shuffled queue from a pool of tracks according to the requested mode.
      */
     fun planQueue(
@@ -118,11 +109,12 @@ object FlowShuffleEngine {
         mode: FlowShuffleMode,
         horizon: Int = 50,
         random: Random = Random.Default,
+        preserveOccurrences: Boolean = false,
         checkActive: () -> Unit = {}
     ): List<ShuffledTrackEntry> {
         if (horizon <= 0) return emptyList()
-        val candidates = pool.filterNot { it.missing || it.streamUrl.isBlank() || it.id == currentTrack?.id }
-            .distinctBy { it.id }
+        val playable = pool.filterNot { it.missing || it.streamUrl.isBlank() || (!preserveOccurrences && it.id == currentTrack?.id) }
+        val candidates = if (preserveOccurrences) playable else playable.distinctBy { it.id }
         if (candidates.isEmpty()) return emptyList()
 
         return when (mode) {
@@ -139,17 +131,17 @@ object FlowShuffleEngine {
             }
 
             FlowShuffleMode.AlbumPreserving -> {
-                val groups = groupAlbumUnits(candidates).shuffled(random).toMutableList()
+                val units = AlbumSequenceMetadata.units(candidates)
+                val groups = units.map { it.tracks }.shuffled(random).toMutableList()
                 // Finish the current album before switching to a randomly chosen album.
                 val currentGroup = groups.indexOfFirst { group -> currentTrack != null &&
-                    currentTrack.album.isNotBlank() && normalize(group.first().album) == normalize(currentTrack.album) &&
-                    normalize(group.first().artist) == normalize(currentTrack.artist) }
+                    AlbumSequenceMetadata.identity(group.first()) == AlbumSequenceMetadata.identity(currentTrack) }
                 if (currentGroup >= 0) groups.add(0, groups.removeAt(currentGroup))
                 val result = mutableListOf<ShuffledTrackEntry>()
                 groups.forEach { albumTracks ->
                     albumTracks.forEachIndexed { i, track ->
                         val cue = if (i == 0 && albumTracks.size > 1) {
-                            TransitionCue("Album Run", "${track.album} (${albumTracks.size} tracks)")
+                            TransitionCue("Album Run", "${track.album} (${albumTracks.size} tracks; ${units.first { it.identity == AlbumSequenceMetadata.identity(track) }.orderSource})")
                         } else null
                         result.add(ShuffledTrackEntry(track, cue))
                     }
@@ -157,7 +149,7 @@ object FlowShuffleEngine {
                 result.take(horizon)
             }
 
-            FlowShuffleMode.SmartFlow -> {
+            FlowShuffleMode.SmartFlow, FlowShuffleMode.Balanced -> {
                 val available = candidates.shuffled(random).toMutableList()
                 val sequence = mutableListOf<Track>()
                 val result = mutableListOf<ShuffledTrackEntry>()
@@ -168,10 +160,8 @@ object FlowShuffleEngine {
                     FlowBrowseFilter.knownKey(it) }
                 val genreScores = mutableMapOf<Pair<String?, String>, Int>()
 
-                var step = 0
                 while (available.isNotEmpty() && result.size < horizon) {
                     checkActive()
-                    step++
                     var bestCandidateIndex = 0
                     var bestScore = Int.MIN_VALUE
                     var bestCue: TransitionCue? = null
@@ -187,16 +177,14 @@ object FlowShuffleEngine {
                         val genrePoints = genreScores.getOrPut(previous?.genre to cand.genre) {
                             GenreTaxonomyEngine.genreAffinityScore(previous?.genre, cand.genre)
                         }
-                        val qualityPoints = if (cand.lossless) 3 else 0
                         val randomJitter = random.nextInt(4)
 
-                        val totalScore = divPoints + keyPoints + genrePoints + qualityPoints + randomJitter
+                        val totalScore = divPoints + keyPoints + genrePoints + randomJitter
 
                         if (totalScore > bestScore) {
                             bestScore = totalScore
                             bestCandidateIndex = i
                             val badge = when {
-                                cand.lossless && step % 4 == 0 -> "Lossless Flow"
                                 genrePoints >= 6 -> "Genre Match (${GenreTaxonomyEngine.canonicalize(cand.genre)})"
                                 keyPoints > 0 -> {
                                     val key = keys[cand.id]

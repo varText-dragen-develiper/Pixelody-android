@@ -36,11 +36,7 @@ class MediaStoreAudioRepository(
         _scanStatus.value = "Indexing device storage for audio files..."
         try {
             val scanned = scanEntireDeviceForAudio(context)
-            val enriched = scanned.map { track ->
-                // Ensure Camelot key and BPM are estimated if not already populated
-                val tele = HarmonicKeyEngine.estimateTrackTelemetry(track)
-                track
-            }
+            val enriched = scanned
 
             _scannedTracks.value = enriched
             _totalLosslessCount.value = enriched.count { it.lossless }

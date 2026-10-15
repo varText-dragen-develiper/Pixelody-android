@@ -1,0 +1,263 @@
+{
+  "policyVersion": "universal-shuffle-v2.1",
+  "generatedFrom": "https://github.com/varText-dragen-develiper/pixelody/blob/main/src/shuffle/universal.js#normalizeEntry",
+  "vectors": [
+    {
+      "track": {
+        "id": "track:unknown",
+        "title": "A real song",
+        "artist": "  ÉCOLE  東京 ",
+        "album": "",
+        "format": "FLAC"
+      },
+      "entryId": "entry:0",
+      "sourceIndex": 0,
+      "expected": {
+        "entryId": "entry:0",
+        "trackId": "track:unknown",
+        "recordingId": null,
+        "artistId": "École 東京",
+        "albumArtistId": null,
+        "albumId": null,
+        "sourceIndex": 0,
+        "discNumber": null,
+        "trackNumber": null,
+        "available": true,
+        "genreId": null,
+        "contextTags": [],
+        "features": {
+          "tempo": {
+            "value": null,
+            "provenance": "unknown",
+            "version": 1,
+            "confidencePermille": null,
+            "unit": "milli-bpm"
+          },
+          "energy": {
+            "value": null,
+            "provenance": "unknown",
+            "version": 1,
+            "confidencePermille": null,
+            "unit": "permille"
+          },
+          "key": {
+            "value": null,
+            "provenance": "unknown",
+            "version": 1,
+            "confidencePermille": null,
+            "unit": "pitch-class-mode"
+          }
+        }
+      }
+    },
+    {
+      "track": {
+        "id": "track:known",
+        "title": "Song",
+        "artist": "Performer",
+        "album": "Café",
+        "albumArtist": "Various Artists",
+        "discNumber": 2,
+        "trackNumber": 3,
+        "musicalKey": "C♭ major",
+        "bpm": 123.4565
+      },
+      "entryId": "entry:1",
+      "sourceIndex": 1,
+      "expected": {
+        "entryId": "entry:1",
+        "trackId": "track:known",
+        "recordingId": null,
+        "artistId": "performer",
+        "albumArtistId": "various artists",
+        "albumId": "[\"various artists\",\"café\"]",
+        "sourceIndex": 1,
+        "discNumber": 2,
+        "trackNumber": 3,
+        "available": true,
+        "genreId": null,
+        "contextTags": [],
+        "features": {
+          "tempo": {
+            "value": 123457,
+            "provenance": "tagged",
+            "version": 1,
+            "confidencePermille": 1000,
+            "unit": "milli-bpm"
+          },
+          "energy": {
+            "value": null,
+            "provenance": "unknown",
+            "version": 1,
+            "confidencePermille": null,
+            "unit": "permille"
+          },
+          "key": {
+            "value": {
+              "pitchClass": 11,
+              "mode": "major"
+            },
+            "provenance": "tagged",
+            "version": 1,
+            "confidencePermille": 1000,
+            "unit": "pitch-class-mode"
+          }
+        }
+      }
+    },
+    {
+      "track": {
+        "id": "track:explicit",
+        "title": "Song",
+        "artist": "Performer",
+        "album": "Album",
+        "albumArtist": "Various",
+        "albumId": "album:id/α",
+        "recordingId": "recording:id",
+        "discNumber": 1,
+        "trackNumber": 2,
+        "musicalKey": "F#m",
+        "bpm": 128.25,
+        "genre": " ELECTRONIC "
+      },
+      "entryId": "entry:2",
+      "sourceIndex": 2,
+      "expected": {
+        "entryId": "entry:2",
+        "trackId": "track:explicit",
+        "recordingId": "recording:id",
+        "artistId": "performer",
+        "albumArtistId": "various",
+        "albumId": "album:id/α",
+        "sourceIndex": 2,
+        "discNumber": 1,
+        "trackNumber": 2,
+        "available": true,
+        "genreId": "electronic",
+        "contextTags": [],
+        "features": {
+          "tempo": {
+            "value": 128250,
+            "provenance": "tagged",
+            "version": 1,
+            "confidencePermille": 1000,
+            "unit": "milli-bpm"
+          },
+          "energy": {
+            "value": null,
+            "provenance": "unknown",
+            "version": 1,
+            "confidencePermille": null,
+            "unit": "permille"
+          },
+          "key": {
+            "value": {
+              "pitchClass": 6,
+              "mode": "minor"
+            },
+            "provenance": "tagged",
+            "version": 1,
+            "confidencePermille": 1000,
+            "unit": "pitch-class-mode"
+          }
+        }
+      }
+    },
+    {
+      "track": {
+        "id": "track:invalid",
+        "title": "Invalid tags",
+        "artist": "",
+        "album": "",
+        "musicalKey": "H minor",
+        "bpm": 0
+      },
+      "entryId": "entry:3",
+      "sourceIndex": 3,
+      "expected": {
+        "entryId": "entry:3",
+        "trackId": "track:invalid",
+        "recordingId": null,
+        "artistId": null,
+        "albumArtistId": null,
+        "albumId": null,
+        "sourceIndex": 3,
+        "discNumber": null,
+        "trackNumber": null,
+        "available": true,
+        "genreId": null,
+        "contextTags": [],
+        "features": {
+          "tempo": {
+            "value": null,
+            "provenance": "unknown",
+            "version": 1,
+            "confidencePermille": null,
+            "unit": "milli-bpm"
+          },
+          "energy": {
+            "value": null,
+            "provenance": "unknown",
+            "version": 1,
+            "confidencePermille": null,
+            "unit": "permille"
+          },
+          "key": {
+            "value": null,
+            "provenance": "unknown",
+            "version": 1,
+            "confidencePermille": null,
+            "unit": "pitch-class-mode"
+          }
+        }
+      }
+    },
+    {
+      "track": {
+        "id": "track:k-prefix",
+        "title": "Unsupported key tag",
+        "musicalKey": "K8A",
+        "bpm": 120
+      },
+      "entryId": "entry:4",
+      "sourceIndex": 4,
+      "expected": {
+        "entryId": "entry:4",
+        "trackId": "track:k-prefix",
+        "recordingId": null,
+        "artistId": null,
+        "albumArtistId": null,
+        "albumId": null,
+        "sourceIndex": 4,
+        "discNumber": null,
+        "trackNumber": null,
+        "available": true,
+        "genreId": null,
+        "contextTags": [],
+        "features": {
+          "tempo": {
+            "value": 120000,
+            "provenance": "tagged",
+            "version": 1,
+            "confidencePermille": 1000,
+            "unit": "milli-bpm"
+          },
+          "energy": {
+            "value": null,
+            "provenance": "unknown",
+            "version": 1,
+            "confidencePermille": null,
+            "unit": "permille"
+          },
+          "key": {
+            "value": null,
+            "provenance": "unknown",
+            "version": 1,
+            "confidencePermille": null,
+            "unit": "pitch-class-mode"
+          }
+        }
+      }
+    }
+  ]
+}

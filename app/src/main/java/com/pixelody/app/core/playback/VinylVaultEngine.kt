@@ -36,8 +36,8 @@ object VinylVaultEngine {
                 title = customTitle ?: "Empty Session",
                 recordedAtEpochMs = timestampMs,
                 timeOfDayLabel = "Midnight Drift",
-                dominantKey = CamelotKey.K8A,
-                averageBpm = 120f,
+                dominantKey = null,
+                averageBpm = null,
                 totalTracks = 0,
                 tracks = emptyList(),
                 atmosphereTag = "Ambient Neutral"
@@ -45,11 +45,11 @@ object VinylVaultEngine {
         }
 
         val telemetries = sessionTracks.map { HarmonicKeyEngine.estimateTrackTelemetry(it) }
-        val avgBpm = telemetries.map { it.bpm }.average().toFloat()
+        val avgBpm = telemetries.mapNotNull { it.bpm }.takeIf { it.isNotEmpty() }?.average()?.toFloat()
 
-        val dominantKey = telemetries.groupBy { it.key }
+        val dominantKey = telemetries.mapNotNull { it.key }.groupBy { it }
             .maxByOrNull { it.value.size }
-            ?.key ?: telemetries.first().key
+            ?.key
 
         val cal = Calendar.getInstance().apply { timeInMillis = timestampMs }
         val hour = cal.get(Calendar.HOUR_OF_DAY)
@@ -63,13 +63,14 @@ object VinylVaultEngine {
         }
 
         val atmosphere = when {
+            avgBpm == null -> "Tempo unavailable"
             avgBpm >= 126f -> "High-Energy Peak"
             avgBpm >= 115f -> "Groove & Movement"
             avgBpm >= 95f -> "Mellow Warmth"
             else -> "Deep Downtempo"
         }
 
-        val title = customTitle ?: "$timeOfDay • ${sessionTracks.first().artist.ifBlank { dominantKey.code }}"
+        val title = customTitle ?: "$timeOfDay • ${sessionTracks.first().artist.ifBlank { dominantKey?.code ?: "Unknown" }}"
 
         return TemporalSonicCapsule(
             id = "capsule_${timestampMs}_${sessionTracks.size}",

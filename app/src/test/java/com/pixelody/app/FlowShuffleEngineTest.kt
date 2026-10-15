@@ -155,7 +155,8 @@ class FlowShuffleEngineTest {
 
     @Test
     fun testShuffleModeNextCycle() {
-        assertEquals(FlowShuffleMode.SmartFlow, FlowShuffleMode.Off.next())
+        assertEquals(FlowShuffleMode.Balanced, FlowShuffleMode.Off.next())
+        assertEquals(FlowShuffleMode.SmartFlow, FlowShuffleMode.Balanced.next())
         assertEquals(FlowShuffleMode.AlbumPreserving, FlowShuffleMode.SmartFlow.next())
         assertEquals(FlowShuffleMode.PureRandom, FlowShuffleMode.AlbumPreserving.next())
         assertEquals(FlowShuffleMode.Off, FlowShuffleMode.PureRandom.next())

@@ -122,7 +122,7 @@ class HarmonicFlowCoordinatorTest {
         assertEquals("1", optimized[0].id) // Anchor preserved
 
         // Second track should be a harmonic match to 8A (8B or 9A, not 2A)
-        val secondTrackKey = HarmonicKeyEngine.estimateTrackTelemetry(optimized[1]).key.code
+        val secondTrackKey = HarmonicKeyEngine.estimateTrackTelemetry(optimized[1]).key!!.code
         assertTrue(secondTrackKey in listOf("8B", "9A", "7A"))
     }
 
@@ -161,7 +161,7 @@ class HarmonicFlowCoordinatorTest {
         assertEquals(3, points.size)
 
         assertEquals("1", points[0].trackId)
-        assertTrue(points[0].energyLevel in 0.1f..1.0f)
-        assertTrue(points[0].normalizedWheelPosition in 0f..1f)
+        assertTrue(points[0].energyLevel!! in 0.1f..1.0f)
+        assertTrue(points[0].normalizedWheelPosition!! in 0f..1f)
     }
 }

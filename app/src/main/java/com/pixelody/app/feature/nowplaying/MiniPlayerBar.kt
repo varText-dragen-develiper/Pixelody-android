@@ -1,5 +1,6 @@
 package com.pixelody.app.feature.nowplaying
 
+import com.pixelody.app.data.model.knownCode
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween

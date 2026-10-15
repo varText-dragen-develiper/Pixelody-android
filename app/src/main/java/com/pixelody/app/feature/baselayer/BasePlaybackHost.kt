@@ -16,6 +16,7 @@ import android.content.ComponentName
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
@@ -37,14 +38,17 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
-import com.pixelody.app.core.analytics.SessionCapsuleEngine
-import com.pixelody.app.core.analytics.SonicCapsuleTimelineEngine
+import com.pixelody.app.core.analytics.ListeningLedgerStore
+import com.pixelody.app.core.analytics.ListeningLedgerSnapshot
+import com.pixelody.app.core.analytics.ListeningLedgerProjection
 import com.pixelody.app.core.playback.AcousticTimbreEngine
 import com.pixelody.app.data.storage.LoudnessNormalizationMode
 import androidx.media3.common.Timeline
 import androidx.media3.session.MediaController
+import androidx.media3.session.SessionResult
 import androidx.media3.session.SessionToken
 import com.pixelody.app.core.playback.PixelodyPlaybackService
+import com.pixelody.app.core.playback.PlaybackEvidenceMetadata
 import com.pixelody.app.core.playback.playbackFailure
 import com.pixelody.app.core.lyrics.LyricsDocument
 import com.pixelody.app.core.lyrics.LyricsRepository
@@ -75,7 +79,9 @@ import com.pixelody.app.data.storage.localTrackFromUri
 import com.pixelody.app.core.playback.mediaMimeType
 import com.pixelody.app.core.playback.rebaseRemoteMediaUrl
 import com.pixelody.app.core.playback.FlowShuffleMode
-import com.pixelody.app.core.playback.FlowShuffleEngine
+import com.pixelody.app.core.shuffle.UniversalShuffleMetadata
+import com.pixelody.app.data.storage.ShuffleScopeIdentityStore
+import androidx.media3.session.SessionCommand
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
 import com.pixelody.app.data.model.EqualizerPreset
@@ -97,6 +103,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.time.ZoneId
+import java.util.UUID
 
 /**
  * Builds a Media3 [MediaItem] from a [Track] entity for playback in the base layer.
@@ -121,19 +130,29 @@ fun baseMediaItemFor(
         track.format.isNotBlank() -> track.format.uppercase()
         else -> "HI-RES"
     }
+    val evidence = Bundle().apply {
+        putLong(PlaybackEvidenceMetadata.DURATION_MS, track.durationSeconds.toLong().coerceAtLeast(0) * 1000)
+        putString(PlaybackEvidenceMetadata.FORMAT, track.format)
+        putBoolean(PlaybackEvidenceMetadata.LOSSLESS, track.lossless)
+        putBoolean(PlaybackEvidenceMetadata.PERSONAL, true)
+    }
     val metadata = MediaMetadata.Builder()
         .setTitle(track.title)
         .setArtist(track.artist)
         .setAlbumTitle(track.album)
+        .setAlbumArtist(track.albumArtist)
+        .setDiscNumber(track.discNumber)
+        .setTrackNumber(track.trackNumber)
         .setSubtitle(formatDisplay)
         .setArtworkUri(artworkUrl?.let(Uri::parse))
+        .setExtras(evidence)
         .build()
-    return MediaItem.Builder()
+    return PlaybackEvidenceMetadata.withEntry(MediaItem.Builder()
         .setUri(streamUrl)
         .setMimeType(mediaMimeType(track.format))
         .setMediaId(track.id)
         .setMediaMetadata(metadata)
-        .build()
+        .build())
 }
 
 /** Explicit rather than relying on RepeatMode's ordinals happening to match Media3's. */
@@ -153,11 +172,6 @@ private fun playerRepeatModeFor(mode: RepeatMode): Int = when (mode) {
  * - Offline media cache from [OfflineMediaStore]
  * - Playback and cold-start state from [MobileSettingsStore]
  */
-/** Below this, a play is a mis-tap rather than a listen and is not recorded. */
-private const val MIN_RECORDED_LISTEN_MS = 5_000L
-private const val LISTEN_TICK_MS = 1_000L
-private const val COMPLETION_FRACTION = 0.9f
-
 @Composable
 fun BasePlaybackHost(
     repository: HostRepository = remember { HostRepository(FakePixelodyHost()) },
@@ -187,13 +201,50 @@ fun BasePlaybackHost(
     val coverStore = remember { CoverStore(context.applicationContext) }
     val equalizerStore = remember { MobileEqualizerStore(context.applicationContext) }
     val persistenceRepository = remember { PixelodyPersistenceRepository(context.applicationContext) }
-    val sessionCapsuleEngine = remember { SessionCapsuleEngine() }
-    val sonicTimelineEngine = remember { SonicCapsuleTimelineEngine() }
+    var listeningSnapshot by remember { mutableStateOf(ListeningLedgerSnapshot()) }
+    var listeningNow by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        val ledger = withContext(Dispatchers.IO) {
+            ListeningLedgerStore(File(context.filesDir, "universal-shuffle/listening"))
+        }
+        while (true) {
+            listeningSnapshot = withContext(Dispatchers.IO) { ledger.reload() }
+            listeningNow = System.currentTimeMillis()
+            delay(2_000)
+        }
+    }
     val mediaStoreAudioRepository = remember { MediaStoreAudioRepository(context.applicationContext, persistenceRepository) }
     val metadataStore = remember { TrackMetadataStore(context.applicationContext) }
     val metadataOverrides by metadataStore.overridesFlow.collectAsState()
 
     var player by remember { mutableStateOf<Player?>(null) }
+    var pendingLearningExport by remember { mutableStateOf<String?>(null) }
+    val exportLearningDocument = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        val json = pendingLearningExport
+        pendingLearningExport = null
+        if (uri != null && json != null) coroutineScope.launch {
+            val saved = withContext(Dispatchers.IO) { runCatching { context.contentResolver.openOutputStream(uri)?.use { it.write(json.toByteArray(Charsets.UTF_8)) } ?: error("No document output") }.isSuccess }
+            android.widget.Toast.makeText(context, if (saved) "Learning export saved" else "Learning export could not be saved", android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+    val importLearningDocument = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) coroutineScope.launch {
+            val json = withContext(Dispatchers.IO) { runCatching {
+                context.contentResolver.openInputStream(uri)!!.bufferedReader().use { reader ->
+                    val result = StringBuilder(); val buffer = CharArray(8192)
+                    while (true) { val read = reader.read(buffer); if (read < 0) break; require(result.length + read <= 16 * 1024 * 1024); result.append(buffer, 0, read) }
+                    result.toString()
+                }
+            }.getOrNull() }
+            val controller = player as? MediaController
+            if (json != null && controller != null) {
+                val future = controller.sendCustomCommand(SessionCommand(PlaybackEvidenceMetadata.COMMAND_POLICY, Bundle.EMPTY), Bundle().apply { putString("action", "import-learning"); putString("json", json) })
+                val receipt = withContext(Dispatchers.IO) { runCatching { future.get(15, java.util.concurrent.TimeUnit.SECONDS) }.getOrNull() }
+                val imported = receipt?.extras?.getString("receipt")?.let { runCatching { org.json.JSONObject(it).optBoolean("ok") }.getOrDefault(false) } == true
+                android.widget.Toast.makeText(context, if (imported) "Learning import restored" else "Learning import was not accepted", android.widget.Toast.LENGTH_LONG).show()
+            } else android.widget.Toast.makeText(context, "Learning import could not be read", android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
     val playbackPositionState = remember { mutableLongStateOf(0L) }
     var playbackDurationMs by remember { mutableStateOf(0L) }
 
@@ -249,6 +300,10 @@ fun BasePlaybackHost(
     var lastTrackId by remember { mutableStateOf<String?>(initialData.lastTrackId) }
     var isPlaying by remember { mutableStateOf(initialData.isPlaying) }
     var queue by remember { mutableStateOf(initialData.queue) }
+    var queueEntryIds by remember { mutableStateOf(initialData.queueEntryIds) }
+    var queueDecisionCues by remember { mutableStateOf(initialData.queueDecisionCues) }
+    var currentEntryId by remember { mutableStateOf(initialData.currentEntryId) }
+    var restoredPlaybackTracks by remember { mutableStateOf<List<Track>>(emptyList()) }
 
     // Hardware DSP, Mastering, Equalizer & Console state
     var equalizerRuntime by remember { mutableStateOf(com.pixelody.app.core.playback.EqualizerRuntimeState()) }
@@ -274,7 +329,7 @@ fun BasePlaybackHost(
     var shuffleMode by remember {
         mutableStateOf(
             FlowShuffleMode.values().firstOrNull { it.name == settingsStore.loadShuffleMode() }
-                ?: if (settingsStore.loadShuffleEnabled()) FlowShuffleMode.SmartFlow else FlowShuffleMode.Off
+                ?: if (settingsStore.loadShuffleEnabled()) FlowShuffleMode.Balanced else FlowShuffleMode.Off
         )
     }
     val shuffleEnabled = shuffleMode != FlowShuffleMode.Off
@@ -312,10 +367,43 @@ fun BasePlaybackHost(
         val count = activePlayer.mediaItemCount
         if (count <= 0) {
             queue = emptyList()
+            queueEntryIds = emptyList()
+            currentEntryId = null
             return
         }
         val start = activePlayer.currentMediaItemIndex + 1
         queue = (start until count).map { activePlayer.getMediaItemAt(it).mediaId }
+        queueEntryIds = (start until count).map { index ->
+            PlaybackEvidenceMetadata.entryId(activePlayer.getMediaItemAt(index)) ?: "legacy-slot-$index"
+        }
+        currentEntryId = PlaybackEvidenceMetadata.entryId(activePlayer.currentMediaItem)
+        queueDecisionCues = (start until count).map { index ->
+            val raw = activePlayer.getMediaItemAt(index).mediaMetadata.extras?.getString(PlaybackEvidenceMetadata.DECISION)
+            runCatching {
+                val receipt = org.json.JSONObject(raw ?: return@map null)
+                val kind = receipt.getString("kind")
+                val relaxed = receipt.getJSONArray("relaxations")
+                val description = buildString {
+                    append(receipt.getString("strategy").replace('-', ' '))
+                    if (receipt.optBoolean("intentionalDuplicate")) append(" · intentional duplicate")
+                    if (relaxed.length() > 0) append(" · spacing relaxed: " + (0 until relaxed.length()).joinToString { relaxed.getString(it) })
+                    if (!receipt.isNull("albumOrdering")) append(" · " + receipt.getString("albumOrdering").replace('-', ' '))
+                }
+                com.pixelody.app.core.playback.TransitionCue(kind.replace('-', ' '), description)
+            }.getOrNull()
+        }
+        restoredPlaybackTracks = (0 until count).map { index ->
+            val item = activePlayer.getMediaItemAt(index)
+            val metadata = item.mediaMetadata
+            val extras = metadata.extras
+            Track(id = item.mediaId, title = metadata.title?.toString().orEmpty(), artist = metadata.artist?.toString().orEmpty(),
+                album = metadata.albumTitle?.toString().orEmpty(), albumArtist = metadata.albumArtist?.toString(),
+                discNumber = metadata.discNumber, trackNumber = metadata.trackNumber,
+                durationSeconds = ((extras?.getLong(PlaybackEvidenceMetadata.DURATION_MS) ?: 0) / 1000).toInt(),
+                format = extras?.getString(PlaybackEvidenceMetadata.FORMAT).orEmpty(), sampleRate = 0, channels = 0,
+                lossless = extras?.getBoolean(PlaybackEvidenceMetadata.LOSSLESS) ?: false,
+                streamUrl = item.localConfiguration?.uri?.toString().orEmpty(), artworkUrl = metadata.artworkUri?.toString())
+        }.distinctBy { it.id }
     }
 
     LaunchedEffect(isPlaying) {
@@ -670,21 +758,27 @@ fun BasePlaybackHost(
         activePlayer.addListener(listener)
         // Flow owns the linear queue order, including notification/headset Next.
         activePlayer.shuffleModeEnabled = false
-        activePlayer.repeatMode = playerRepeatModeFor(repeatMode)
+        repeatMode = when (activePlayer.repeatMode) {
+            Player.REPEAT_MODE_ALL -> RepeatMode.All
+            Player.REPEAT_MODE_ONE -> RepeatMode.One
+            else -> RepeatMode.Off
+        }
+        shuffleMode = FlowShuffleMode.values().firstOrNull { it.name == settingsStore.loadShuffleMode() } ?: shuffleMode
         val activeMediaId = activePlayer.currentMediaItem?.mediaId
         isPlaying = activePlayer.isPlaying
         if (activeMediaId != null) {
             currentTrackId = activeMediaId
             lastTrackId = activeMediaId
         }
+        syncQueueFromPlayer()
         onDispose {
             activePlayer.removeListener(listener)
         }
     }
 
     // Assemble current BaseLayerData snapshot
-    val currentTracks = remember(hostTracks, localTracks, favoriteTrackIds, initialData, metadataOverrides) {
-        val combined = (hostTracks + localTracks).distinctBy { it.id }
+    val currentTracks = remember(hostTracks, localTracks, restoredPlaybackTracks, favoriteTrackIds, initialData, metadataOverrides) {
+        val combined = (hostTracks + localTracks + restoredPlaybackTracks).distinctBy { it.id }
         val base = if (combined.isEmpty()) initialData.tracks else (combined + initialData.tracks).distinctBy { it.id }
         val overridden = metadataStore.applyOverrides(base)
         overridden.map { it.copy(favorite = favoriteTrackIds.contains(it.id)) }
@@ -730,6 +824,9 @@ fun BasePlaybackHost(
         lastTrackId = lastTrackId,
         isPlaying = isPlaying,
         queue = queue,
+        queueEntryIds = queueEntryIds,
+        queueDecisionCues = queueDecisionCues,
+        currentEntryId = currentEntryId,
         hostReachable = hostReachable,
         source = activeSource,
         lens = activeLens
@@ -739,50 +836,16 @@ fun BasePlaybackHost(
         onDataChanged(baseData)
     }
 
-    var analyticsResetEpoch by remember { mutableStateOf(0L) }
-    val sessionInsights by sessionCapsuleEngine.insights.collectAsState()
-    val dailyCapsule by sonicTimelineEngine.dailyCapsule.collectAsState()
-    val weeklyTrend by sonicTimelineEngine.weeklyTrend.collectAsState()
-
-    /**
-     * Records what was actually played.
-     *
-     * Home's capsule and insights used to be manufactured from the library, so
-     * they reported every track owned as a track played. Nothing recorded a real
-     * listen because neither engine had a call site. This is that call site.
-     *
-     * It has to sit here rather than in the Player.Listener because the listener
-     * is constructed before currentTracks exists, so it cannot resolve an id to
-     * a Track. Time is accumulated only while isPlaying, and flushed in finally
-     * so a track change, a stop, or this host leaving composition all record the
-     * listen that just happened.
-     */
-    LaunchedEffect(currentTrackId, analyticsResetEpoch) {
-        val epoch = analyticsResetEpoch
-        val id = currentTrackId ?: return@LaunchedEffect
-        var playedMs = 0L
-        try {
-            while (true) {
-                delay(LISTEN_TICK_MS)
-                if (isPlaying) playedMs += LISTEN_TICK_MS
-            }
-        } finally {
-            if (epoch == analyticsResetEpoch && playedMs >= MIN_RECORDED_LISTEN_MS) {
-                val played = currentTracks.firstOrNull { it.id == id }
-                if (played != null) {
-                    val seconds = (playedMs / 1000L).toInt()
-                    val completed = played.durationSeconds > 0 &&
-                        seconds >= (played.durationSeconds * COMPLETION_FRACTION).toInt()
-                    sonicTimelineEngine.recordTrackListen(
-                        track = played,
-                        listenedSeconds = seconds,
-                        isCompleted = completed,
-                        isBitPerfect = played.lossless
-                    )
-                    sessionCapsuleEngine.recordTrackPlay(played)
-                }
-            }
-        }
+    // The service records intervals even when this UI is gone. These are projections
+    // of its durable facts; disposing or re-creating the screen creates no outcome.
+    val sessionInsights = remember(listeningSnapshot) {
+        ListeningLedgerProjection.toInsights(listeningSnapshot, listeningSnapshot.recentEvents.lastOrNull()?.occurrence?.sessionId)
+    }
+    val dailyCapsule = remember(listeningSnapshot, listeningNow, currentTracks) {
+        ListeningLedgerProjection.toDailyCapsule(listeningSnapshot, listeningNow, ZoneId.systemDefault(), currentTracks)
+    }
+    val weeklyTrend = remember(listeningSnapshot, listeningNow) {
+        ListeningLedgerProjection.toWeeklyTrend(listeningSnapshot, listeningNow, ZoneId.systemDefault())
     }
 
     LaunchedEffect(player, currentTrackId, loudnessMode, sleepTimerState.volumeScale, currentTracks) {
@@ -853,15 +916,36 @@ fun BasePlaybackHost(
         queuePlanningJob?.cancel()
         pendingPlayback = trackIds to startPositionMs
         queuePlanningJob = coroutineScope.launch {
-            val ordered = withContext(Dispatchers.Default) {
-                if (mode == FlowShuffleMode.Off) return@withContext tracksToPlay
-                val anchor = tracksToPlay.first()
-                listOf(anchor) + FlowShuffleEngine.planQueue(anchor, tracksToPlay, mode, tracksToPlay.size,
-                    checkActive = { ensureActive() }).map { it.track }
+            val sourceKey = when {
+                tracksToPlay.map { it.id }.sorted() == localTracks.map { it.id }.sorted() -> "local-library"
+                else -> userPlaylists.firstOrNull { it.trackIds.sorted() == tracksToPlay.map { t -> t.id }.sorted() }?.let { "playlist:${it.id}" }
+            }
+            val source = try {
+                withContext(Dispatchers.IO) {
+                    ensureActive()
+                    ShuffleScopeIdentityStore(context).source(sourceKey, tracksToPlay.map { it.id })
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                pendingPlayback = null
+                playbackError = "Saved queue memory could not be opened. Your previous queue has been kept."
+                return@launch
             }
             if (player !== activePlayer) return@launch
             activePlayer.shuffleModeEnabled = false
-            val mediaItems = ordered.map { baseMediaItemFor(it, offlineMediaStore, hostBaseUrl) }
+            val ordered = tracksToPlay
+            val sessionId = UUID.randomUUID().toString()
+            val mediaItems = ordered.mapIndexed { index, track ->
+                val item = PlaybackEvidenceMetadata.withEntry(baseMediaItemFor(track, offlineMediaStore, hostBaseUrl), source.entryIds[index])
+                val extras = Bundle(item.mediaMetadata.extras ?: Bundle()).apply {
+                    putString(PlaybackEvidenceMetadata.SESSION_ID, sessionId)
+                    putString(PlaybackEvidenceMetadata.SCOPE_ID, source.scopeId)
+                    putString(PlaybackEvidenceMetadata.MODE, mode.name)
+                    putString(PlaybackEvidenceMetadata.POLICY_ENTRY, UniversalShuffleMetadata.rawEntry(track, source.entryIds[index]).toString())
+                }
+                item.buildUpon().setMediaMetadata(item.mediaMetadata.buildUpon().setExtras(extras).build()).build()
+            }
             activePlayer.setMediaItems(mediaItems, 0, startPositionMs.coerceAtLeast(0L))
             activePlayer.prepare()
             activePlayer.playWhenReady = true
@@ -984,27 +1068,10 @@ fun BasePlaybackHost(
         if (requested != null) {
             // Changing mode during a large-library plan must retain the Play request.
             startPlayback(requested.first, requested.second, nextMode)
-        } else if (nextMode != FlowShuffleMode.Off && activePlayer != null && activePlayer.currentMediaItemIndex >= 0) {
-            activePlayer.shuffleModeEnabled = false
-            val start = activePlayer.currentMediaItemIndex + 1
-            val items = (start until activePlayer.mediaItemCount).map { activePlayer.getMediaItemAt(it) }
-            val anchorId = activePlayer.currentMediaItem?.mediaId
-            val anchor = resolveTrack(anchorId)
-            val tracks = items.map { resolveTrack(it.mediaId) }
-            queuePlanningJob = coroutineScope.launch {
-                val planned = withContext(Dispatchers.Default) {
-                    FlowShuffleEngine.planUpcomingOrder(anchor, tracks, nextMode,
-                        checkActive = { ensureActive() })
-                }
-                // A skip, queue edit, or external controller invalidates this snapshot.
-                if (player !== activePlayer || activePlayer.currentMediaItem?.mediaId != anchorId ||
-                    activePlayer.currentMediaItemIndex + 1 != start ||
-                    (start until activePlayer.mediaItemCount).map { activePlayer.getMediaItemAt(it) } != items) return@launch
-                val reordered = planned.map { items[it] }
-                activePlayer.removeMediaItems(start, activePlayer.mediaItemCount)
-                activePlayer.addMediaItems(reordered)
-                syncQueueFromPlayer()
-            }
+        } else if (activePlayer != null) {
+            (activePlayer as? MediaController)?.sendCustomCommand(SessionCommand(PlaybackEvidenceMetadata.COMMAND_MODE, Bundle.EMPTY), Bundle().apply {
+                putString("mode", nextMode.name)
+            })
         }
         settingsStore.saveShuffleMode(nextMode.name)
         settingsStore.saveShuffleEnabled(nextMode != FlowShuffleMode.Off)
@@ -1088,15 +1155,20 @@ fun BasePlaybackHost(
         syncQueueFromPlayer()
     }
 
-    fun removeQueueItem(trackId: String) {
+    fun removeQueueItem(entryOrTrackId: String) {
         val activePlayer = player
         if (activePlayer == null) {
-            queue = queue.filter { it != trackId }
+            val index = queueEntryIds.indexOf(entryOrTrackId).takeIf { it >= 0 } ?: queue.indexOf(entryOrTrackId)
+            if (index >= 0) {
+                queue = queue.toMutableList().apply { removeAt(index) }
+                if (index in queueEntryIds.indices) queueEntryIds = queueEntryIds.toMutableList().apply { removeAt(index) }
+            }
             return
         }
         val start = activePlayer.currentMediaItemIndex + 1
         val index = (start until activePlayer.mediaItemCount)
-            .firstOrNull { activePlayer.getMediaItemAt(it).mediaId == trackId }
+            .firstOrNull { PlaybackEvidenceMetadata.entryId(activePlayer.getMediaItemAt(it)) == entryOrTrackId }
+            ?: (start until activePlayer.mediaItemCount).firstOrNull { activePlayer.getMediaItemAt(it).mediaId == entryOrTrackId }
         if (index != null) activePlayer.removeMediaItem(index)
         syncQueueFromPlayer()
     }
@@ -1119,9 +1191,7 @@ fun BasePlaybackHost(
             queue = emptyList()
             return
         }
-        val start = activePlayer.currentMediaItemIndex + 1
-        val count = activePlayer.mediaItemCount
-        if (start < count) activePlayer.removeMediaItems(start, count)
+        (activePlayer as? MediaController)?.sendCustomCommand(SessionCommand(PlaybackEvidenceMetadata.COMMAND_POLICY, Bundle.EMPTY), Bundle().apply { putString("action", "clear-future") })
         syncQueueFromPlayer()
     }
 
@@ -1177,11 +1247,26 @@ fun BasePlaybackHost(
         insertIntoQueue(trackId, 0)
     }
 
+    fun playQueueEntry(entryId: String) {
+        val active = player ?: return
+        val index = (active.currentMediaItemIndex + 1 until active.mediaItemCount)
+            .firstOrNull { PlaybackEvidenceMetadata.entryId(active.getMediaItemAt(it)) == entryId } ?: return
+        active.seekTo(index, 0)
+        active.play()
+    }
+
+    fun restoreQueueEntry(trackId: String, entryId: String, position: Int) {
+        val active = player ?: return
+        val track = resolveTrack(trackId) ?: return
+        val start = active.currentMediaItemIndex + 1
+        val item = PlaybackEvidenceMetadata.withEntry(baseMediaItemFor(track, offlineMediaStore, hostBaseUrl), entryId)
+        active.addMediaItem((start + position).coerceIn(start, active.mediaItemCount), item)
+        syncQueueFromPlayer()
+    }
+
     PixelodyBaseShell(
         onResetDeveloperData = { includeTrackEdits ->
             val resetPlayer = checkNotNull(player) { "Playback is still connecting; try again" }
-            // Invalidate the old listen BEFORE stopping; its finally block must not refill history.
-            analyticsResetEpoch++
             queuePlanningJob?.cancel()
             pendingPlayback = null
             resetPlayer.pause()
@@ -1193,14 +1278,27 @@ fun BasePlaybackHost(
             lastTrackId = null
             settingsStore.saveLastTrackId(null)
             settingsStore.saveLastTrackPositionMs(0L)
-            sessionCapsuleEngine.resetSession()
-            sonicTimelineEngine.clearTimeline()
+            val controller = checkNotNull(resetPlayer as? MediaController)
+            val reset = controller.sendCustomCommand(SessionCommand(PlaybackEvidenceMetadata.COMMAND_POLICY, Bundle.EMPTY),
+                Bundle().apply { putString("action", "reset-developer-data") })
+            val result = withContext(Dispatchers.IO) { reset.get(15, java.util.concurrent.TimeUnit.SECONDS) }
+            check(result.resultCode == SessionResult.RESULT_SUCCESS) { "Listening data could not be reset" }
             com.pixelody.app.core.playback.HarmonicKeyEngine.clearCache()
             persistenceRepository.clearListeningArchives()
             if (includeTrackEdits) metadataStore.clearAllOverrides()
         },
+        onShuffleAction = { action ->
+            if (action == "import-learning") importLearningDocument.launch(arrayOf("application/json", "text/plain"))
+            else {
+                val future = (player as? MediaController)?.sendCustomCommand(SessionCommand(PlaybackEvidenceMetadata.COMMAND_POLICY, Bundle.EMPTY), Bundle().apply { putString("action", action) })
+                if (action == "export-learning" && future != null) coroutineScope.launch {
+                    val json = withContext(Dispatchers.IO) { runCatching { future.get(15, java.util.concurrent.TimeUnit.SECONDS).extras.getString("json") }.getOrNull() }
+                    if (json != null) { pendingLearningExport = json; exportLearningDocument.launch("pixelody-learning.json") }
+                }
+            }
+        },
         onShuffleTracks = { ids ->
-            val mode = shuffleMode.takeUnless { it == FlowShuffleMode.Off } ?: FlowShuffleMode.SmartFlow
+            val mode = shuffleMode.takeUnless { it == FlowShuffleMode.Off } ?: FlowShuffleMode.Balanced
             shuffleMode = mode
             settingsStore.saveShuffleMode(mode.name)
             settingsStore.saveShuffleEnabled(true)
@@ -1242,6 +1340,8 @@ fun BasePlaybackHost(
         onInsertIntoQueue = ::insertIntoQueue,
         onRemoveQueueItem = ::removeQueueItem,
         onRemoveQueueItemAt = ::removeQueueItemAt,
+        onPlayQueueEntry = ::playQueueEntry,
+        onRestoreQueueEntry = ::restoreQueueEntry,
         onClearQueue = ::clearQueue,
         equalizerRuntimeState = equalizerRuntime,
         equalizerProfile = globalEqualizer,

@@ -97,7 +97,8 @@ class MediaStoreAudioRepositoryTest {
         )
 
         val telemetry = com.pixelody.app.core.playback.HarmonicKeyEngine.estimateTrackTelemetry(track)
-        assertTrue("Estimated BPM should be in normal range", telemetry.bpm >= 60f && telemetry.bpm <= 200f)
-        assertTrue("Detected key confidence should be high", telemetry.detectedKeyConfidence > 0.8f)
+        org.junit.Assert.assertNull(telemetry.bpm)
+        org.junit.Assert.assertNull(telemetry.key)
+        org.junit.Assert.assertNull(telemetry.detectedKeyConfidence)
     }
 }

@@ -25,7 +25,7 @@ enum class TrackSortMode(val label: String, val badge: String) {
             HarmonicKey -> tracks.sortedWith(
                 compareBy<Track> {
                     val key = HarmonicKeyEngine.estimateTrackTelemetry(it).key
-                    key.number * 2 + (if (key.mode == com.pixelody.app.data.model.CamelotMode.Minor) 0 else 1)
+                    key?.let { known -> known.number * 2 + (if (known.mode == com.pixelody.app.data.model.CamelotMode.Minor) 0 else 1) } ?: Int.MAX_VALUE
                 }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.title }
             )
             DurationDesc -> tracks.sortedWith(

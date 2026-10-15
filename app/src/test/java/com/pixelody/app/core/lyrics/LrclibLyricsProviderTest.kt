@@ -5,6 +5,7 @@ import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -91,7 +92,7 @@ class LrclibLyricsProviderTest {
     }
 
     @Test
-    fun testConvertRecordToDocumentWithPlainLyricsAlignsAcoustics() = runBlocking {
+    fun testConvertPlainLyricsKeepsUnknownTimingAndSource() = runBlocking {
         val track = Track(
             id = "test-track-2",
             title = "Acoustic Melody",
@@ -110,8 +111,10 @@ class LrclibLyricsProviderTest {
         val doc = LrclibLyricsProvider.convertRecordToDocument(track, json, null)
         assertNotNull(doc)
         assertTrue(doc!!.hasLyrics)
-        assertTrue(doc.isSynced)
+        assertFalse(doc.isSynced)
         assertEquals(LyricsSource.LrcLib, doc.source)
         assertTrue(doc.lines.any { it.text.contains("First line of the song") })
+        assertTrue(doc.lines.all { it.timestampMs < 0L })
+        assertEquals(track.title, doc.title)
     }
 }

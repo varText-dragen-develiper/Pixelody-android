@@ -53,7 +53,7 @@ class VinylVaultEngineTest {
         assertEquals("Synthwave Night", capsule.title)
         assertEquals(3, capsule.totalTracks)
         assertEquals(CamelotKey.K8A, capsule.dominantKey)
-        assertEquals(128.0f, capsule.averageBpm, 0.1f)
+        assertEquals(128.0f, capsule.averageBpm!!, 0.1f)
         assertEquals("High-Energy Peak", capsule.atmosphereTag)
     }
 
