@@ -47,7 +47,7 @@ enum class AudioHapticMode(
 enum class HapticPrimitiveType(val displayName: String, val baseDurationMs: Long) {
     LowTick("Sub-Bass Thud", 25L),
     Click("Kick/Snare Click", 20L),
-    Tick("Perception Tick", 12L),
+    Tick("Percussion Tick", 12L),
     QuickRise("Bass Swell", 45L),
     QuickFall("Bass Drop", 40L),
     Spin("Vinyl Platter Spin", 60L)

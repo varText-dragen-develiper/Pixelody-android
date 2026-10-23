@@ -96,7 +96,7 @@ fun SoundMeshRadarContent(
                     color = Color(0xFF38BDF8)
                 )
                 Text(
-                    text = "Multi-device spatial surround & sub-ms PTP clock sync",
+                    text = "Multi-device audio experiment. Synchronized output is still in development.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -108,7 +108,7 @@ fun SoundMeshRadarContent(
                 border = BorderStroke(1.dp, Color(0xFF4ADE80))
             ) {
                 Text(
-                    text = "PTP SYNC < 1ms",
+                    text = "SYNC IN DEVELOPMENT",
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Black,
                     color = Color(0xFF4ADE80),

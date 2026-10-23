@@ -100,7 +100,7 @@ class UniversalPlaybackAuthority(
             requestedPlay = !readonly
             if (sourceChanging) return
             if (naturalBoundaryHandled || native.playbackState == Player.STATE_ENDED) {
-                if ((publishedState?.optJSONArray("remaining")?.length() ?: 0) > 0) advance()
+                if ((publishedState?.optJSONArray("remaining")?.length() ?: 0) > 0) advance(lane = "base")
                 else advance(entryId = idOfOrNull(native.currentMediaItem))
             } else if (!readonly) native.play()
         }
@@ -264,15 +264,25 @@ class UniversalPlaybackAuthority(
         }
     }
 
-    private fun advance(previous: Boolean = false, entryId: String? = null, natural: Boolean = false, positionMs: Long = 0) {
+    private fun advance(previous: Boolean = false, entryId: String? = null, natural: Boolean = false, positionMs: Long = 0, lane: String? = null) {
         if (closed) return
         val token = version.incrementAndGet()
         val playing = if (natural) requestedPlay else native.playWhenReady || requestedPlay
+        // A personal Next plays the live queue; how much was heard decides how
+        // strongly that skip steers this session. Remote commands leave no mark.
+        val heardMs = native.currentPosition.coerceAtLeast(0)
+        val durationMs = native.duration
+        val personal = commandPersonal
         if (!natural) boundary(commandPersonal)
         io.execute {
             if (readonly) return@execute
             val request = JSONObject().put("attemptId", uuid()).put("advanceId", uuid()).put("direction", if (previous) "previous" else "next").put("naturalEnd", natural)
             entryId?.let { request.put("entryId", it) }
+            lane?.let { request.put("lane", it) }
+            if (!natural && !previous && entryId == null && lane == null) {
+                request.put("heardMs", heardMs).put("personal", personal)
+                if (durationMs > 0) request.put("coveragePermille", (heardMs * 1000 / durationMs).coerceIn(0, 1000))
+            }
             stageAndRender(request, positionMs, playing, token)
         }
     }
@@ -309,6 +319,7 @@ class UniversalPlaybackAuthority(
     }
 
     private fun insert(index: Int, items: List<MediaItem>) {
+        if (items.isNotEmpty() && items.all { it.mediaMetadata.extras?.getBoolean(PlaybackEvidenceMetadata.ADD_TO_SESSION) == true }) { addSource(items); return }
         val offset = (index - native.currentMediaItemIndex - 1).coerceAtLeast(0)
         val copies = items.map { if (idOfOrNull(it) == null) PlaybackEvidenceMetadata.withEntry(it) else it }
         edit { original -> copies.foldIndexed(original) { n, s, requested ->
@@ -319,6 +330,32 @@ class UniversalPlaybackAuthority(
             val inserted = Policy.mutate(s, JSONObject().put("type", "insert").put("entry", rawEntry(item)).put("index", s.getJSONArray("entries").length()))
             Policy.mutate(inserted, JSONObject().put("type", "move").put("entryId", id).put("index", offset + n).put("intentId", uuid()))
         } }
+    }
+
+    /** Add to session: another list joins this shuffle as a whole, not as songs queued next. */
+    private fun addSource(items: List<MediaItem>) = edit { s ->
+        val existing = s.getJSONArray("entries").objects()
+        val taken = existing.map { it.getString("entryId") }.toMutableSet()
+        val added = items.map { requested ->
+            val item = if (idOfOrNull(requested)?.let { it in taken } != false) PlaybackEvidenceMetadata.withEntry(requested) else requested
+            taken += idOf(item)
+            media[idOf(item)] = item
+            rawEntry(item)
+        }
+        Policy.reconcile(s, JSONArray(existing.map { JSONObject(it.toString()) } + added))
+    }
+
+    /** Takes one list back out of a linked session. The song playing now stays. */
+    fun removeSource(sourceKey: String) = edit { s ->
+        val current = Policy.currentOccurrence(s)?.optString("entryId")
+        Policy.reconcile(s, JSONArray(s.getJSONArray("entries").objects()
+            .filter { it.optString("sourceKey") != sourceKey || it.getString("entryId") == current }.map { JSONObject(it.toString()) }))
+    }
+
+    /** Linked lists take turns by size, or evenly whatever their size. */
+    fun setAirtime(even: Boolean) = edit { s ->
+        val options = JSONObject(s.getJSONObject("options").toString()).put("airtime", if (even) "even" else "size")
+        Policy.setMode(s, s.getString("mode"), options, authorityContext(s))
     }
 
     private fun remove(from: Int, until: Int) {
@@ -367,6 +404,12 @@ class UniversalPlaybackAuthority(
             return
         }
         val futureDecisions = if (pending != null) decisions.drop(1) else decisions
+        // What a skip would play instead, worked out as if the current song had
+        // already started. The queue screen shows it beside Up next.
+        val liveNext = if (s.optString("mode") == "off") null else runCatching {
+            val settled = if (pending != null) Policy.commit(s, JSONObject(pending.toString()).put("positionMs", 0)) else s
+            Policy.preview(settled, JSONObject().put("lane", "live"), ctx)?.optString("trackId")?.takeIf { it.isNotEmpty() }
+        }.getOrNull()
         fun evidence(item: MediaItem, receipt: JSONObject?): MediaItem {
             val extras = Bundle(item.mediaMetadata.extras ?: Bundle()).apply {
                 putString(PlaybackEvidenceMetadata.SESSION_ID, s.getString("sessionId"))
@@ -377,7 +420,12 @@ class UniversalPlaybackAuthority(
             return item.buildUpon().setMediaMetadata(item.mediaMetadata.buildUpon().setExtras(extras).build()).build()
         }
         val receipt = pending?.optJSONObject("receipt") ?: history.lastOrNull()?.optJSONObject("receipt")
-        val future = futureDecisions.mapNotNull { d -> media[d.getString("entryId")]?.let { evidence(it, d) } }
+        val future = futureDecisions.mapNotNull { d -> media[d.getString("entryId")]?.let { evidence(it, d) } }.mapIndexed { index, item ->
+            if (index != 0) item else {
+                val extras = Bundle(item.mediaMetadata.extras ?: Bundle()).apply { putString(PlaybackEvidenceMetadata.LIVE_NEXT, liveNext) }
+                item.buildUpon().setMediaMetadata(item.mediaMetadata.buildUpon().setExtras(extras).build()).build()
+            }
+        }
         publishedState = JSONObject(s.toString())
         main.post {
             if (closed || token != version.get()) return@post

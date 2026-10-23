@@ -66,7 +66,7 @@ fun SessionCapsuleCard(
     val tracksCount = dailyCapsule?.audioDna?.tracksPlayedCount ?: insights.tracksPlayed
     val dominantFormat = when {
         dailyCapsule != null && dailyCapsule.hasData ->
-            if (dailyCapsule.audioDna.bitPerfectPlayCount > 0) "FLAC/DSD" else "AAC"
+            if (dailyCapsule.audioDna.losslessRatio > 0f) "Includes lossless" else "Listening history"
         dailyCapsule != null -> ""
         else -> insights.dominantFormat
     }

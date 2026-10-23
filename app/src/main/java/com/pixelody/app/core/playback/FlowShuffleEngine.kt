@@ -15,15 +15,21 @@ enum class FlowShuffleMode(val displayName: String, val badge: String) {
     Off("Shuffle Off", "Off"),
     Balanced("Balanced Shuffle", "Balanced"),
     SmartFlow("Flow Shuffle", "Flow"),
-    AlbumPreserving("Album Shuffle", "Album"),
-    PureRandom("Pure Random", "Random");
+    AlbumPreserving("Album Shuffle", "Album");
 
     fun next(): FlowShuffleMode = when (this) {
         Off -> Balanced
         Balanced -> SmartFlow
         SmartFlow -> AlbumPreserving
-        AlbumPreserving -> PureRandom
-        PureRandom -> Off
+        AlbumPreserving -> Off
+    }
+
+    companion object {
+        /** Saved names, including Pure Random, which was removed: it continues as Balanced. */
+        fun fromSaved(name: String?): FlowShuffleMode? = when (name) {
+            "PureRandom", "Standard", "random" -> Balanced
+            else -> entries.firstOrNull { it.name == name }
+        }
     }
 }
 
@@ -120,14 +126,6 @@ object FlowShuffleEngine {
         return when (mode) {
             FlowShuffleMode.Off -> {
                 candidates.take(horizon).map { ShuffledTrackEntry(it) }
-            }
-
-            FlowShuffleMode.PureRandom -> {
-                val shuffled = candidates.shuffled(random).take(horizon)
-                shuffled.mapIndexed { index, track ->
-                    val cue = if (index % 5 == 0) TransitionCue("Surprise", "Pure random draw") else null
-                    ShuffledTrackEntry(track, cue)
-                }
             }
 
             FlowShuffleMode.AlbumPreserving -> {

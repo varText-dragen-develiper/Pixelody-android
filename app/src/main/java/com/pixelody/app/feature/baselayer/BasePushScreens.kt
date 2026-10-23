@@ -343,7 +343,7 @@ fun BaseTrackDetailScreen(
         ) {
             Text("Track not found", style = MaterialTheme.typography.titleMedium)
             Text(
-                "This track is no longer available in the active library snapshot.",
+                "This track is no longer in your library.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

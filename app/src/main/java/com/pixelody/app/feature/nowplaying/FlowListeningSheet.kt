@@ -29,7 +29,6 @@ internal fun FlowEntry(mode: FlowShuffleMode, key: CamelotKey?, bpm: Float?, onC
         FlowShuffleMode.Balanced -> "Balanced"
         FlowShuffleMode.SmartFlow -> "Smart"
         FlowShuffleMode.AlbumPreserving -> "Albums"
-        FlowShuffleMode.PureRandom -> "Random"
     }
     OutlinedButton(onClick = onClick, modifier = modifier.fillMaxWidth().heightIn(min = 48.dp)) {
         Text("Flow · $modeLabel" + (key?.let { " · ${it.code}" } ?: "") +
@@ -84,7 +83,6 @@ internal fun FlowListeningSheet(
                                 FlowShuffleMode.Balanced -> "Variety now, with unplayed music remembered across sessions"
                                 FlowShuffleMode.SmartFlow -> "Variety with genre and known key connections"
                                 FlowShuffleMode.AlbumPreserving -> "Keep each album together"
-                                FlowShuffleMode.PureRandom -> "Let every song surprise you"
                             }, style = MaterialTheme.typography.bodySmall)
                         }
                     }

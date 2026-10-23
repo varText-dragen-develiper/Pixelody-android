@@ -81,6 +81,7 @@ import com.pixelody.app.core.playback.rebaseRemoteMediaUrl
 import com.pixelody.app.core.playback.FlowShuffleMode
 import com.pixelody.app.core.shuffle.UniversalShuffleMetadata
 import com.pixelody.app.data.storage.ShuffleScopeIdentityStore
+import com.pixelody.app.core.playback.ShuffleSourceKeys
 import androidx.media3.session.SessionCommand
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
@@ -128,7 +129,7 @@ fun baseMediaItemFor(
     val formatDisplay = when {
         track.lossless -> "LOSSLESS"
         track.format.isNotBlank() -> track.format.uppercase()
-        else -> "HI-RES"
+        else -> "AUDIO"
     }
     val evidence = Bundle().apply {
         putLong(PlaybackEvidenceMetadata.DURATION_MS, track.durationSeconds.toLong().coerceAtLeast(0) * 1000)
@@ -224,7 +225,7 @@ fun BasePlaybackHost(
         pendingLearningExport = null
         if (uri != null && json != null) coroutineScope.launch {
             val saved = withContext(Dispatchers.IO) { runCatching { context.contentResolver.openOutputStream(uri)?.use { it.write(json.toByteArray(Charsets.UTF_8)) } ?: error("No document output") }.isSuccess }
-            android.widget.Toast.makeText(context, if (saved) "Learning export saved" else "Learning export could not be saved", android.widget.Toast.LENGTH_LONG).show()
+            android.widget.Toast.makeText(context, if (saved) "Listening history exported" else "Learning export could not be saved", android.widget.Toast.LENGTH_LONG).show()
         }
     }
     val importLearningDocument = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -241,7 +242,7 @@ fun BasePlaybackHost(
                 val future = controller.sendCustomCommand(SessionCommand(PlaybackEvidenceMetadata.COMMAND_POLICY, Bundle.EMPTY), Bundle().apply { putString("action", "import-learning"); putString("json", json) })
                 val receipt = withContext(Dispatchers.IO) { runCatching { future.get(15, java.util.concurrent.TimeUnit.SECONDS) }.getOrNull() }
                 val imported = receipt?.extras?.getString("receipt")?.let { runCatching { org.json.JSONObject(it).optBoolean("ok") }.getOrDefault(false) } == true
-                android.widget.Toast.makeText(context, if (imported) "Learning import restored" else "Learning import was not accepted", android.widget.Toast.LENGTH_LONG).show()
+                android.widget.Toast.makeText(context, if (imported) "Listening history imported" else "The listening history could not be imported", android.widget.Toast.LENGTH_LONG).show()
             } else android.widget.Toast.makeText(context, "Learning import could not be read", android.widget.Toast.LENGTH_LONG).show()
         }
     }
@@ -303,6 +304,13 @@ fun BasePlaybackHost(
     var queueEntryIds by remember { mutableStateOf(initialData.queueEntryIds) }
     var queueDecisionCues by remember { mutableStateOf(initialData.queueDecisionCues) }
     var currentEntryId by remember { mutableStateOf(initialData.currentEntryId) }
+    var liveNextTrackId by remember { mutableStateOf(initialData.liveNextTrackId) }
+    var shuffleWhy by remember { mutableStateOf(initialData.shuffleWhy) }
+    // Add to session: the list playing now plus every list linked to it.
+    var currentSourceKey by remember { mutableStateOf<String?>(null) }
+    var currentSourceName by remember { mutableStateOf("This queue") }
+    var sessionLists by remember { mutableStateOf(initialData.sessionLists) }
+    var sessionEven by remember { mutableStateOf(initialData.sessionEven) }
     var restoredPlaybackTracks by remember { mutableStateOf<List<Track>>(emptyList()) }
 
     // Hardware DSP, Mastering, Equalizer & Console state
@@ -328,7 +336,7 @@ fun BasePlaybackHost(
     var hiResSettings by remember { mutableStateOf(HiResLosslessSettings()) }
     var shuffleMode by remember {
         mutableStateOf(
-            FlowShuffleMode.values().firstOrNull { it.name == settingsStore.loadShuffleMode() }
+            FlowShuffleMode.fromSaved(settingsStore.loadShuffleMode())
                 ?: if (settingsStore.loadShuffleEnabled()) FlowShuffleMode.Balanced else FlowShuffleMode.Off
         )
     }
@@ -369,9 +377,16 @@ fun BasePlaybackHost(
             queue = emptyList()
             queueEntryIds = emptyList()
             currentEntryId = null
+            liveNextTrackId = null
+            shuffleWhy = null
             return
         }
         val start = activePlayer.currentMediaItemIndex + 1
+        liveNextTrackId = if (start < count) activePlayer.getMediaItemAt(start).mediaMetadata.extras?.getString(PlaybackEvidenceMetadata.LIVE_NEXT) else null
+        shuffleWhy = com.pixelody.app.core.playback.ShuffleLanes.whyLine(
+            activePlayer.currentMediaItem?.mediaMetadata?.extras?.getString(PlaybackEvidenceMetadata.DECISION),
+            if (start >= 2) activePlayer.getMediaItemAt(start - 2).mediaMetadata.title?.toString() else null
+        )
         queue = (start until count).map { activePlayer.getMediaItemAt(it).mediaId }
         queueEntryIds = (start until count).map { index ->
             PlaybackEvidenceMetadata.entryId(activePlayer.getMediaItemAt(index)) ?: "legacy-slot-$index"
@@ -379,18 +394,7 @@ fun BasePlaybackHost(
         currentEntryId = PlaybackEvidenceMetadata.entryId(activePlayer.currentMediaItem)
         queueDecisionCues = (start until count).map { index ->
             val raw = activePlayer.getMediaItemAt(index).mediaMetadata.extras?.getString(PlaybackEvidenceMetadata.DECISION)
-            runCatching {
-                val receipt = org.json.JSONObject(raw ?: return@map null)
-                val kind = receipt.getString("kind")
-                val relaxed = receipt.getJSONArray("relaxations")
-                val description = buildString {
-                    append(receipt.getString("strategy").replace('-', ' '))
-                    if (receipt.optBoolean("intentionalDuplicate")) append(" · intentional duplicate")
-                    if (relaxed.length() > 0) append(" · spacing relaxed: " + (0 until relaxed.length()).joinToString { relaxed.getString(it) })
-                    if (!receipt.isNull("albumOrdering")) append(" · " + receipt.getString("albumOrdering").replace('-', ' '))
-                }
-                com.pixelody.app.core.playback.TransitionCue(kind.replace('-', ' '), description)
-            }.getOrNull()
+            com.pixelody.app.core.playback.ShuffleLanes.queueCue(raw)
         }
         restoredPlaybackTracks = (0 until count).map { index ->
             val item = activePlayer.getMediaItemAt(index)
@@ -763,7 +767,7 @@ fun BasePlaybackHost(
             Player.REPEAT_MODE_ONE -> RepeatMode.One
             else -> RepeatMode.Off
         }
-        shuffleMode = FlowShuffleMode.values().firstOrNull { it.name == settingsStore.loadShuffleMode() } ?: shuffleMode
+        shuffleMode = FlowShuffleMode.fromSaved(settingsStore.loadShuffleMode()) ?: shuffleMode
         val activeMediaId = activePlayer.currentMediaItem?.mediaId
         isPlaying = activePlayer.isPlaying
         if (activeMediaId != null) {
@@ -827,6 +831,10 @@ fun BasePlaybackHost(
         queueEntryIds = queueEntryIds,
         queueDecisionCues = queueDecisionCues,
         currentEntryId = currentEntryId,
+        liveNextTrackId = liveNextTrackId,
+        shuffleWhy = shuffleWhy,
+        sessionLists = sessionLists,
+        sessionEven = sessionEven,
         hostReachable = hostReachable,
         source = activeSource,
         lens = activeLens
@@ -916,10 +924,10 @@ fun BasePlaybackHost(
         queuePlanningJob?.cancel()
         pendingPlayback = trackIds to startPositionMs
         queuePlanningJob = coroutineScope.launch {
-            val sourceKey = when {
-                tracksToPlay.map { it.id }.sorted() == localTracks.map { it.id }.sorted() -> "local-library"
-                else -> userPlaylists.firstOrNull { it.trackIds.sorted() == tracksToPlay.map { t -> t.id }.sorted() }?.let { "playlist:${it.id}" }
-            }
+            val sourceKey = ShuffleSourceKeys.keyFor(tracksToPlay, localTracks, userPlaylists.map { it.id to it.trackIds })
+            // A new Play or Shuffle replaces any linked session.
+            sessionLists = emptyList()
+            sessionEven = false
             val source = try {
                 withContext(Dispatchers.IO) {
                     ensureActive()
@@ -936,13 +944,16 @@ fun BasePlaybackHost(
             activePlayer.shuffleModeEnabled = false
             val ordered = tracksToPlay
             val sessionId = UUID.randomUUID().toString()
+            val listKey = sourceKey ?: source.scopeId
+            currentSourceKey = listKey
+            currentSourceName = com.pixelody.app.core.playback.ShuffleLanes.listName(listKey, userPlaylists.map { it.id to it.name }, tracksToPlay.first().album)
             val mediaItems = ordered.mapIndexed { index, track ->
                 val item = PlaybackEvidenceMetadata.withEntry(baseMediaItemFor(track, offlineMediaStore, hostBaseUrl), source.entryIds[index])
                 val extras = Bundle(item.mediaMetadata.extras ?: Bundle()).apply {
                     putString(PlaybackEvidenceMetadata.SESSION_ID, sessionId)
                     putString(PlaybackEvidenceMetadata.SCOPE_ID, source.scopeId)
                     putString(PlaybackEvidenceMetadata.MODE, mode.name)
-                    putString(PlaybackEvidenceMetadata.POLICY_ENTRY, UniversalShuffleMetadata.rawEntry(track, source.entryIds[index]).toString())
+                    putString(PlaybackEvidenceMetadata.POLICY_ENTRY, UniversalShuffleMetadata.rawEntry(track, source.entryIds[index], listKey).toString())
                 }
                 item.buildUpon().setMediaMetadata(item.mediaMetadata.buildUpon().setExtras(extras).build()).build()
             }
@@ -1030,6 +1041,68 @@ fun BasePlaybackHost(
     }
 
     fun addToQueue(trackId: String) = addTracksToQueue(listOf(trackId))
+
+    fun sessionKeyFor(trackIds: List<String>): String? =
+        ShuffleSourceKeys.keyFor(trackIds.mapNotNull(::resolveTrack), localTracks, userPlaylists.map { it.id to it.trackIds })
+
+    fun sessionListName(key: String, albumTitle: String? = null) =
+        com.pixelody.app.core.playback.ShuffleLanes.listName(key, userPlaylists.map { it.id to it.name }, albumTitle)
+
+    /** A list can join the shuffle playing now when it is a whole list that isn't already in it. */
+    fun canAddToSession(trackIds: List<String>): Boolean {
+        val activePlayer = player ?: return false
+        if (shuffleMode == FlowShuffleMode.Off || activePlayer.mediaItemCount == 0 || trackIds.isEmpty()) return false
+        // After a restart the playing list isn't known until the next Play or Shuffle.
+        if (currentSourceKey == null) return false
+        val key = sessionKeyFor(trackIds) ?: return false
+        return key != currentSourceKey && sessionLists.none { it.sourceKey == key }
+    }
+
+    /**
+     * Add to session: the list's songs join this shuffle as their own list, so
+     * the lists take turns instead of the new songs being queued next.
+     */
+    fun addCollectionToSession(trackIds: List<String>, name: String?) {
+        val activePlayer = player as? MediaController ?: return
+        if (!canAddToSession(trackIds)) return
+        val key = sessionKeyFor(trackIds) ?: return
+        val first = currentSourceKey
+        val items = trackIds.mapNotNull(::resolveTrack).map { track ->
+            val item = baseMediaItemFor(track, offlineMediaStore, hostBaseUrl)
+            val extras = Bundle(item.mediaMetadata.extras ?: Bundle()).apply {
+                putBoolean(PlaybackEvidenceMetadata.ADD_TO_SESSION, true)
+                putString(PlaybackEvidenceMetadata.POLICY_ENTRY, UniversalShuffleMetadata.rawEntry(track, track.id, key).toString())
+            }
+            item.buildUpon().setMediaMetadata(item.mediaMetadata.buildUpon().setExtras(extras).build()).build()
+        }
+        if (sessionLists.isEmpty()) {
+            // A fresh link starts with turns by size; the queue screen can make them even.
+            activePlayer.sendCustomCommand(SessionCommand(PlaybackEvidenceMetadata.COMMAND_POLICY, Bundle.EMPTY), Bundle().apply { putString("action", "airtime"); putBoolean("even", false) })
+            sessionLists = listOfNotNull(first?.let { com.pixelody.app.core.playback.SessionList(it, currentSourceName) })
+            sessionEven = false
+        }
+        activePlayer.addMediaItems(items)
+        val title = name?.takeIf { it.isNotBlank() } ?: sessionListName(key, items.firstOrNull()?.mediaMetadata?.albumTitle?.toString())
+        sessionLists = sessionLists + com.pixelody.app.core.playback.SessionList(key, title)
+    }
+
+    fun removeSessionList(key: String) {
+        val activePlayer = player as? MediaController ?: return
+        activePlayer.sendCustomCommand(SessionCommand(PlaybackEvidenceMetadata.COMMAND_POLICY, Bundle.EMPTY), Bundle().apply { putString("action", "remove-source"); putString("sourceKey", key) })
+        val left = sessionLists.filterNot { it.sourceKey == key }
+        if (key == currentSourceKey) {
+            currentSourceKey = left.firstOrNull()?.sourceKey
+            currentSourceName = left.firstOrNull()?.name ?: "This queue"
+        }
+        // One list left is an ordinary single-list shuffle again.
+        sessionLists = if (left.size > 1) left else emptyList()
+    }
+
+    fun setSessionEven(even: Boolean) {
+        val activePlayer = player as? MediaController ?: return
+        activePlayer.sendCustomCommand(SessionCommand(PlaybackEvidenceMetadata.COMMAND_POLICY, Bundle.EMPTY), Bundle().apply { putString("action", "airtime"); putBoolean("even", even) })
+        sessionEven = even
+    }
 
     fun seek(positionMs: Long) {
         val activePlayer = player ?: return
@@ -1304,6 +1377,12 @@ fun BasePlaybackHost(
             settingsStore.saveShuffleEnabled(true)
             startPlayback(ids, 0L, mode)
         },
+        onPlayInOrder = { ids ->
+            shuffleMode = FlowShuffleMode.Off
+            settingsStore.saveShuffleMode(FlowShuffleMode.Off.name)
+            settingsStore.saveShuffleEnabled(false)
+            startPlayback(ids, 0L, FlowShuffleMode.Off)
+        },
         data = baseData,
         localTracks = localTracks,
         sessionInsights = sessionInsights,
@@ -1341,6 +1420,10 @@ fun BasePlaybackHost(
         onRemoveQueueItem = ::removeQueueItem,
         onRemoveQueueItemAt = ::removeQueueItemAt,
         onPlayQueueEntry = ::playQueueEntry,
+        canAddToSession = ::canAddToSession,
+        onAddToSession = ::addCollectionToSession,
+        onRemoveSessionList = ::removeSessionList,
+        onSessionEven = ::setSessionEven,
         onRestoreQueueEntry = ::restoreQueueEntry,
         onClearQueue = ::clearQueue,
         equalizerRuntimeState = equalizerRuntime,

@@ -61,7 +61,8 @@ class UniversalShuffleLearningTest {
     @Test fun configAndVersionsMatchFrozenMachineAndLearningContracts() {
         val machine = JSONObject(fixtures("machine-contract.json").readText())
         val learning = JSONObject(fixtures("learning-contract.json").readText())
-        assertEquals(machine.getString("policyVersion"), L.POLICY_VERSION)
+        // Session marks never reach the ledger, so it keeps the v2.1 learning policy.
+        assertEquals(machine.getString("learningPolicyVersion"), L.POLICY_VERSION)
         assertEquals(learning.getInt("schemaVersion"), L.VERSION)
         assertEquals(canonical(machine.getJSONObject("learningConstants")), canonical(JSONObject(L.CONFIG)))
         assertEquals(canonical(learning.getJSONObject("config")), canonical(JSONObject(L.CONFIG)))

@@ -144,31 +144,31 @@ enum class DjTransitionCurve(
     EqualPower(
         title = "Equal Power",
         subtitle = "Smooth Sinusoidal",
-        description = "Constant psychoacoustic RMS energy fade preventing volume dips.",
+        description = "Fades between tracks using an equal-power curve.",
         iconGlyphName = "WaveformBars"
     ),
     BassSwap(
         title = "Bass Swap",
         subtitle = "Low-End Crossover",
-        description = "Instant low-frequency cutoff switch at midpoint to prevent muddy phase clash.",
+        description = "Switches the bass between tracks halfway through the fade.",
         iconGlyphName = "Sliders"
     ),
     FilterSweep(
         title = "Filter Sweep",
         subtitle = "High-Pass Resonant",
-        description = "Sweeps outgoing track low/mid body away into shimmering highs before dropping incoming track.",
+        description = "Filters out the outgoing track’s bass and mids before the next track starts.",
         iconGlyphName = "Sparkle"
     ),
     EchoOut(
         title = "Echo Out",
         subtitle = "Delay Feedback Tail",
-        description = "Cuts outgoing deck with simulated rhythmic echo delay tail as incoming track drops.",
+        description = "Fades out the outgoing track with an echo effect.",
         iconGlyphName = "Broadcast"
     ),
     VinylBrake(
         title = "Vinyl Brake",
         subtitle = "Turntable Decel Bend",
-        description = "Simulates analog turntable motor stop with pitch bend down into instant incoming drop.",
+        description = "Slows and lowers the outgoing track before switching.",
         iconGlyphName = "VinylDisc"
     )
 }

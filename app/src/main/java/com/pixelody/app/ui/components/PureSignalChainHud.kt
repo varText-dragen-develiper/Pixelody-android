@@ -104,7 +104,7 @@ fun PureSignalChainHud(
 
                     Column {
                         Text(
-                            text = "PURE SIGNAL MASTER",
+                            text = "SOURCE AND PRESET",
                             style = MaterialTheme.typography.labelMedium.copy(
                                 fontWeight = FontWeight.Black,
                                 letterSpacing = 1.5.sp
@@ -112,7 +112,7 @@ fun PureSignalChainHud(
                             color = Color(0xFF4ADE80)
                         )
                         Text(
-                            text = verification?.bitstreamLabel ?: "24-bit / 192kHz Direct FLAC",
+                            text = verification?.bitstreamLabel ?: "Source information unavailable",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -121,18 +121,18 @@ fun PureSignalChainHud(
 
                 Surface(
                     shape = RoundedCornerShape(8.dp),
-                    color = if (verification?.isBitPerfect != false) Color(0xFF4ADE80).copy(alpha = 0.20f)
+                    color = if (verification?.isBitPerfect == true) Color(0xFF4ADE80).copy(alpha = 0.20f)
                     else Color(0xFFF59E0B).copy(alpha = 0.20f),
                     border = BorderStroke(
                         1.dp,
-                        if (verification?.isBitPerfect != false) Color(0xFF4ADE80) else Color(0xFFF59E0B)
+                        if (verification?.isBitPerfect == true) Color(0xFF4ADE80) else Color(0xFFF59E0B)
                     )
                 ) {
                     Text(
-                        text = if (verification?.isBitPerfect != false) "BIT-PERFECT DIRECT" else "DSP RESAMPLED",
+                        text = if (verification?.isBitPerfect == true) "BIT-PERFECT DIRECT" else "OUTPUT UNVERIFIED",
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Black,
-                        color = if (verification?.isBitPerfect != false) Color(0xFF4ADE80) else Color(0xFFF59E0B),
+                        color = if (verification?.isBitPerfect == true) Color(0xFF4ADE80) else Color(0xFFF59E0B),
                         modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                     )
                 }
@@ -144,13 +144,13 @@ fun PureSignalChainHud(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                SignalChainNodePill(label = verification?.codec ?: "FLAC", sublabel = "${verification?.bitDepth ?: 24}b")
+                SignalChainNodePill(label = verification?.codec ?: "Unknown", sublabel = verification?.bitDepth?.takeIf { it > 0 }?.let { "${it}b" } ?: "Unknown")
                 Text("➔", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 SignalChainNodePill(label = "PARAMETRIC", sublabel = "10-Band")
                 Text("➔", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 SignalChainNodePill(label = "LIMITER", sublabel = "${selectedPreset.limiterCeilingDb}dB")
                 Text("➔", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                SignalChainNodePill(label = "OUTPUT", sublabel = verification?.outputSink?.take(10) ?: "Direct")
+                SignalChainNodePill(label = "OUTPUT", sublabel = verification?.outputSink?.take(10) ?: "Unknown")
             }
 
             // Acoustic Preset Chips

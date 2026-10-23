@@ -70,7 +70,7 @@ enum class MasteringPreset(
 ) {
     AudiophileReference(
         displayName = "Reference",
-        description = "Transparent high-fidelity transfer with linear phase response",
+        description = "Flat EQ with no added drive or stereo widening",
         gainsDb = listOf(0f, 0f, 0f, 0f, 0f),
         qFactors = listOf(1.0f, 1.4f, 1.4f, 1.4f, 1.0f),
         tubeDrive = 0.0f,
@@ -81,7 +81,7 @@ enum class MasteringPreset(
     ),
     AnalogTapeWarmth(
         displayName = "Tape Warmth",
-        description = "Subtle 2nd-order harmonics with soft high-frequency tape rolloff",
+        description = "Tape-style warmth with a softer high end",
         gainsDb = listOf(2.0f, 1.0f, 0.0f, 0.5f, -1.0f),
         qFactors = listOf(0.8f, 1.2f, 1.4f, 1.2f, 0.8f),
         tubeDrive = 0.25f,
@@ -92,7 +92,7 @@ enum class MasteringPreset(
     ),
     TubeVibeStudio(
         displayName = "Tube Vibe",
-        description = "Rich triode valve saturation with harmonic density & presence",
+        description = "Tube-style saturation and added presence",
         gainsDb = listOf(2.5f, 1.5f, -0.5f, 1.8f, 1.0f),
         qFactors = listOf(1.0f, 1.4f, 1.5f, 1.4f, 1.1f),
         tubeDrive = 0.55f,
@@ -103,7 +103,7 @@ enum class MasteringPreset(
     ),
     ClubSoundstage(
         displayName = "Club Stage",
-        description = "Sub-harmonic bass synthesis with widened stereo field immersion",
+        description = "More bass and a wider stereo image",
         gainsDb = listOf(4.5f, 2.0f, -1.0f, 1.5f, 3.0f),
         qFactors = listOf(1.2f, 1.5f, 1.4f, 1.3f, 1.2f),
         tubeDrive = 0.35f,
@@ -114,7 +114,7 @@ enum class MasteringPreset(
     ),
     BinauralHorizon(
         displayName = "Binaural 3D",
-        description = "Psychoacoustic HRTF crossfeed with 200% expanded stereo horizon",
+        description = "Stereo widening and crossfeed settings",
         gainsDb = listOf(0.5f, -0.5f, 1.0f, 2.0f, 3.5f),
         qFactors = listOf(1.0f, 1.3f, 1.4f, 1.4f, 1.0f),
         tubeDrive = 0.15f,
@@ -125,7 +125,7 @@ enum class MasteringPreset(
     ),
     VocalClarity(
         displayName = "Vocal Clarity",
-        description = "Mid-forward presence curve with transparent sibilance control",
+        description = "More midrange presence and a softer top end",
         gainsDb = listOf(-1.5f, -0.8f, 3.5f, 2.8f, 0.5f),
         qFactors = listOf(0.9f, 1.2f, 1.8f, 1.6f, 1.0f),
         tubeDrive = 0.20f,
@@ -136,7 +136,7 @@ enum class MasteringPreset(
     ),
     NightListening(
         displayName = "Night Studio",
-        description = "Soft-knee dynamic containment for fatigue-free late-night listening",
+        description = "Gentler peaks for quieter listening",
         gainsDb = listOf(-3.0f, -1.5f, 1.0f, -1.0f, -2.5f),
         qFactors = listOf(0.8f, 1.0f, 1.2f, 1.0f, 0.8f),
         tubeDrive = 0.10f,
@@ -147,7 +147,7 @@ enum class MasteringPreset(
     ),
     Custom(
         displayName = "Custom",
-        description = "Custom calibrated studio mastering parameters",
+        description = "Your saved EQ and processing settings",
         gainsDb = listOf(0f, 0f, 0f, 0f, 0f),
         qFactors = listOf(1.0f, 1.4f, 1.4f, 1.4f, 1.0f),
         tubeDrive = 0.0f,

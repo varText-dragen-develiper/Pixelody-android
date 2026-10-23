@@ -44,7 +44,14 @@ data class BaseLayerData(
     val lens: BaseLens = BaseLens.Everything,
     val queueEntryIds: List<String> = emptyList(),
     val currentEntryId: String? = null,
-    val queueDecisionCues: List<com.pixelody.app.core.playback.TransitionCue?> = emptyList()
+    val queueDecisionCues: List<com.pixelody.app.core.playback.TransitionCue?> = emptyList(),
+    /** What a skip would play instead of Up next, while shuffle is on. */
+    val liveNextTrackId: String? = null,
+    /** Why the song playing now was picked, in a sentence. */
+    val shuffleWhy: String? = null,
+    /** The lists linked with Add to session; empty for a single list. */
+    val sessionLists: List<com.pixelody.app.core.playback.SessionList> = emptyList(),
+    val sessionEven: Boolean = false
 ) {
     private val byId: Map<String, Track> by lazy { tracks.associateBy { it.id } }
 

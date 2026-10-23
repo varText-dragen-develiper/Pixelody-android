@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -35,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.pixelody.app.core.playback.FlowShuffleMode
 import com.pixelody.app.core.playback.QueueUndoState
+import com.pixelody.app.core.playback.SessionList
 import com.pixelody.app.core.playback.ShuffledTrackEntry
 import com.pixelody.app.data.model.CamelotKey
 import com.pixelody.app.data.model.EqualizerProfile
@@ -97,7 +99,15 @@ internal fun QueueScreen(
     onExportLearning: () -> Unit = {},
     onImportLearning: () -> Unit = {},
     onDeleteLearning: () -> Unit = {},
-    onForgetOtherQueues: () -> Unit = {}
+    onForgetOtherQueues: () -> Unit = {},
+    // The two shuffle queues: what plays when this song ends, and what a skip plays.
+    upNextTitle: String? = null,
+    ifSkipTitle: String? = null,
+    whyLine: String? = null,
+    sessionLists: List<SessionList> = emptyList(),
+    sessionEven: Boolean = false,
+    onRemoveSessionList: (String) -> Unit = {},
+    onSessionEven: (Boolean) -> Unit = {}
 ) {
     val haptic = LocalHapticFeedback.current
     val theme = LocalPixelodyThemeVariant.current
@@ -161,6 +171,11 @@ internal fun QueueScreen(
                 }
             item {
                 FlowEntry(shuffleMode, flowKey, flowBpm, onToggleShuffle)
+            }
+            if (isLocalQueue && shuffleMode != FlowShuffleMode.Off && (upNextTitle != null || sessionLists.isNotEmpty())) {
+                item {
+                    ShuffleLanesCard(upNextTitle, ifSkipTitle, whyLine, sessionLists, sessionEven, onRemoveSessionList, onSessionEven)
+                }
             }
             if (!isLocalQueue && snapshot != null) {
                 item {
@@ -337,6 +352,49 @@ internal fun SourceSummaryCard(
             Spacer(modifier = Modifier.width(12.dp))
             Button(onClick = onAction) {
                 Text(actionLabel)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShuffleLanesCard(
+    upNextTitle: String?,
+    ifSkipTitle: String?,
+    whyLine: String?,
+    sessionLists: List<SessionList>,
+    sessionEven: Boolean,
+    onRemoveSessionList: (String) -> Unit,
+    onSessionEven: (Boolean) -> Unit
+) {
+    SectionCard(title = "Shuffle", subtitle = whyLine ?: "Up next plays when this song ends. A skip plays the other one.") {
+        if (upNextTitle != null) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("UP NEXT", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(upNextTitle, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("IF YOU SKIP", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(ifSkipTitle ?: upNextTitle, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+                }
+            }
+        }
+        if (sessionLists.size > 1) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Text("THIS SESSION", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            sessionLists.forEach { list ->
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(list.name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, modifier = Modifier.weight(1f))
+                    TextButton(
+                        onClick = { onRemoveSessionList(list.sourceKey) },
+                        modifier = Modifier.semantics { contentDescription = "Remove ${list.name} from this session" }
+                    ) { Text("Remove") }
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(checked = sessionEven, onCheckedChange = onSessionEven)
+                Text("Even turns, whatever each list's size", style = MaterialTheme.typography.bodySmall)
             }
         }
     }

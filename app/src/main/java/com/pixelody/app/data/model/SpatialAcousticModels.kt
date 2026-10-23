@@ -135,7 +135,7 @@ enum class BinauralCrossfeedMode(
     ),
     WideAngleMaster(
         title = "Wide 90° Soundstage",
-        description = "Expansive acoustic arc with deeper 650μs ITD delay and prominent head-shadow attenuation.",
+        description = "A wider speaker layout with 650μs crossfeed delay.",
         baseAngleDeg = 45f,
         baseItdMicroseconds = 650f,
         lowPassCutoffHz = 600f
@@ -149,7 +149,7 @@ enum class BinauralCrossfeedMode(
     ),
     DirectStereoOff(
         title = "Direct Stereo (Bypassed)",
-        description = "Standard isolated L/R headphone output with zero acoustic crossfeed.",
+        description = "Left and right channels with crossfeed off.",
         baseAngleDeg = 90f,
         baseItdMicroseconds = 0f,
         lowPassCutoffHz = 20000f

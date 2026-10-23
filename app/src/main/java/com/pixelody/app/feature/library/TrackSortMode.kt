@@ -12,7 +12,7 @@ enum class TrackSortMode(val label: String, val badge: String) {
     ArtistAsc("Artist", "ARTIST"),
     HarmonicKey("Harmonic Key", "KEY"),
     DurationDesc("Duration", "TIME"),
-    QualityFirst("Hi-Res First", "HI-RES");
+    QualityFirst("Lossless First", "LOSSLESS");
 
     fun sortTracks(tracks: List<Track>): List<Track> {
         return when (this) {

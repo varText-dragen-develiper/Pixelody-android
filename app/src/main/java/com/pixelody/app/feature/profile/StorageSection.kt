@@ -136,12 +136,12 @@ internal fun StorageSection(activeTheme: PixelodyMobileTheme, cachedTrackCount: 
 
             // Storage Quota Selector
             Text(
-                text = "Storage Quota Limit (LRU Auto-Eviction)",
+                text = "Cache storage limit",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "When quota is reached, least recently played unpinned tracks are pruned automatically.",
+                text = "When the cache is full, the least recently played unpinned tracks are removed first.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -176,7 +176,7 @@ internal fun StorageSection(activeTheme: PixelodyMobileTheme, cachedTrackCount: 
 
             // Auto-Cache Policies
             Text(
-                text = "Smart Offline Sync Policies",
+                text = "Offline cache settings",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold
             )
@@ -266,7 +266,7 @@ internal fun StorageSection(activeTheme: PixelodyMobileTheme, cachedTrackCount: 
                     shape = activeTheme.plate,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("Prune Unpinned", maxLines = 1)
+                    Text("Remove unpinned tracks", maxLines = 1)
                 }
                 OutlinedButton(
                     onClick = onClearArtwork,

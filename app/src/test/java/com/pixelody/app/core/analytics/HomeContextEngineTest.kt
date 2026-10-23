@@ -100,8 +100,8 @@ class HomeContextEngineTest {
 
         assertEquals(HomeOperationalMode.HardwareAnchored, state.operationalMode)
         assertEquals(true, state.showHardwareBanner)
-        assertTrue(state.hardwareAnchor?.isUsbDac == true)
-        assertTrue(state.hardwareAnchor?.title?.contains("DAC") == true)
+        assertEquals(false, state.hardwareAnchor?.isUsbDac)
+        assertEquals("Wired audio connected", state.hardwareAnchor?.title)
     }
 
     @Test

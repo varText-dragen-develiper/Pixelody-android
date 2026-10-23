@@ -165,9 +165,9 @@ class PixelodyPlaybackService : MediaLibraryService() {
                     PixelodyWidgetProvider.updateAllWidgets(
                         context = this@PixelodyPlaybackService,
                         title = metadata?.title?.toString() ?: "Pixelody",
-                        artist = metadata?.artist?.toString() ?: "Audiophile Player",
+                        artist = metadata?.artist?.toString() ?: "Ready to play",
                         isPlaying = player.isPlaying,
-                        format = metadata?.subtitle?.toString() ?: "HI-RES"
+                        format = metadata?.subtitle?.toString() ?: "AUDIO"
                     )
                 }
             }
@@ -185,9 +185,9 @@ class PixelodyPlaybackService : MediaLibraryService() {
                 PixelodyWidgetProvider.updateAllWidgets(
                     context = this@PixelodyPlaybackService,
                     title = metadata?.title?.toString() ?: "Pixelody",
-                    artist = metadata?.artist?.toString() ?: "Audiophile Player",
+                    artist = metadata?.artist?.toString() ?: "Ready to play",
                     isPlaying = player?.isPlaying ?: false,
-                    format = metadata?.subtitle?.toString() ?: "HI-RES"
+                    format = metadata?.subtitle?.toString() ?: "AUDIO"
                 )
             }
 
@@ -290,6 +290,8 @@ class PixelodyPlaybackService : MediaLibraryService() {
                         "reshuffle-remaining" -> shuffleAuthority?.reshuffleRemaining()
                         "clear-future" -> shuffleAuthority?.clearFuture()
                         "evict-other-scopes" -> shuffleAuthority?.forgetOtherScopes()
+                        "remove-source" -> args.getString("sourceKey")?.let { shuffleAuthority?.removeSource(it) }
+                        "airtime" -> shuffleAuthority?.setAirtime(args.getBoolean("even"))
                         "disable-learning" -> universalListening.setEnabled(false, nowMs)
                         "enable-learning" -> universalListening.setEnabled(true, nowMs)
                         "reset-learning" -> universalListening.resetLearning(nowMs)
@@ -503,8 +505,7 @@ class PixelodyPlaybackService : MediaLibraryService() {
         val currentIndex = if (entries.isEmpty()) -1 else entries.indexOfFirst { it.entryId == currentEntryId }.coerceAtLeast(0)
         val settings = MobileSettingsStore(applicationContext)
         val savedMode = when (settings.loadShuffleMode()) {
-            "PureRandom", "Standard", "random" -> "random"
-            "Balanced", "balanced" -> "balanced"
+            "PureRandom", "Standard", "random", "Balanced", "balanced" -> "balanced"
             "SmartFlow", "Flow", "flow" -> "flow"
             "AlbumPreserving", "album" -> "album"
             else -> "off"
@@ -577,8 +578,7 @@ class PixelodyPlaybackService : MediaLibraryService() {
             player.playWhenReady = false
             val settings = MobileSettingsStore(applicationContext)
             val mode = when (saved.shuffleMode) {
-                "random" -> "PureRandom"
-                "balanced" -> "Balanced"
+                "random", "balanced" -> "Balanced"
                 "flow" -> "SmartFlow"
                 "album" -> "AlbumPreserving"
                 else -> "Off"

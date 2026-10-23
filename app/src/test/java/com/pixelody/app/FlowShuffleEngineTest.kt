@@ -158,15 +158,21 @@ class FlowShuffleEngineTest {
         assertEquals(FlowShuffleMode.Balanced, FlowShuffleMode.Off.next())
         assertEquals(FlowShuffleMode.SmartFlow, FlowShuffleMode.Balanced.next())
         assertEquals(FlowShuffleMode.AlbumPreserving, FlowShuffleMode.SmartFlow.next())
-        assertEquals(FlowShuffleMode.PureRandom, FlowShuffleMode.AlbumPreserving.next())
-        assertEquals(FlowShuffleMode.Off, FlowShuffleMode.PureRandom.next())
+        assertEquals(FlowShuffleMode.Off, FlowShuffleMode.AlbumPreserving.next())
     }
 
     @Test
-    fun testPureRandomPreservesAllElementsWithoutDuplicates() {
+    fun removedPureRandomContinuesAsBalanced() {
+        assertEquals(FlowShuffleMode.Balanced, FlowShuffleMode.fromSaved("PureRandom"))
+        assertEquals(FlowShuffleMode.SmartFlow, FlowShuffleMode.fromSaved("SmartFlow"))
+        assertEquals(null, FlowShuffleMode.fromSaved("Smart Flow"))
+    }
+
+    @Test
+    fun testBalancedPreservesAllElementsWithoutDuplicates() {
         val tracks = (1..50).map { mockTrack(it.toString(), artist = "Artist $it") }
         val current = tracks[0]
-        val result = FlowShuffleEngine.planQueue(current, tracks, FlowShuffleMode.PureRandom)
+        val result = FlowShuffleEngine.planQueue(current, tracks, FlowShuffleMode.Balanced)
 
         assertEquals(49, result.size)
         val resultIds = result.map { it.track.id }.toSet()

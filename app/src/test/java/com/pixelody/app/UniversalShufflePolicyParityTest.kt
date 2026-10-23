@@ -49,8 +49,54 @@ class UniversalShufflePolicyParityTest {
                 stepsChecked++
             }
         }
-        assertEquals(9, traces.length())
+        assertEquals(12, traces.length())
         println("UniversalShufflePolicy parity: ${traces.length()} shared traces, $stepsChecked full state/decision/SHA steps")
+    }
+
+    @Test fun withSkipsIgnoredEveryKeptModeRepeatsTheV21Order() {
+        val scenarios = JSONObject(fixture("v21-decision-parity.json").readText()).getJSONArray("scenarios")
+        for (index in 0 until scenarios.length()) {
+            val scenario = scenarios.getJSONObject(index)
+            var state = Policy.createSession(scenario.getJSONObject("input"))
+            val sequence = JSONArray()
+            for (step in 0 until scenario.getInt("steps")) {
+                val staged = Policy.stage(state, JSONObject().put("attemptId", "a$step").put("naturalEnd", step > 0).put("personal", false), scenario.getJSONObject("context"))
+                val pending = staged.optJSONObject("pending") ?: break
+                sequence.put(pending.getString("entryId")); state = Policy.commit(staged, pending)
+            }
+            exact(scenario.getString("name"), scenario.getJSONArray("sequence"), sequence)
+        }
+    }
+    @Test fun v21SessionsUpgradeInPlaceAndRandomContinuesAsBalanced() {
+        val snapshots = JSONObject(fixture("v21-snapshots.json").readText()).getJSONObject("snapshots")
+        for (name in listOf("random", "flow")) {
+            val snapshot = snapshots.getJSONObject(name)
+            val restored = Policy.restore(snapshot)
+            assertEquals("restored", restored.getString("status")); exact("$name diagnostics", JSONArray().put("upgraded-from-v2.1"), restored.getJSONArray("diagnostics"))
+            val state = restored.getJSONObject("state")
+            assertEquals(if (name == "random") "balanced" else "flow", state.getString("mode"))
+            exact("$name remaining", snapshot.getJSONArray("remaining"), state.getJSONArray("remaining")); exact("$name history", snapshot.getJSONArray("history"), state.getJSONArray("history"))
+            assertEquals(0, state.getJSONObject("lanes").getJSONArray("pinned").length())
+            assertNotNull(Policy.stage(state, JSONObject().put("attemptId", "after-upgrade").put("naturalEnd", true)).optJSONObject("pending"))
+        }
+        assertEquals("balanced", Policy.normalizeMode("random")); assertFalse("random" in Policy.MODES)
+    }
+    @Test fun naturalEndPlaysTheBaseQueueAndASkipPlaysTheLiveQueue() {
+        var state = Policy.createSession(input("flow", 12))
+        val first = Policy.stage(state, JSONObject().put("attemptId", "first").put("naturalEnd", false))
+        assertEquals("base", first.getJSONObject("pending").getString("lane"))
+        state = Policy.commit(first, first.getJSONObject("pending"))
+        val head = state.getJSONObject("lanes").getJSONArray("pinned").getJSONObject(0).getString("entryId")
+        assertEquals(head, Policy.preview(state, JSONObject().put("lane", "base"))!!.getString("entryId"))
+        val live = Policy.preview(state, JSONObject().put("lane", "live"))!!
+        assertNotEquals(head, live.getString("entryId"))
+        val skipped = Policy.stage(state, JSONObject().put("attemptId", "skip").put("advanceId", "skip").put("naturalEnd", false).put("heardMs", 9000).put("coveragePermille", 40))
+        assertEquals("live", skipped.getJSONObject("pending").getString("lane")); assertEquals("early", skipped.getJSONObject("pending").getJSONObject("receipt").getString("skip"))
+        val failed = Policy.abort(skipped, skipped.getJSONObject("pending"))
+        val retry = Policy.stage(failed, JSONObject().put("attemptId", "retry").put("advanceId", "skip"))
+        assertEquals("live", retry.getJSONObject("pending").getString("lane")); assertEquals("early", retry.getJSONObject("pending").getJSONObject("receipt").getString("skip"))
+        val committed = Policy.commit(retry, retry.getJSONObject("pending"))
+        assertEquals(-1000, committed.getJSONObject("lanes").getJSONArray("marks").getJSONObject(0).getInt("mark"))
     }
 
     private fun input(mode: String = "balanced", count: Int = 5): JSONObject = JSONObject()

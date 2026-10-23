@@ -42,7 +42,7 @@ enum class OscilloscopeDisplayMode(
     AudioMatrixPolar(
         title = "Matrix Polar Radar",
         subtitle = "Radial Sweep Goniometer",
-        description = "Circular radar goniometer sweeping radially with instantaneous RMS envelope modulation.",
+        description = "A circular trace that moves with the signal level.",
         badgeGlyph = "RADR"
     )
 }

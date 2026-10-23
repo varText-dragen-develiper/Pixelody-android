@@ -6,49 +6,24 @@ import com.pixelody.app.data.model.Track
 import kotlin.math.pow
 
 /**
- * PureSignalMasterEngine: Studio-grade audiophile signal chain processor.
- * Features bit-perfect stream verification, 10-band parametric target curves, and true-peak mastering limiters.
+ * Source-format information and optional processing presets.
+ * Track metadata cannot verify the samples delivered by an Android output.
  */
 object PureSignalMasterEngine {
 
     /**
-     * Inspects the audio playback path to verify bit-perfect integrity and sample rate matching.
+     * Reports known source metadata. Output verification requires route measurements.
      */
     fun verifyBitstreamPath(
         track: Track,
         activeOutputDevice: String? = null
     ): AudioBitstreamVerification {
-        val bitDepth = track.bitDepth ?: if (track.lossless) 24 else 16
-        val sampleRate = if (track.sampleRate > 0) track.sampleRate else 44100
-        val isLossless = track.lossless || track.format.contains("FLAC", ignoreCase = true) || track.codec.contains("FLAC", ignoreCase = true)
-
-        val isUsbDac = activeOutputDevice?.contains("USB", ignoreCase = true) == true ||
-                activeOutputDevice?.contains("DAC", ignoreCase = true) == true
-
-        val outputSink = when {
-            isUsbDac -> "USB DAC Direct (Bit-Perfect)"
-            activeOutputDevice?.contains("Bluetooth", ignoreCase = true) == true -> "LDAC / aptX HD Wireless"
-            activeOutputDevice?.contains("Headphone", ignoreCase = true) == true -> "3.5mm Hi-Fi DAC Output"
-            else -> "High-Res Direct PCM"
-        }
-
-        val dynamicRange = when {
-            bitDepth >= 24 -> 120.0f
-            bitDepth == 16 -> 96.0f
-            else -> 92.0f
-        }
-
-        val thdPlusN = if (bitDepth >= 24) 0.00025f else 0.0015f
-
         return AudioBitstreamVerification(
-            isBitPerfect = isLossless && (isUsbDac || sampleRate >= 44100),
-            bitDepth = bitDepth,
-            sampleRateHz = sampleRate,
-            codec = track.format.ifBlank { if (isLossless) "FLAC" else "AAC" },
-            resamplingRatio = 1.0f,
-            outputSink = outputSink,
-            dynamicRangeDb = dynamicRange,
-            thdPlusNPercent = thdPlusN
+            isBitPerfect = false,
+            bitDepth = track.bitDepth?.takeIf { it > 0 } ?: 0,
+            sampleRateHz = track.sampleRate.coerceAtLeast(0),
+            codec = track.format.ifBlank { track.codec.ifBlank { "Unknown format" } },
+            outputSink = activeOutputDevice?.takeIf { it.isNotBlank() } ?: "Output unknown"
         )
     }
 

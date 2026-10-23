@@ -70,8 +70,8 @@ enum class BpmBucket(val label: String, val minBpm: Int, val maxBpm: Int) {
 enum class SortStrategy(val label: String) {
     LosslessPurity("HIGHEST BIT-DEPTH"),
     HarmonicFlow("HARMONIC FLOW"),
-    Recent("RECENTLY DIGGED"),
-    MostPlayed("HEAVY ROTATION")
+    Recent("RANDOM PICKS"),
+    MostPlayed("LONGEST TRACKS")
 }
 
 /**

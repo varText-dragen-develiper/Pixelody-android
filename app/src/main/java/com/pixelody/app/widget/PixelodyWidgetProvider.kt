@@ -26,9 +26,9 @@ class PixelodyWidgetProvider : AppWidgetProvider() {
     ) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val title = prefs.getString(KEY_TITLE, "Pixelody") ?: "Pixelody"
-        val artist = prefs.getString(KEY_ARTIST, "Audiophile Player") ?: "Audiophile Player"
+        val artist = prefs.getString(KEY_ARTIST, "Ready to play") ?: "Ready to play"
         val isPlaying = prefs.getBoolean(KEY_IS_PLAYING, false)
-        val format = prefs.getString(KEY_FORMAT, "HI-RES") ?: "HI-RES"
+        val format = prefs.getString(KEY_FORMAT, "AUDIO") ?: "AUDIO"
 
         for (widgetId in appWidgetIds) {
             val views = buildRemoteViews(context, title, artist, isPlaying, format)
@@ -83,9 +83,9 @@ class PixelodyWidgetProvider : AppWidgetProvider() {
             if (appWidgetIds.isEmpty()) return
 
             val currentTitle = title ?: prefs.getString(KEY_TITLE, "Pixelody") ?: "Pixelody"
-            val currentArtist = artist ?: prefs.getString(KEY_ARTIST, "Audiophile Player") ?: "Audiophile Player"
+            val currentArtist = artist ?: prefs.getString(KEY_ARTIST, "Ready to play") ?: "Ready to play"
             val currentIsPlaying = isPlaying ?: prefs.getBoolean(KEY_IS_PLAYING, false)
-            val currentFormat = format ?: prefs.getString(KEY_FORMAT, "HI-RES") ?: "HI-RES"
+            val currentFormat = format ?: prefs.getString(KEY_FORMAT, "AUDIO") ?: "AUDIO"
 
             for (widgetId in appWidgetIds) {
                 val views = buildRemoteViews(context, currentTitle, currentArtist, currentIsPlaying, currentFormat)

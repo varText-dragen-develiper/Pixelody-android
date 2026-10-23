@@ -48,6 +48,31 @@ class UniversalAuthorityStoreTest {
         } finally { threads.shutdownNow() }
     }
 
+    // An install updating from the v2.1 policy has a v2.1 checkpoint on disk. It must
+    // load as an ordinary copy and accept the next save, never freeze shuffle read-only.
+    @Test fun priorPolicyCheckpointLoadsAndTheNextSaveReplacesIt() {
+        val fixtures = System.getProperty("pixelody.shuffle.fixtures")?.let(::File) ?: generateSequence(File(System.getProperty("user.dir"))) { it.parentFile }
+            .map { File(it, "docs/api-contract-fixtures/shuffle-universal-v2") }.first { it.isDirectory }
+        val prior = JSONObject(File(fixtures, "v21-snapshots.json").readText(Charsets.UTF_8)).getJSONObject("snapshots").getJSONObject("flow")
+        assertEquals(Policy.PRIOR_POLICY_VERSION, prior.getString("policyVersion"))
+        val entries = prior.getJSONArray("entries")
+        val wrapper = JSONObject().put("adapterVersion", 1).put("session", prior).put("bank", Scopes.createBank())
+            .put("intent", JSONObject.NULL).put("personal", JSONObject())
+        val saved = PlaybackSessionCheckpoint(prior.getString("sessionId"), prior.getLong("revision"),
+            (0 until entries.length()).map { PlaybackQueueOccurrence(entries.getJSONObject(it).getString("entryId"), entries.getJSONObject(it).getString("trackId"), "content://fixture/track") },
+            currentIndex = 0, positionMs = 0, shuffleMode = prior.getString("mode"), policyStateJson = wrapper.toString(),
+            authorityId = prior.getString("authorityId"), authorityEpoch = prior.getLong("authorityEpoch"), scopeId = prior.getString("scopeId"))
+        val store = UniversalAuthorityStore(temporary.root)
+        writeRaw(store.primaryFile, saved)
+        val loaded = store.load()
+        assertEquals(SessionLoadStatus.LOADED, loaded.status)
+        assertFalse(loaded.readOnly)
+        assertEquals("restored", Policy.restore(JSONObject(loaded.checkpoint!!.policyStateJson).getJSONObject("session")).getString("status"))
+        val next = store.save(checkpoint(4))
+        assertTrue(next.diagnostics.toString(), next.saved)
+        assertEquals(Policy.POLICY_VERSION, JSONObject(store.load().checkpoint!!.policyStateJson).getJSONObject("session").getString("policyVersion"))
+    }
+
     private fun checkpoint(revision: Long = 3, scope: String = "playlist:α"): PlaybackSessionCheckpoint {
         val state = Policy.createSession(JSONObject().put("sessionId", "session-$scope").put("scopeId", scope)
             .put("authorityId", "local").put("authorityEpoch", 3).put("seed", "store-tests").put("mode", "balanced")
@@ -125,7 +150,7 @@ class UniversalAuthorityStoreTest {
 
     @Test fun unsupportedActivePolicyVersionsInEitherCopyAreReadOnlyEvenBeforeLoad() {
         val changes: List<(JSONObject) -> Unit> = listOf(
-            { it.getJSONObject("session").put("schemaVersion", 3) },
+            { it.getJSONObject("session").put("schemaVersion", Policy.VERSION + 1) },
             { it.getJSONObject("session").put("policyVersion", "universal-shuffle-v99") },
             { it.getJSONObject("session").put("configVersion", 99) },
             { it.put("adapterVersion", 2) },

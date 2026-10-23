@@ -157,7 +157,7 @@ class SonicCapsuleTimelineEngine(
             totalListeningMinutes = totalMinutes,
             tracksPlayedCount = totalTracks,
             uniqueArtistsCount = uniqueArtists,
-            bitPerfectPlayCount = losslessCount
+            bitPerfectPlayCount = 0
         )
 
         // Highlight tracks (ordered by replay count and completion ratio)
@@ -221,13 +221,13 @@ class SonicCapsuleTimelineEngine(
         // asserting work the app never did.
         return when (style) {
             NarrativeStyle.Poetic -> {
-                "Today unfolded across $tracks ${if (tracks == 1) "track" else "tracks"}$minutesClause, carrying a $fidelityPercent% lossless aura under the banner of ${archetype.title}."
+                "Today you listened to $tracks ${if (tracks == 1) "track" else "tracks"}$minutesClause. $fidelityPercent% were lossless files."
             }
             NarrativeStyle.Analytical -> {
                 "Session log: $tracks ${if (tracks == 1) "track" else "tracks"}$minutesClause, $fidelityPercent% lossless, $artists ${if (artists == 1) "artist" else "artists"}. Dominant mode: ${mood.title}."
             }
             NarrativeStyle.DjLinerNotes -> {
-                "Handoff: $tracks ${if (tracks == 1) "cut" else "cuts"}$minutesClause from $artists ${if (artists == 1) "artist" else "artists"}, $fidelityPercent% lossless, riding ${archetype.title} momentum."
+                "$tracks ${if (tracks == 1) "track" else "tracks"}$minutesClause from $artists ${if (artists == 1) "artist" else "artists"}. $fidelityPercent% were lossless files."
             }
         }
     }

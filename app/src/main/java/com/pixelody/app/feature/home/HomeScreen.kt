@@ -265,7 +265,7 @@ internal fun HomeScreen(
                 CuratedSmartCrate(
                     id = "crate-hires-24bit",
                     title = "24-Bit FLAC Master",
-                    subtitle = "Bit-perfect lossless stream",
+                    subtitle = "Lossless source file",
                     tag = "HI-RES",
                     glyphType = TransportGlyphType.DiamondLossless,
                     tracks = losslessTracks,
@@ -648,7 +648,7 @@ internal fun HomeScreen(
         if (losslessTracks.isNotEmpty() || localTracks.isNotEmpty() || playableHostTracks.isNotEmpty()) {
             item(key = "sources_quality", contentType = "sources_quality") {
                 Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                    HomeSectionHeader(title = "Sources And Quality", subtitle = "Local-first choices without the debug wall.")
+                    HomeSectionHeader(title = "Sources And Quality", subtitle = "Listening and library settings.")
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         item(contentType = "source_tile") {
                             SourceChoiceTile(
@@ -730,7 +730,7 @@ internal fun HomeScreen(
         if (standoutTracks.isNotEmpty()) {
             item(key = "standouts", contentType = "standouts") {
                 Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                    HomeSectionHeader(title = "Standouts", subtitle = "A little larger, still quick to scan.")
+                    HomeSectionHeader(title = "Standouts", subtitle = "Browse your music.")
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         items(standoutTracks, key = { it.id }, contentType = { "standout_card" }) { track ->
                             FeatureTrackCard(
@@ -757,7 +757,7 @@ internal fun HomeScreen(
         if (artistGroups.isNotEmpty()) {
             item(key = "artists", contentType = "artists") {
                 Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                    HomeSectionHeader(title = "Artists In Rotation", subtitle = "Tap into a voice, then keep moving.")
+                    HomeSectionHeader(title = "Artists In Rotation", subtitle = "Browse by artist.")
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(artistGroups, key = { it.first }, contentType = { "artist_pill" }) { (artist, tracksForArtist) ->
                             ArtistShortcutPill(
@@ -774,7 +774,7 @@ internal fun HomeScreen(
         if (jumpBackTracks.isNotEmpty()) {
             item(key = "jump_back", contentType = "jump_back") {
                 Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                    HomeSectionHeader(title = "Jump Back In", subtitle = "Compact, quick, no overthinking.")
+                    HomeSectionHeader(title = "Jump Back In", subtitle = "Choose something to play.")
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         items(jumpBackTracks, key = { it.id }, contentType = { "jump_back_card" }) { track ->
                             MiniTrackCard(
@@ -1374,7 +1374,7 @@ internal fun AlbumCarouselDeck(
         ) {
             HomeSectionHeader(
                 title = "Albums To Start",
-                subtitle = "Choose a pocket of the library, not a whole screen.",
+                subtitle = "Browse a collection.",
                 modifier = Modifier.weight(1f).padding(end = 8.dp)
             )
             Surface(

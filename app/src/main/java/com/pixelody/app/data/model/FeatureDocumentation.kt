@@ -116,7 +116,7 @@ object FeatureDocumentationRepository {
             sections = listOf(
                 DocSection(
                     title = "Beyond Random Shuffle",
-                    body = "Smart Flow uses available key and energy information to choose an order from your library.",
+                    body = "Flow uses available key and energy information to choose an order from your library.",
                     keyPoints = listOf(
                         "Favors compatible keys.",
                         "Uses tempo when planning changes.",
@@ -167,12 +167,12 @@ object FeatureDocumentationRepository {
                         "24-Bit FLAC Master: gathers matching high-resolution source files.",
                         "Harmonic Camelot Flow: gathers tracks by key relationships.",
                         "Vinyl Analog Lounge: gathers albums matching its rules.",
-                        "Heavy Rotation Digs: gathers your most-played tracks."
+                        "Longest Tracks: sorts the matching tracks by duration."
                     )
                 ),
                 DocSection(
                     title = "Custom Rule Builder",
-                    body = "Tap '+ Smart Crate' and choose rules for format, sample rate, year, genre, artist, or play count.",
+                    body = "Tap '+ Smart Crate' to see the available format, genre, tempo, and key filters. Random Picks shuffles the matching tracks.",
                     keyPoints = listOf(
                         "Rename, reorder, or delete crates from their action menu.",
                         "Hold a crate for options and help."
@@ -208,10 +208,10 @@ object FeatureDocumentationRepository {
             sections = listOf(
                 DocSection(
                     title = "Understanding LUFS & Headroom",
-                    body = "Choose a loudness target:",
+                    body = "Use the loudness-normalization toggle in Now Playing.",
                     keyPoints = listOf(
-                        "Streaming Standard: target -14 LUFS.",
-                        "Audiophile Dynamic: target -18 LUFS, with 4 dB more headroom.",
+                        "Turn normalization on to apply the available track gain.",
+                        "Separate loudness-target presets are not available in this screen.",
                         "Off: no loudness-normalization gain."
                     )
                 )
@@ -297,11 +297,11 @@ object FeatureDocumentationRepository {
             id = "mastering_rack",
             title = "Studio Mastering & Parametric EQ",
             category = "Acoustic Console",
-            summary = "Adjust ten EQ bands, tape drive, stereo width, and limiting.",
+            summary = "Adjust five EQ bands, tape drive, stereo width, and limiting.",
             sections = listOf(
                 DocSection(
-                    title = "10-Band Parametric Equalization",
-                    body = "The bands run from Sub-Bass at 31 Hz to Air at 16 kHz, with bass, midrange, and treble controls between them.",
+                    title = "5-Band Equalization",
+                    body = "The five bands cover 60 Hz through 14 kHz.",
                     keyPoints = listOf(
                         "Minimum-phase filters.",
                         "Boost or cut each band by up to 12 dB; adjust Q to change its width."
@@ -355,7 +355,7 @@ object FeatureDocumentationRepository {
             sections = listOf(
                 DocSection(
                     title = "Room Geometry & Wall Damping",
-                    body = "Choose room sizes from 40 to 1,200 m³ and adjust how much sound the walls absorb.",
+                    body = "Choose room sizes from 28 to 3,500 m³ and adjust how much sound the walls absorb.",
                     keyPoints = listOf(
                         "RT60 Decay: time for the reverb to fall by 60 dB.",
                         "Wall Damping: reduce reflected mid and high frequencies."
@@ -370,7 +370,7 @@ object FeatureDocumentationRepository {
                     )
                 )
             ),
-            proTip = "Try 'Audiophile Studio' as a starting point for headphone listening.",
+            proTip = "Try 'Abbey Control Room' as a starting point for headphone listening.",
             relatedTopicIds = listOf("mastering_rack", "oscilloscope", "hires_lossless")
         ),
         FeatureDocTopic(
@@ -390,10 +390,10 @@ object FeatureDocumentationRepository {
                 ),
                 DocSection(
                     title = "CRT Phosphor Types & Persistence",
-                    body = "Choose P31 Green, P7 Amber, or Blue Phosphor for different trace colors and persistence.",
+                    body = "Choose Classic P1 Green, Vintage P3 Amber, Medical P4 Cyan, Studio P45 Monochrome, RGB Laser, or Cyberpunk Ultraviolet.",
                     keyPoints = listOf(
-                        "P31 Green: a shorter trail.",
-                        "P7 Amber: a longer trail."
+                        "Classic P1 Green: green traces.",
+                        "Vintage P3 Amber: amber traces."
                     )
                 )
             ),
@@ -408,7 +408,7 @@ object FeatureDocumentationRepository {
             sections = listOf(
                 DocSection(
                     title = "Phrase Boundary Matching",
-                    body = "Auto-DJ uses detected 16- or 32-bar phrases to plan track changes on downbeats.",
+                    body = "Auto-DJ estimates phrase boundaries from BPM and bar counts. These are timing estimates, not detected musical phrases.",
                     keyPoints = listOf(
                         "BPM Synchronization: adjust the incoming track's tempo.",
                         "Downbeat Alignment: start the next track at the beginning of a phrase."
@@ -416,7 +416,7 @@ object FeatureDocumentationRepository {
                 ),
                 DocSection(
                     title = "Harmonic Crossfade Curves",
-                    body = "Choose Equal-Power or Slow Exponential fades. Bass Swap reduces outgoing bass during the transition.",
+                    body = "Choose from the transition curves shown in Auto-DJ. Bass Swap reduces outgoing bass during the transition.",
                     keyPoints = listOf(
                         "Equal-Power: balance the two tracks' levels through the fade.",
                         "Bass Swap: reduce outgoing 40–200 Hz bass as the incoming bass starts."
@@ -442,7 +442,7 @@ object FeatureDocumentationRepository {
                 ),
                 DocSection(
                     title = "Technical Metadata Inspection",
-                    body = "Check bit depth, sample rate, codec, bitrate, ReplayGain, and release year.",
+                    body = "Check bit depth, sample rate, codec, bitrate, ReplayGain, and available album information.",
                     keyPoints = listOf(
                         "Shows available source metadata, such as FLAC 96 kHz / 24-bit.",
                         "Shows available LUFS information."

@@ -153,7 +153,7 @@ fun SonicCapsuleTimelineView(
                                 color = MaterialTheme.colorScheme.primary
                             )
                             Text(
-                                text = "${capsule.memoryTimeline.size} chronological session nodes logged today",
+                                text = "${capsule.memoryTimeline.size} listening events today",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -387,7 +387,7 @@ private fun AiLinerNotesBanner(
                         sizeDp = 14
                     )
                     Text(
-                        text = "AI SONIC LINER NOTES",
+                        text = "SESSION NOTES",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Black,
                         letterSpacing = 1.sp,
@@ -476,9 +476,9 @@ private fun AudioDnaGaugeGrid(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             AudioDnaCard(
-                title = "LOSSLESS PURITY",
+                title = "LOSSLESS TRACKS",
                 value = "${(dna.losslessRatio * 100).toInt()}%",
-                subtitle = "${dna.bitPerfectPlayCount} Bit-Perfect Tracks",
+                subtitle = "Source format, not verified output",
                 accentColor = Color(0xFFE5A93C),
                 glyph = TransportGlyphType.DiamondLossless,
                 modifier = Modifier.weight(1f)
@@ -851,7 +851,7 @@ private fun EmptyTimelineCard() {
                 sizeDp = 28
             )
             Text(
-                text = "Listening Timeline Awaiting Flow",
+                text = "Your listening timeline will appear here",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface

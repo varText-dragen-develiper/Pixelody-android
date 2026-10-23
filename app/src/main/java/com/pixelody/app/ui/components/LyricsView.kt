@@ -211,7 +211,7 @@ fun LyricsView(
                         color = Color(0xFF6C9EFF)
                     )
                     Text(
-                        text = "Synchronizing acoustic telemetry for ${currentTrack?.title.orEmpty()}...",
+                        text = "Loading lyrics for ${currentTrack?.title.orEmpty()}...",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

@@ -18,6 +18,10 @@ object PlaybackEvidenceMetadata {
     const val MODE = "pixelody.policyMode"
     const val DECISION = "pixelody.decision"
     const val ATTEMPT_ID = "pixelody.attemptId"
+    /** On the Up next item: the song a skip would play instead. */
+    const val LIVE_NEXT = "pixelody.liveNext"
+    /** On items sent with Add to session: join the shuffle rather than queue next. */
+    const val ADD_TO_SESSION = "pixelody.addToSession"
     const val COMMAND_MODE = "pixelody.shuffle.mode"
     const val COMMAND_POLICY = "pixelody.shuffle.control"
 

@@ -1,5 +1,5 @@
 {
-  "policyVersion": "universal-shuffle-v2.1",
+  "policyVersion": "universal-shuffle-v2.2",
   "generatedFrom": "https://github.com/varText-dragen-develiper/pixelody/blob/main/src/shuffle/universal.js#normalizeEntry",
   "vectors": [
     {
@@ -19,6 +19,7 @@
         "artistId": "École 東京",
         "albumArtistId": null,
         "albumId": null,
+        "sourceKey": null,
         "sourceIndex": 0,
         "discNumber": null,
         "trackNumber": null,
@@ -71,6 +72,7 @@
         "artistId": "performer",
         "albumArtistId": "various artists",
         "albumId": "[\"various artists\",\"café\"]",
+        "sourceKey": null,
         "sourceIndex": 1,
         "discNumber": 2,
         "trackNumber": 3,
@@ -129,6 +131,7 @@
         "artistId": "performer",
         "albumArtistId": "various",
         "albumId": "album:id/α",
+        "sourceKey": null,
         "sourceIndex": 2,
         "discNumber": 1,
         "trackNumber": 2,
@@ -181,6 +184,7 @@
         "artistId": null,
         "albumArtistId": null,
         "albumId": null,
+        "sourceKey": null,
         "sourceIndex": 3,
         "discNumber": null,
         "trackNumber": null,
@@ -228,6 +232,7 @@
         "artistId": null,
         "albumArtistId": null,
         "albumId": null,
+        "sourceKey": null,
         "sourceIndex": 4,
         "discNumber": null,
         "trackNumber": null,

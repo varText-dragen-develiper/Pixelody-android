@@ -118,6 +118,10 @@ class UniversalAuthorityStore(directory: File) {
     private data class Candidate(val kind: Kind, val raw: String? = null, val decoded: DecodedPlaybackSession? = null,
         val inner: Boolean = false)
     private class UnsupportedInner : IllegalArgumentException()
+    private companion object {
+        const val PRIOR_SCHEMA_VERSION = 2
+        const val PRIOR_CONFIG_VERSION = 1
+    }
 
     private fun read(file: File): Candidate {
         if (!file.exists()) return Candidate(Kind.ABSENT)
@@ -157,7 +161,7 @@ class UniversalAuthorityStore(directory: File) {
         version(bank, "schemaVersion", Scopes.VERSION)
         val rows = bank.getJSONArray("scopes")
         for (index in 0 until rows.length()) rows.optJSONObject(index)?.optJSONObject("session")?.let(::policyVersions)
-        Policy.validateState(session)
+        validateSession(session)
         require(rows.length() <= Scopes.MAX_SCOPES) { "Too many scopes" }
         val scopeIds = HashSet<String>()
         for (index in 0 until rows.length()) {
@@ -165,7 +169,7 @@ class UniversalAuthorityStore(directory: File) {
             val scopeId = opaque(row.get("scopeId"))
             require(scopeIds.add(scopeId) && safeNonnegative(row.opt("savedAtMs"))) { "Invalid scope row" }
             val scopeSession = row.getJSONObject("session")
-            Policy.validateState(scopeSession)
+            validateSession(scopeSession)
             require(scopeSession.getString("scopeId") == scopeId) { "Scope identity mismatch" }
         }
         val evictions = bank.getJSONArray("evictions")
@@ -195,11 +199,21 @@ class UniversalAuthorityStore(directory: File) {
         }) { "Authority queue identity mismatch" }
     }
 
+    // A checkpoint written by the previous policy (v2.1) stays readable and
+    // writable: the authority upgrades it through Policy.restore on load.
+    private fun prior(session: JSONObject) = session.opt("policyVersion") == Policy.PRIOR_POLICY_VERSION
+
     private fun policyVersions(session: JSONObject) {
-        version(session, "schemaVersion", Policy.VERSION)
         require(session.has("policyVersion") && !session.isNull("policyVersion")) { "Missing policy version" }
-        if (session.opt("policyVersion") != Policy.POLICY_VERSION) throw UnsupportedInner()
-        version(session, "configVersion", 1)
+        val prior = prior(session)
+        version(session, "schemaVersion", if (prior) PRIOR_SCHEMA_VERSION else Policy.VERSION)
+        if (!prior && session.opt("policyVersion") != Policy.POLICY_VERSION) throw UnsupportedInner()
+        version(session, "configVersion", if (prior) PRIOR_CONFIG_VERSION else Policy.CONFIG_VERSION)
+    }
+
+    private fun validateSession(session: JSONObject) {
+        if (!prior(session)) { Policy.validateState(session); return }
+        require(Policy.restore(session).optString("status") == "restored") { "Invalid prior session" }
     }
 
     private fun rejectUnsupportedVersions(wrapper: JSONObject) {
@@ -208,8 +222,10 @@ class UniversalAuthorityStore(directory: File) {
             val actual = value.opt(field)
             return if (expected is Number) actual !is Number || actual.toDouble() != expected.toDouble() else actual != expected
         }
-        fun policyUnsupported(session: JSONObject): Boolean = unsupported(session, "schemaVersion", Policy.VERSION) ||
-            unsupported(session, "policyVersion", Policy.POLICY_VERSION) || unsupported(session, "configVersion", 1)
+        fun policyUnsupported(session: JSONObject): Boolean = if (prior(session))
+            unsupported(session, "schemaVersion", PRIOR_SCHEMA_VERSION) || unsupported(session, "configVersion", PRIOR_CONFIG_VERSION)
+        else unsupported(session, "schemaVersion", Policy.VERSION) ||
+            unsupported(session, "policyVersion", Policy.POLICY_VERSION) || unsupported(session, "configVersion", Policy.CONFIG_VERSION)
         if (unsupported(wrapper, "adapterVersion", 1)) throw UnsupportedInner()
         wrapper.optJSONObject("session")?.let { if (policyUnsupported(it)) throw UnsupportedInner() }
         wrapper.optJSONObject("bank")?.let { bank ->

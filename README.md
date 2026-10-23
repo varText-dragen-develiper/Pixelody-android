@@ -16,7 +16,7 @@ This repository is the open-source edition of the Android app. It is licensed un
 - Pairs with a Windows host by QR code or short code, and remembers trusted hosts.
 - Browses the host's library, playlists and queue.
 - Plays through a Media3 playback service using authenticated streams from the host.
-- Follows live host state with bounded reconnect and clear failure messages.
+- Reconnects when the host connection drops and reports connection problems.
 - Joins J.A.M. sessions: join, approval, permission actions, queue and removal.
 - Installs optional modules downloaded from the Pixelody website, through Settings & Themes, then Modules. How it works is described in the Windows repository's `docs/OPTIONAL_MODULES.md`.
 

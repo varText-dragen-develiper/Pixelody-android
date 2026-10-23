@@ -126,7 +126,7 @@ internal fun TrackSpatialActionRibbon(
                     RibbonActionCard(
                         glyph = TransportGlyphType.PlayNext,
                         title = "Play Next",
-                        subtitle = "Up next in queue",
+                        subtitle = "",
                         modifier = Modifier.weight(1f),
                         onClick = {
                             haptic.performConfirm()
@@ -136,7 +136,7 @@ internal fun TrackSpatialActionRibbon(
                     RibbonActionCard(
                         glyph = TransportGlyphType.AddToQueue,
                         title = "Add to Queue",
-                        subtitle = "Append to end",
+                        subtitle = "",
                         modifier = Modifier.weight(1f),
                         onClick = {
                             haptic.performConfirm()
@@ -151,7 +151,7 @@ internal fun TrackSpatialActionRibbon(
                 ) {
                     RibbonActionCard(
                         glyph = TransportGlyphType.FlowShuffle,
-                        title = "Smart Flow",
+                        title = "Flow",
                         subtitle = "Radio from this song",
                         modifier = Modifier.weight(1f),
                         onClick = {
@@ -163,7 +163,7 @@ internal fun TrackSpatialActionRibbon(
                         glyph = if (isFavorite) TransportGlyphType.HeartFilled else TransportGlyphType.Heart,
                         glyphColor = if (isFavorite) Color(0xFFEF4444) else MaterialTheme.colorScheme.primary,
                         title = if (isFavorite) "Favorited" else "Favorite",
-                        subtitle = if (isFavorite) "In Favorites" else "Save to favorites",
+                        subtitle = "",
                         modifier = Modifier.weight(1f),
                         onClick = {
                             haptic.performConfirm()

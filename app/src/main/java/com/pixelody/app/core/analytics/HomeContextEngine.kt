@@ -41,13 +41,13 @@ class HomeContextEngine(
         val phase = CircadianPhase.current(calendar)
 
         // 1. Determine Hardware Anchor State
-        val isUsbDac = audioRoute == AudioDeviceRoute.Wired && (currentTrack?.lossless == true || (currentTrack?.sampleRate ?: 0) >= 48000)
+        val isWiredAudio = audioRoute == AudioDeviceRoute.Wired
         val hardwareAnchor = when {
-            isUsbDac -> HardwareAnchorState(
-                isUsbDac = true,
-                title = "Hi-Res Bit-Perfect DAC Active",
-                badge = "${currentTrack?.sampleRate ?: 96000}Hz / ${currentTrack?.bitDepth ?: 24}-bit",
-                description = "Direct output mode enabled."
+            isWiredAudio -> HardwareAnchorState(
+                isUsbDac = false,
+                title = "Wired audio connected",
+                badge = "Source: ${currentTrack?.format?.takeIf { it.isNotBlank() } ?: "Unknown format"}",
+                description = "Check the output device for its current format."
             )
             isOffline -> HardwareAnchorState(
                 isOffline = true,
@@ -60,7 +60,7 @@ class HomeContextEngine(
 
         // 2. Determine Operational Mode
         val mode = when {
-            hardwareAnchor?.isUsbDac == true -> HomeOperationalMode.HardwareAnchored
+            isWiredAudio -> HomeOperationalMode.HardwareAnchored
             isPlaying && currentTrack != null -> HomeOperationalMode.ActiveGroove
             hardwareAnchor?.isOffline == true -> HomeOperationalMode.HardwareAnchored
             else -> HomeOperationalMode.HorizonCue
@@ -68,30 +68,30 @@ class HomeContextEngine(
 
         // 3. Greeting & Atmospheric Theme
         val (greetingTitle, greetingSubtitle) = when (phase) {
-            CircadianPhase.Morning -> "Morning Horizon" to "Clean acoustic starts and crisp morning focus."
+            CircadianPhase.Morning -> "Morning Horizon" to "Pick something for the morning."
             CircadianPhase.Afternoon -> "Daylight Flow" to "High-momentum rhythm for productive sessions."
-            CircadianPhase.Evening -> "Sunset Atmosphere" to "Warm vinyl saturation and mellow harmonic drift."
-            CircadianPhase.Night -> "Late Night Deep Listen" to "Audiophile hi-res immersion and quiet dynamic range."
+            CircadianPhase.Evening -> "Sunset Atmosphere" to "Settle in with some music."
+            CircadianPhase.Night -> "Late Night Deep Listen" to "Make time for a full listen."
         }
 
         // 4. Hero Capsule & Single-Tap Cue
         val heroTitle = when (mode) {
             HomeOperationalMode.ActiveGroove -> currentTrack?.title ?: "Active Audio Groove"
-            HomeOperationalMode.HardwareAnchored -> hardwareAnchor?.title ?: "Hardware Direct Audio"
+            HomeOperationalMode.HardwareAnchored -> hardwareAnchor?.title ?: "Audio output"
             HomeOperationalMode.HorizonCue -> dailyCapsule?.primaryMood?.name ?: "${phase.displayName} Flow"
             HomeOperationalMode.DiscoveryCrates -> "Crate Discovery"
         }
 
         val heroSubtitle = when (mode) {
             HomeOperationalMode.ActiveGroove -> "${currentTrack?.artist} • ${currentTrack?.format ?: "FLAC"}"
-            HomeOperationalMode.HardwareAnchored -> hardwareAnchor?.description ?: "Studio Mastered Audio"
+            HomeOperationalMode.HardwareAnchored -> hardwareAnchor?.description ?: "Output settings"
             HomeOperationalMode.HorizonCue -> dailyCapsule?.aiNarrative ?: greetingSubtitle
             HomeOperationalMode.DiscoveryCrates -> "Curated by key and sonic texture."
         }
 
         val heroBadge = when (mode) {
             HomeOperationalMode.ActiveGroove -> if (currentTrack?.lossless == true) "BIT-PERFECT LOSSLESS" else "ACTIVE GROOVE"
-            HomeOperationalMode.HardwareAnchored -> hardwareAnchor?.badge ?: "DAC DIRECT"
+            HomeOperationalMode.HardwareAnchored -> hardwareAnchor?.badge ?: "AUDIO"
             HomeOperationalMode.HorizonCue -> "${dailyCapsule?.streakDays ?: 7}D STREAK"
             HomeOperationalMode.DiscoveryCrates -> "CURATED"
         }

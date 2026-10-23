@@ -227,6 +227,11 @@ fun PixelodyBaseShell(
     onRemoveQueueItem: (String) -> Unit = {},
     onRemoveQueueItemAt: (Int) -> Unit = { index -> data.queue.getOrNull(index)?.let(onRemoveQueueItem) },
     onPlayQueueEntry: ((String) -> Unit)? = null,
+    // Add to session: link another whole list into the shuffle playing now.
+    canAddToSession: (List<String>) -> Boolean = { false },
+    onAddToSession: (List<String>, String?) -> Unit = { _, _ -> },
+    onRemoveSessionList: (String) -> Unit = {},
+    onSessionEven: (Boolean) -> Unit = {},
     onRestoreQueueEntry: ((String, String, Int) -> Unit)? = null,
     onClearQueue: () -> Unit = {},
     onResetDeveloperData: (suspend (Boolean) -> Unit)? = null,
@@ -264,6 +269,8 @@ fun PixelodyBaseShell(
     onShuffleModeChange: (FlowShuffleMode) -> Unit = {},
     onShuffleAction: (String) -> Unit = {},
     onShuffleTracks: (List<String>) -> Unit = onPlayTracks,
+    // A list's Play button: that list in order, with shuffle off.
+    onPlayInOrder: (List<String>) -> Unit = onPlayTracks,
     repeatMode: RepeatMode = RepeatMode.Off,
     onToggleRepeat: () -> Unit = {},
     onSourceChange: (BaseSource) -> Unit,
@@ -414,6 +421,14 @@ fun PixelodyBaseShell(
         else onPlayTracks(listOf(trackId))
     }
 
+    // A list's Shuffle button: only that list, through the shuffle core. The
+    // first song is a random pick; the core chooses every song after it.
+    fun shuffleCollection(ids: List<String>) {
+        if (ids.isEmpty()) return
+        val seed = ids.random()
+        onShuffleTracks(listOf(seed) + ids.filterNot { it == seed })
+    }
+
     fun shuffleAllFlow() {
         val playablePool = data.visibleTracks().filter { data.isPlayable(it.id) && matchesFlow(it) }
         if (playablePool.isNotEmpty()) {
@@ -538,15 +553,22 @@ fun PixelodyBaseShell(
                     data.visibleTrackIds(openCollection.trackIds)
                 )
                 Button(
-                    onClick = { onPlayTracks(playable) },
+                    onClick = { onPlayInOrder(playable) },
                     enabled = playable.isNotEmpty(),
                     modifier = Modifier.weight(1f)
                 ) { Text("Play") }
                 OutlinedButton(
-                    onClick = { onPlayTracks(playable.shuffled()) },
+                    onClick = { shuffleCollection(playable) },
                     enabled = playable.size > 1,
                     modifier = Modifier.weight(1f)
                 ) { Text("Shuffle") }
+                val linkable = remember(playable, data.sessionLists, data.currentTrackId, shuffleMode) { canAddToSession(playable) }
+                if (linkable) {
+                    OutlinedButton(
+                        onClick = { onAddToSession(playable, openCollection.name) },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Add to session", maxLines = 1) }
+                }
             }
         }
 
@@ -1486,6 +1508,13 @@ fun PixelodyBaseShell(
                         onImportLearning = { onShuffleAction("import-learning") },
                         onDeleteLearning = { onShuffleAction("delete-learning") },
                         onForgetOtherQueues = { onShuffleAction("evict-other-scopes") },
+                        upNextTitle = data.queue.firstOrNull()?.let { id -> (data.track(id) ?: localTracks.firstOrNull { it.id == id })?.title },
+                        ifSkipTitle = data.liveNextTrackId?.let { id -> (data.track(id) ?: localTracks.firstOrNull { it.id == id })?.title },
+                        whyLine = data.shuffleWhy,
+                        sessionLists = data.sessionLists,
+                        sessionEven = data.sessionEven,
+                        onRemoveSessionList = onRemoveSessionList,
+                        onSessionEven = onSessionEven,
                         onPlayQueueItem = { index ->
                             queueEntries.getOrNull(index)?.first?.let { position ->
                                 val entryId = data.queueEntryIds.getOrNull(position)
@@ -1572,6 +1601,10 @@ fun PixelodyBaseShell(
                 onSourceChange = onSourceChange,
                 onLensChange = onLensChange,
                 onPlayTracks = onPlayTracks,
+                onPlayInOrder = onPlayInOrder,
+                onShuffleCollection = ::shuffleCollection,
+                canAddToSession = canAddToSession,
+                onAddToSession = onAddToSession,
                 onAddToQueue = onAddToQueue,
                 onOpenCollection = { kindKey, id ->
                     send(BaseIntent.Back)
@@ -1652,9 +1685,9 @@ private fun BaseNotPortedYet(what: String) {
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Text(text = "$what is not in the base layer yet", style = MaterialTheme.typography.bodyMedium)
+        Text(text = "$what is not available yet", style = MaterialTheme.typography.bodyMedium)
         Text(
-            text = "The port order builds the frame first, then moves features in one at a time. See the base layer standard, section 6.",
+            text = "This feature is still being connected to the current interface.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -1784,6 +1817,10 @@ private fun BaseOverlayHost(
     onPlayTracks: (List<String>) -> Unit,
     onAddToQueue: (String) -> Unit,
     onOpenCollection: (String, String) -> Unit,
+    onPlayInOrder: (List<String>) -> Unit = onPlayTracks,
+    onShuffleCollection: (List<String>) -> Unit = { onPlayTracks(it.shuffled()) },
+    canAddToSession: (List<String>) -> Boolean = { false },
+    onAddToSession: (List<String>, String?) -> Unit = { _, _ -> },
     onCratesChange: (CrateBook) -> Unit,
     onCoversChange: (CoverBook) -> Unit = {},
     coverStore: CoverStore? = null,
@@ -1994,8 +2031,12 @@ private fun BaseOverlayHost(
                         val playable = collection
                             ?.let { data.playableTrackIds(it.trackIds) }
                             .orEmpty()
-                        BaseOverlayItem("Play") { onDismiss(); onPlayTracks(playable) }
-                        BaseOverlayItem("Shuffle") { onDismiss(); onPlayTracks(playable.shuffled()) }
+                        BaseOverlayItem("Play") { onDismiss(); onPlayInOrder(playable) }
+                        BaseOverlayItem("Shuffle") { onDismiss(); onShuffleCollection(playable) }
+                        val linkable = remember(playable, data.sessionLists, data.currentTrackId) { canAddToSession(playable) }
+                        if (linkable) {
+                            BaseOverlayItem(label = "Add to session", subtitle = "Shuffle this list in with what's playing") { onDismiss(); onAddToSession(playable, collection?.name) }
+                        }
                         BaseOverlayItem("Open") {
                             onOpenCollection(overlay.kindKey, overlay.collectionId)
                         }
@@ -2018,7 +2059,7 @@ private fun BaseOverlayHost(
                         if (isPlaylist) {
                             BaseOverlayItem(
                                 label = "Export playlist (M3U8)",
-                                subtitle = "Save a standard M3U8 playlist file",
+                                subtitle = "Save the track list as an M3U8 file",
                                 trailing = "›"
                             ) {
                                 val playlistTracks = collection?.trackIds?.mapNotNull { data.track(it) }.orEmpty()
@@ -2029,7 +2070,7 @@ private fun BaseOverlayHost(
                             }
                             BaseOverlayItem(
                                 label = "Rename playlist",
-                                subtitle = "Change playlist title",
+                                subtitle = "Choose a new name",
                                 trailing = "›"
                             ) {
                                 send(

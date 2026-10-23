@@ -9,7 +9,7 @@ import org.json.JSONObject
 /** Maps local catalog evidence to the exact shared normalizer. Caller owns stable entry identity. */
 object UniversalShuffleMetadata {
     /** No occurrence IDs are invented here; repeated track IDs must have distinct caller-supplied entry IDs. */
-    fun rawEntry(track: Track, entryId: String): JSONObject {
+    fun rawEntry(track: Track, entryId: String, sourceKey: String? = null): JSONObject {
         val telemetry = HarmonicKeyEngine.estimateTrackTelemetry(track)
         val key = telemetry.key?.let {
             // Camelot wheel numbers are not pitch classes. Map through the known chromatic root.
@@ -29,6 +29,8 @@ object UniversalShuffleMetadata {
             .put("discNumber", track.discNumber ?: JSONObject.NULL).put("trackNumber", track.trackNumber ?: JSONObject.NULL)
             .put("available", !track.missing && track.streamUrl.isNotBlank()).put("genre", track.genre)
             .put("contextTags", JSONArray()).put("features", features)
+            // Which list the song came from, so linked lists can take turns.
+            .apply { if (!sourceKey.isNullOrEmpty()) put("sourceKey", sourceKey) }
     }
 
     fun normalizedEntry(track: Track, entryId: String, sourceIndex: Int = 0): JSONObject =

@@ -1,20 +1,24 @@
 package com.pixelody.app.data.model
 
 /**
- * End-to-end bitstream verification metadata across the Android audio pipeline.
+ * Known source metadata. Zero means unknown for integer fields; NaN means
+ * unmeasured for float fields. isBitPerfect is false until actually verified.
  */
 data class AudioBitstreamVerification(
-    val isBitPerfect: Boolean = true,
-    val bitDepth: Int = 24,
-    val sampleRateHz: Int = 192000,
-    val codec: String = "FLAC",
-    val resamplingRatio: Float = 1.0f, // 1.0 = native direct bit-perfect path
-    val outputSink: String = "USB DAC Direct",
-    val dynamicRangeDb: Float = 118.5f,
-    val thdPlusNPercent: Float = 0.0003f
+    val isBitPerfect: Boolean = false,
+    val bitDepth: Int = 0,
+    val sampleRateHz: Int = 0,
+    val codec: String = "Unknown format",
+    val resamplingRatio: Float = Float.NaN,
+    val outputSink: String = "Output unknown",
+    val dynamicRangeDb: Float = Float.NaN,
+    val thdPlusNPercent: Float = Float.NaN
 ) {
     val bitstreamLabel: String
-        get() = "$bitDepth-bit / ${sampleRateHz / 1000}kHz $codec"
+        get() = listOfNotNull(
+            bitDepth.takeIf { it > 0 }?.let { "$it-bit" },
+            sampleRateHz.takeIf { it > 0 }?.let { "${it / 1000.0}kHz" }
+        ).joinToString(" / ").let { if (it.isBlank()) codec else "$it $codec" }
 }
 
 /**

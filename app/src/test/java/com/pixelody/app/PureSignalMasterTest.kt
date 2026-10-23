@@ -25,15 +25,31 @@ class PureSignalMasterTest {
     }
 
     @Test
-    fun `verifyBitstreamPath recognizes 24-bit 192kHz FLAC as bit-perfect`() {
+    fun `lossless source and USB route do not establish bit-perfect output`() {
         val track = createTestTrack(lossless = true, sampleRate = 192000, bitDepth = 24)
         val verification = PureSignalMasterEngine.verifyBitstreamPath(track, "USB DAC Adapter")
 
-        assertTrue(verification.isBitPerfect)
+        assertFalse(verification.isBitPerfect)
         assertEquals(24, verification.bitDepth)
         assertEquals(192000, verification.sampleRateHz)
-        assertEquals("24-bit / 192kHz FLAC", verification.bitstreamLabel)
-        assertEquals(1.0f, verification.resamplingRatio, 0.001f)
+        assertEquals("24-bit / 192.0kHz FLAC", verification.bitstreamLabel)
+        assertTrue(verification.resamplingRatio.isNaN())
+        assertTrue(verification.dynamicRangeDb.isNaN())
+        assertTrue(verification.thdPlusNPercent.isNaN())
+        assertEquals("USB DAC Adapter", verification.outputSink)
+    }
+
+    @Test
+    fun `unknown metadata and Bluetooth codec are not guessed`() {
+        val verification = PureSignalMasterEngine.verifyBitstreamPath(
+            createTestTrack(lossless = true, sampleRate = 0, bitDepth = null), "Bluetooth speaker"
+        )
+        assertFalse(verification.isBitPerfect)
+        assertEquals(0, verification.bitDepth)
+        assertEquals(0, verification.sampleRateHz)
+        assertEquals("FLAC", verification.bitstreamLabel)
+        assertEquals("Bluetooth speaker", verification.outputSink)
+        assertEquals("Unknown format", com.pixelody.app.data.model.AudioBitstreamVerification().bitstreamLabel)
     }
 
     @Test

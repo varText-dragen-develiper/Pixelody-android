@@ -125,7 +125,7 @@ fun HiResLosslessHorizonCard(
 
                     Column {
                         Text(
-                            text = "HI-RES LOSSLESS HORIZON",
+                            text = "EXPERIMENTAL DAC PREVIEW",
                             style = MaterialTheme.typography.labelSmall,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
@@ -162,7 +162,7 @@ fun HiResLosslessHorizonCard(
                                 .background(primaryAccentColor)
                         )
                         Text(
-                            text = if (isBitPerfect) "1:1 DIRECT" else "MIXER",
+                            text = "OUTPUT UNVERIFIED",
                             style = MaterialTheme.typography.labelSmall,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
@@ -234,7 +234,7 @@ private fun SignalChainDiagram(
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text(
-            text = "AUDIO SIGNAL PATH & DIRECT ROUTING",
+            text = "CONFIGURED SIGNAL PATH — OUTPUT UNVERIFIED",
             style = MaterialTheme.typography.labelSmall,
             fontFamily = FontFamily.Monospace,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -273,8 +273,8 @@ private fun SignalChainDiagram(
             // Stage 3: Direct Buffer
             SignalChainNode(
                 stageTitle = "BUFFER",
-                formatText = if (chain.isOsResamplerBypassed) "FLAG_DIRECT" else "Resampled",
-                specText = if (chain.isOsResamplerBypassed) "Bypass Mixer" else "48kHz System",
+                formatText = if (chain.isOsResamplerBypassed) "Direct requested" else "Resampled",
+                specText = if (chain.isOsResamplerBypassed) "Output unverified" else "System output",
                 isOk = chain.isOsResamplerBypassed,
                 accentColor = accentColor
             )
@@ -483,7 +483,7 @@ private fun AudiophileSettingsSection(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // Bit-Perfect Direct Passthrough Switch
+        // Request direct output Switch
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -491,13 +491,13 @@ private fun AudiophileSettingsSection(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Bit-Perfect Direct Passthrough",
+                    text = "Request direct output",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "Transmit bit-for-bit unadulterated PCM/DoP directly to DAC",
+                    text = "Experimental setting. Direct output has not been verified.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -523,13 +523,13 @@ private fun AudiophileSettingsSection(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Bypass Android OS Resampler",
+                    text = "Request resampler bypass",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "Use FLAG_DIRECT_OUTPUT to bypass 48kHz mixer downsampling",
+                    text = "Request a direct path where supported. The actual output needs device verification.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

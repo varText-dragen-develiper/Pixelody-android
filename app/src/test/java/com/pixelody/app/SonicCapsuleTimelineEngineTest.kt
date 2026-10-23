@@ -157,7 +157,7 @@ class SonicCapsuleTimelineEngineTest {
         val dna = engine.dailyCapsule.value.audioDna
         assertEquals(3, dna.tracksPlayedCount)
         assertEquals(3, dna.uniqueArtistsCount)
-        assertEquals(2, dna.bitPerfectPlayCount)
+        assertEquals(0, dna.bitPerfectPlayCount)
         assertEquals(0.666f, dna.losslessRatio, 0.02f)
         assertTrue(dna.totalListeningMinutes >= 15)
     }
@@ -177,9 +177,9 @@ class SonicCapsuleTimelineEngineTest {
         )
 
         val poetic = engine.generateAiLinerNote(metrics, SonicArchetype.HiResAudiophile, SonicMood.LateNightDrift, NarrativeStyle.Poetic)
-        assertTrue(poetic.contains("lossless aura"))
+        assertTrue(poetic.contains("lossless files"))
         assertTrue(poetic.contains("90%"))
-        assertTrue(poetic.contains("Hi-Res Audiophile"))
+        assertTrue(poetic.contains("15 tracks"))
 
         val analytical = engine.generateAiLinerNote(metrics, SonicArchetype.HiResAudiophile, SonicMood.LateNightDrift, NarrativeStyle.Analytical)
         assertTrue(analytical.contains("Session log"))
@@ -187,9 +187,9 @@ class SonicCapsuleTimelineEngineTest {
         assertTrue(analytical.contains("Late Night Drift"))
 
         val djNotes = engine.generateAiLinerNote(metrics, SonicArchetype.ElectronicExplorer, SonicMood.MiddayFocus, NarrativeStyle.DjLinerNotes)
-        assertTrue(djNotes.contains("Handoff"))
-        assertTrue(djNotes.contains("15 cuts"))
-        assertTrue(djNotes.contains("Electronic Explorer"))
+        assertTrue(djNotes.contains("15 tracks"))
+        assertTrue(djNotes.contains("10 artists"))
+        assertTrue(djNotes.contains("90%"))
     }
 
     @Test
