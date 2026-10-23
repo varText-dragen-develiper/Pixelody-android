@@ -110,7 +110,7 @@ object FeatureDocumentationRepository {
         ),
         FeatureDocTopic(
             id = "smart_flow",
-            title = "Smart Flow & Harmonic Pairing",
+            title = "Flow & Harmonic Pairing",
             category = "Playback Engine",
             summary = "Plan the next tracks using key, tempo, and transition settings.",
             sections = listOf(
@@ -124,7 +124,7 @@ object FeatureDocumentationRepository {
                     )
                 )
             ),
-            proTip = "Start Smart Flow from Quick Start or the Flow Shuffle control in Now Playing.",
+            proTip = "Start Flow from Quick Start or the Flow Shuffle control in Now Playing.",
             relatedTopicIds = listOf("harmonigrains", "harmonic_lens", "trajectory_sculptor")
         ),
         FeatureDocTopic(

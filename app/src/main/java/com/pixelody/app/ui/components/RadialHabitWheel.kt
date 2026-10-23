@@ -352,7 +352,7 @@ fun buildCabinetActionItems(
                 id = CabinetActionId.ConnectDesktop,
                 glyphType = TransportGlyphType.DesktopHost,
                 label = if (target.isConnected) "Reconnect" else "Connect",
-                subtitle = if (target.isConnected) "Refresh socket" else "Connect to PC",
+                subtitle = if (target.isConnected) "Reconnect" else "Connect to Windows",
                 accentColor = PixelodyDirection.Ink
             ),
             CabinetActionItem(
@@ -382,7 +382,7 @@ fun buildCabinetActionItems(
                 id = CabinetActionId.RescanPhoneStorage,
                 glyphType = TransportGlyphType.Refresh,
                 label = "Rescan Phone",
-                subtitle = "Scan MediaStore",
+                subtitle = "Scan device music",
                 accentColor = PixelodyDirection.Ink
             ),
             CabinetActionItem(
@@ -395,7 +395,7 @@ fun buildCabinetActionItems(
             CabinetActionItem(
                 id = CabinetActionId.ClearCacheStorage,
                 glyphType = TransportGlyphType.Download,
-                label = "Cache Store",
+                label = "Offline cache",
                 subtitle = "Manage downloads",
                 accentColor = PixelodyDirection.Ink
             ),
@@ -473,7 +473,7 @@ fun buildCabinetActionItems(
             id = CabinetActionId.DailySoundCheck,
             glyphType = TransportGlyphType.Checkmark,
             label = "Sound Check",
-            subtitle = "Execute daily ritual",
+            subtitle = "Run your daily actions",
             accentColor = PixelodyDirection.Ink
         ),
         CabinetActionItem(
