@@ -4,7 +4,7 @@ Connect to [Pixelody for Windows](https://github.com/varText-dragen-develiper/Pi
 
 ## Choose source or a published build
 
-Check [Android Releases](https://github.com/varText-dragen-develiper/Pixelody-android/releases) for an APK and its installation instructions. No Android GitHub release is published as of October 10, 2026. The steps below produce a developer debug APK; they do not prove release signing or an update path from another installation.
+The [Android 0.2.1 preview](https://github.com/varText-dragen-develiper/Pixelody-android/releases/tag/v0.2.1) is available as a debug-signed APK for Android 8 or newer. Compare it with the release’s checksum file and read the update instructions. If Android reports a signing-key conflict, stop and report it before uninstalling; uninstalling can remove local data. The [website](https://pixelody-web.pixelody101.workers.dev/testing) has setup help and a listening checklist. The source-build steps below make a developer debug APK; they do not establish production signing or compatibility with every existing installation.
 
 ## Build from source
 
@@ -24,7 +24,7 @@ On Linux/macOS, run the wrapper with **bash ./gradlew**. The output is **app/bui
 
 Start the Windows host and put both devices on its supported private network. Open the Android pairing flow, use the host's QR or short code, and confirm the host identity. Browse one album, start an authorized stream, check the queue and reopen the app. If host playback stops after Windows sleeps, Wi-Fi changes, or permissions are revoked, include that in your report so I can follow what happened. Keep it separate from phone-local playback results.
 
-For phone-local playback, use your build's instructions and device test results.
+For a first phone-local session, import music you have permission to use, try play, pause, seek and skip, then close and reopen Pixelody. Check that your library and settings are still there.
 
 ## Modules and help
 

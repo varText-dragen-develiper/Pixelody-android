@@ -1,13 +1,13 @@
 # Pixelody for Android
 
-Pixelody for Android connects to your Windows library over the local network. Browse music, control playback, and join J.A.M. (Joined Audio Mesh) sessions. Keep the Windows host running for these features; hosting that library from your phone is still planned.
+I’m building Pixelody for Android alongside the Windows app. Play music on your phone, or connect to your Windows library to browse, listen and join J.A.M. (Joined Audio Mesh) sessions. Keep the Windows host running for its library and session features; hosting that library from your phone is still planned.
 
 This repository is the open-source edition of the Android app. It is licensed under the GNU General Public License v3.0 only (see [LICENSE](LICENSE) and [NOTICE](NOTICE)). If you fork or redistribute it, read the name and logo guidance in [TRADEMARKS.md](TRADEMARKS.md). The Windows app is at [Pixelody](https://github.com/varText-dragen-develiper/Pixelody).
 
 ## Start here
 
 - [Getting started](docs/GETTING_STARTED.md): requirements, source build and first listening session.
-- [Android releases](https://github.com/varText-dragen-develiper/Pixelody-android/releases): exact binaries and release notes when published. No Android GitHub release is published as of October 10, 2026.
+- [Android releases](https://github.com/varText-dragen-develiper/Pixelody-android/releases): the Android 0.2.1 debug-signed testing APK and its installation notes, under `v0.2.1`.
 - [Support](SUPPORT.md) and [shared discussions](https://github.com/varText-dragen-develiper/Pixelody/discussions): report problems or share listening ideas.
 - [Release preparation](docs/RELEASE_PREPARATION.md): what still needs verification before distributing a binary.
 

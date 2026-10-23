@@ -1,6 +1,6 @@
 # Android Mobile UX And Navigation Philosophy
 
-These notes translate Pixelody's desktop North Star into a native Android surface.
+These notes describe how I want Pixelody to feel on a phone.
 They define product intent, not a blanket implementation claim. As of 2026-08-10,
 the current Compose shell uses Home/Search/Library/Create as its persistent set and
 opens Player, Queue, Profile, Files, and Tools contextually. The older target below
@@ -10,7 +10,7 @@ navigation.
 
 ## Mobile Thesis
 
-Pixelody Android should feel like a calm personal music companion: immediately playable like familiar streaming apps, but visibly local-first, source-aware, and comfortable with advanced sharing/J.A.M. controls when the user asks for them.
+I want it to be easy to open Pixelody and get to the music. Keep the current track and its source clear, with sharing and J.A.M. controls close when someone needs them.
 
 Use Spotify, Pandora, and similar mature music apps as ergonomics references only:
 
