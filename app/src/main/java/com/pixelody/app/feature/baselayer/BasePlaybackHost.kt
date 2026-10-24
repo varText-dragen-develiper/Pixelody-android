@@ -17,6 +17,14 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import com.pixelody.app.core.unskippable.UnskippableMix
+import com.pixelody.app.data.storage.TrackMetadataOverride
+import com.pixelody.app.data.storage.UnskippableMixStore
+import com.pixelody.app.feature.unskippable.UnskippableBuilder
+import com.pixelody.app.feature.unskippable.UnskippableCover
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
@@ -27,6 +35,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -349,6 +359,20 @@ fun BasePlaybackHost(
     var playbackSpeed by remember { mutableFloatStateOf(settingsStore.loadPlaybackSpeed()) }
     var pitchLocked by remember { mutableStateOf(settingsStore.loadPitchLocked()) }
     var loudnessMode by remember { mutableStateOf(settingsStore.loadLoudnessNormalization()) }
+    // Unskippable mixes: saved apart from playlists, opened on their own cover, and
+    // played with skip, seek and queue changes locked until the mix ends or you leave.
+    val unskippableStore = remember { UnskippableMixStore(context.applicationContext) }
+    var unskippableMixes by remember { mutableStateOf(unskippableStore.load()) }
+    var unskippableBuilderOpen by remember { mutableStateOf(false) }
+    var unskippableBuilderSeed by remember { mutableStateOf<UnskippableMix.Recipe?>(null) }
+    // Saveable so a rotation does not drop the cover while the playback lock is still on.
+    var unskippableCoverId by rememberSaveable { mutableStateOf<String?>(null) }
+    var unskippableActive by rememberSaveable { mutableStateOf(false) }
+    var unskippableFinished by rememberSaveable { mutableStateOf(false) }
+    var unskippablePrior by rememberSaveable(stateSaver = listSaver<Pair<FlowShuffleMode, RepeatMode>?, String>(
+        save = { p -> p?.let { listOf(it.first.name, it.second.name) } ?: emptyList() },
+        restore = { l -> if (l.size == 2) FlowShuffleMode.valueOf(l[0]) to RepeatMode.valueOf(l[1]) else null })) { mutableStateOf<Pair<FlowShuffleMode, RepeatMode>?>(null) }
+    var playerEndedAt by remember { mutableLongStateOf(0L) }
 
     fun updateSpeedAndPitch(speed: Float, locked: Boolean) {
         playbackSpeed = speed
@@ -744,6 +768,7 @@ fun BasePlaybackHost(
             override fun onPlaybackStateChanged(playbackState: Int) {
                 playbackPositionState.longValue = activePlayer.currentPosition.coerceAtLeast(0L)
                 settingsStore.saveLastTrackPositionMs(playbackPositionState.longValue)
+                if (playbackState == Player.STATE_ENDED) playerEndedAt = System.currentTimeMillis()
             }
 
             override fun onPlayerError(error: PlaybackException) {
@@ -915,7 +940,14 @@ fun BasePlaybackHost(
             ?: initialData.track(id)
     }
 
-    fun startPlayback(trackIds: List<String>, startPositionMs: Long, mode: FlowShuffleMode = shuffleMode) {
+    fun unskippableBlocks(): Boolean {
+        if (!unskippableActive) return false
+        Toast.makeText(context, "Unskippable is on. Leave the mix to skip, seek or change the queue.", Toast.LENGTH_SHORT).show()
+        return true
+    }
+
+    fun startPlayback(trackIds: List<String>, startPositionMs: Long, mode: FlowShuffleMode = shuffleMode, unskippable: Boolean = false) {
+        if (!unskippable && unskippableBlocks()) return
         val activePlayer = player ?: return
         if (trackIds.isEmpty()) return
         val tracksToPlay = trackIds.mapNotNull { resolveTrack(it) }
@@ -1019,6 +1051,7 @@ fun BasePlaybackHost(
     }
 
     fun nextTrack() {
+        if (unskippableBlocks()) return
         val activePlayer = player
         if (activePlayer != null && activePlayer.hasNextMediaItem()) {
             activePlayer.seekToNextMediaItem()
@@ -1028,6 +1061,7 @@ fun BasePlaybackHost(
     }
 
     fun addTracksToQueue(trackIds: List<String>) {
+        if (unskippableBlocks()) return
         val tracks = trackIds.mapNotNull(::resolveTrack)
         if (tracks.isEmpty()) return
         val activePlayer = player
@@ -1063,6 +1097,7 @@ fun BasePlaybackHost(
      * the lists take turns instead of the new songs being queued next.
      */
     fun addCollectionToSession(trackIds: List<String>, name: String?) {
+        if (unskippableBlocks()) return
         val activePlayer = player as? MediaController ?: return
         if (!canAddToSession(trackIds)) return
         val key = sessionKeyFor(trackIds) ?: return
@@ -1087,6 +1122,7 @@ fun BasePlaybackHost(
     }
 
     fun removeSessionList(key: String) {
+        if (unskippableBlocks()) return
         val activePlayer = player as? MediaController ?: return
         activePlayer.sendCustomCommand(SessionCommand(PlaybackEvidenceMetadata.COMMAND_POLICY, Bundle.EMPTY), Bundle().apply { putString("action", "remove-source"); putString("sourceKey", key) })
         val left = sessionLists.filterNot { it.sourceKey == key }
@@ -1105,6 +1141,7 @@ fun BasePlaybackHost(
     }
 
     fun seek(positionMs: Long) {
+        if (unskippableBlocks()) return
         val activePlayer = player ?: return
         activePlayer.seekTo(positionMs)
         playbackPositionState.longValue = positionMs
@@ -1112,6 +1149,7 @@ fun BasePlaybackHost(
     }
 
     fun previousTrack() {
+        if (unskippableBlocks()) return
         val activePlayer = player
         if (activePlayer != null && activePlayer.hasPreviousMediaItem()) {
             activePlayer.seekToPreviousMediaItem()
@@ -1133,6 +1171,7 @@ fun BasePlaybackHost(
      * played history intact. Off freezes the current order; new plays use source order.
      */
     fun setShuffleMode(nextMode: FlowShuffleMode) {
+        if (unskippableBlocks()) return
         if (nextMode == shuffleMode) return
         shuffleMode = nextMode
         queuePlanningJob?.cancel()
@@ -1153,6 +1192,7 @@ fun BasePlaybackHost(
     fun toggleShuffle() = setShuffleMode(shuffleMode.next())
 
     fun toggleRepeat() {
+        if (unskippableBlocks()) return
         val nextMode = when (repeatMode) {
             RepeatMode.Off -> RepeatMode.All
             RepeatMode.All -> RepeatMode.One
@@ -1164,6 +1204,7 @@ fun BasePlaybackHost(
     }
 
     fun moveQueueItem(fromIndex: Int, toIndex: Int) {
+        if (unskippableBlocks()) return
         if (fromIndex == toIndex) return
         if (fromIndex !in queue.indices || toIndex !in queue.indices) return
         val activePlayer = player
@@ -1190,6 +1231,7 @@ fun BasePlaybackHost(
      * parameter all along and nothing ever passed it.
      */
     fun setQueueOrder(trackIds: List<String>) {
+        if (unskippableBlocks()) return
         val activePlayer = player
         if (activePlayer == null) {
             queue = trackIds
@@ -1214,6 +1256,7 @@ fun BasePlaybackHost(
      * different position is a quieter kind of wrong than not restoring it at all.
      */
     fun insertIntoQueue(trackId: String, position: Int) {
+        if (unskippableBlocks()) return
         val track = resolveTrack(trackId) ?: return
         val activePlayer = player
         if (activePlayer == null) {
@@ -1229,6 +1272,7 @@ fun BasePlaybackHost(
     }
 
     fun removeQueueItem(entryOrTrackId: String) {
+        if (unskippableBlocks()) return
         val activePlayer = player
         if (activePlayer == null) {
             val index = queueEntryIds.indexOf(entryOrTrackId).takeIf { it >= 0 } ?: queue.indexOf(entryOrTrackId)
@@ -1247,6 +1291,7 @@ fun BasePlaybackHost(
     }
 
     fun removeQueueItemAt(position: Int) {
+        if (unskippableBlocks()) return
         if (position !in queue.indices) return
         val activePlayer = player
         if (activePlayer == null) {
@@ -1259,6 +1304,7 @@ fun BasePlaybackHost(
     }
 
     fun clearQueue() {
+        if (unskippableBlocks()) return
         val activePlayer = player
         if (activePlayer == null) {
             queue = emptyList()
@@ -1317,10 +1363,12 @@ fun BasePlaybackHost(
     }
 
     fun playNext(trackId: String) {
+        if (unskippableBlocks()) return
         insertIntoQueue(trackId, 0)
     }
 
     fun playQueueEntry(entryId: String) {
+        if (unskippableBlocks()) return
         val active = player ?: return
         val index = (active.currentMediaItemIndex + 1 until active.mediaItemCount)
             .firstOrNull { PlaybackEvidenceMetadata.entryId(active.getMediaItemAt(it)) == entryId } ?: return
@@ -1329,6 +1377,7 @@ fun BasePlaybackHost(
     }
 
     fun restoreQueueEntry(trackId: String, entryId: String, position: Int) {
+        if (unskippableBlocks()) return
         val active = player ?: return
         val track = resolveTrack(trackId) ?: return
         val start = active.currentMediaItemIndex + 1
@@ -1337,7 +1386,93 @@ fun BasePlaybackHost(
         syncQueueFromPlayer()
     }
 
+    fun sendUnskippableLock(locked: Boolean) {
+        (player as? MediaController)?.sendCustomCommand(SessionCommand(PlaybackEvidenceMetadata.COMMAND_POLICY, Bundle.EMPTY),
+            Bundle().apply { putString("action", "unskippable-lock"); putBoolean("locked", locked) })
+    }
+
+    fun saveUnskippableProgress() {
+        val id = unskippableCoverId ?: return
+        if (!unskippableActive) return
+        val activePlayer = player ?: return
+        val trackId = activePlayer.currentMediaItem?.mediaId ?: return
+        val positionMs = activePlayer.currentPosition.coerceAtLeast(0L)
+        unskippableStore.update(id) { if (trackId in it.trackIds) it.copy(progressTrackId = trackId, progressPositionMs = positionMs) else it }
+        unskippableMixes = unskippableStore.load()
+    }
+
+    // The mix plays in order with repeat off; shuffle and repeat come back the way
+    // they were when you leave or the mix ends.
+    fun beginUnskippable(fromStart: Boolean) {
+        val mix = unskippableMixes.firstOrNull { it.id == unskippableCoverId } ?: return
+        if (player == null) { Toast.makeText(context, "Playback is still connecting. Try again in a moment.", Toast.LENGTH_SHORT).show(); return }
+        val available = { id: String -> resolveTrack(id)?.missing == false }
+        val point = UnskippableMix.resumePoint(mix.trackIds, if (fromStart) null else mix.progressTrackId, if (fromStart) 0L else mix.progressPositionMs, available)
+        if (point == null) { Toast.makeText(context, "None of this mix's songs are available.", Toast.LENGTH_SHORT).show(); return }
+        unskippablePrior = unskippablePrior ?: (shuffleMode to repeatMode)
+        shuffleMode = FlowShuffleMode.Off
+        repeatMode = RepeatMode.Off
+        player?.repeatMode = Player.REPEAT_MODE_OFF
+        unskippableFinished = false
+        startPlayback(mix.trackIds.drop(point.index).filter(available), point.positionMs, FlowShuffleMode.Off, unskippable = true)
+        unskippableActive = true
+        sendUnskippableLock(true)
+    }
+
+    fun endUnskippableSession() {
+        unskippableActive = false
+        sendUnskippableLock(false)
+        unskippablePrior?.let { (mode, repeat) ->
+            shuffleMode = mode
+            repeatMode = repeat
+            player?.repeatMode = playerRepeatModeFor(repeat)
+            (player as? MediaController)?.sendCustomCommand(SessionCommand(PlaybackEvidenceMetadata.COMMAND_MODE, Bundle.EMPTY), Bundle().apply { putString("mode", mode.name) })
+        }
+        unskippablePrior = null
+    }
+
+    fun leaveUnskippable() {
+        if (unskippableActive) {
+            saveUnskippableProgress()
+            player?.pause()
+            isPlaying = false
+            endUnskippableSession()
+        }
+        unskippableCoverId = null
+        unskippableFinished = false
+    }
+
+    fun finishUnskippable() {
+        val id = unskippableCoverId ?: return
+        if (!unskippableActive) return
+        unskippableStore.update(id) { it.copy(progressTrackId = null, progressPositionMs = 0L, lastFinishedAtMs = System.currentTimeMillis()) }
+        unskippableMixes = unskippableStore.load()
+        endUnskippableSession()
+        unskippableFinished = true
+    }
+
+    fun openUnskippable(id: String) {
+        if (unskippableCoverId != null && unskippableCoverId != id) leaveUnskippable()
+        unskippableCoverId = id
+        unskippableFinished = false
+    }
+
+    LaunchedEffect(playerEndedAt) {
+        if (playerEndedAt > 0L && unskippableActive) finishUnskippable()
+    }
+    LaunchedEffect(unskippableActive, isPlaying) {
+        while (unskippableActive && isPlaying) {
+            delay(5000)
+            saveUnskippableProgress()
+        }
+    }
+
+    Box(modifier = modifier) {
     PixelodyBaseShell(
+        unskippableMixes = unskippableMixes,
+        unskippableDurationOf = { mix -> mix.trackIds.sumOf { (resolveTrack(it)?.durationSeconds ?: 0).toLong() } * 1000L },
+        onMakeUnskippable = { unskippableBuilderSeed = null; unskippableBuilderOpen = true },
+        onOpenUnskippable = ::openUnskippable,
         onResetDeveloperData = { includeTrackEdits ->
             val resetPlayer = checkNotNull(player) { "Playback is still connecting; try again" }
             queuePlanningJob?.cancel()
@@ -1531,6 +1666,43 @@ fun BasePlaybackHost(
         incomingDeepLink = incomingDeepLink,
         incomingSearchQuery = incomingSearchQuery,
         onDeepLinkConsumed = onDeepLinkConsumed,
-        modifier = modifier
+        modifier = Modifier.fillMaxSize()
     )
+    if (unskippableBuilderOpen) {
+        UnskippableBuilder(
+            tracks = baseData.tracks,
+            seedRecipe = unskippableBuilderSeed,
+            uniqueName = { base ->
+                val taken = (unskippableMixes.map { it.name } + userPlaylists.map { it.name }).map { it.lowercase() }.toSet()
+                generateSequence(1) { it + 1 }.map { if (it == 1) base else "$base $it" }.first { it.lowercase() !in taken }
+            },
+            onTagGenre = { ids, genre ->
+                ids.forEach { id -> metadataStore.saveOverride((metadataStore.getOverride(id) ?: TrackMetadataOverride(id)).copy(genre = genre, updatedAt = System.currentTimeMillis())) }
+                Toast.makeText(context, "Tagged ${ids.size} song${if (ids.size == 1) "" else "s"} as $genre.", Toast.LENGTH_SHORT).show()
+            },
+            onSave = { name, preview ->
+                val record = unskippableStore.create(name, preview, System.currentTimeMillis())
+                unskippableMixes = unskippableStore.load()
+                unskippableBuilderOpen = false
+                Toast.makeText(context, "Saved ${record.name}.", Toast.LENGTH_SHORT).show()
+                openUnskippable(record.id)
+            },
+            onDismiss = { unskippableBuilderOpen = false }
+        )
+    }
+    unskippableMixes.firstOrNull { it.id == unskippableCoverId }?.let { mix ->
+        UnskippableCover(
+            mix = mix,
+            trackById = ::resolveTrack,
+            currentTrackId = currentTrackId,
+            active = unskippableActive,
+            finished = unskippableFinished,
+            isPlaying = isPlaying,
+            progress = { if (playbackDurationMs > 0) (playbackPositionState.longValue.toFloat() / playbackDurationMs).coerceIn(0f, 1f) else 0f },
+            onToggle = { if (unskippableActive) togglePlay() else beginUnskippable(fromStart = false) },
+            onRestart = { beginUnskippable(fromStart = true) },
+            onLeave = ::leaveUnskippable
+        )
+    }
+    }
 }

@@ -54,6 +54,9 @@ class PixelodyPlaybackService : MediaLibraryService() {
     private var player: ExoPlayer? = null
     private var mediaLibrarySession: MediaLibrarySession? = null
     private var shuffleAuthority: UniversalPlaybackAuthority? = null
+    // An unskippable mix is playing: skip, seek and queue changes are refused from every
+    // controller (notification, lock screen, headset, car), and the system hides them.
+    private var unskippableLocked = false
     private val stateStore by lazy { getSharedPreferences(PLAYBACK_PREFERENCES, MODE_PRIVATE) }
     private val checkpointStore by lazy { VersionedPlaybackSessionStore(File(filesDir, "universal-shuffle")) }
     private val checkpointIo = Executors.newSingleThreadExecutor { task -> Thread(task, "Pixelody-playback-session").apply { isDaemon = true } }
@@ -259,10 +262,12 @@ class PixelodyPlaybackService : MediaLibraryService() {
                     commands.add(SessionCommand(PlaybackEvidenceMetadata.COMMAND_MODE, Bundle.EMPTY))
                     commands.add(SessionCommand(PlaybackEvidenceMetadata.COMMAND_POLICY, Bundle.EMPTY))
                 }
-                return MediaSession.ConnectionResult.AcceptedResultBuilder(session).setAvailableSessionCommands(commands.build()).build()
+                return MediaSession.ConnectionResult.AcceptedResultBuilder(session).setAvailableSessionCommands(commands.build())
+                    .setAvailablePlayerCommands(playerCommandsFor(controller)).build()
             }
 
             override fun onPlayerCommandRequest(session: MediaSession, controller: MediaSession.ControllerInfo, playerCommand: Int): Int {
+                if (unskippableLocked && UnskippableLock.blocks(playerCommand, controller.packageName == packageName)) return SessionError.ERROR_PERMISSION_DENIED
                 shuffleAuthority?.controllerOrigin(controller.packageName == packageName)
                 return SessionResult.RESULT_SUCCESS
             }
@@ -286,6 +291,7 @@ class PixelodyPlaybackService : MediaLibraryService() {
                             }
                             return future
                         }
+                        "unskippable-lock" -> setUnskippableLock(args.getBoolean("locked"))
                         "new-cycle" -> shuffleAuthority?.newCycle()
                         "reshuffle-remaining" -> shuffleAuthority?.reshuffleRemaining()
                         "clear-future" -> shuffleAuthority?.clearFuture()
@@ -406,6 +412,25 @@ class PixelodyPlaybackService : MediaLibraryService() {
                 )
             )
             .build()
+    }
+
+    private fun playerCommandsFor(controller: MediaSession.ControllerInfo): Player.Commands =
+        if (unskippableLocked) UnskippableLock.lockedCommands(controller.packageName == packageName)
+        else MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS
+
+    private fun setUnskippableLock(locked: Boolean) {
+        if (unskippableLocked == locked) return
+        unskippableLocked = locked
+        val session = mediaLibrarySession ?: return
+        // Connected controllers keep their session commands; only the player commands change.
+        for (controller in session.connectedControllers) {
+            val commands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS.buildUpon()
+            if (controller.packageName == packageName) {
+                commands.add(SessionCommand(PlaybackEvidenceMetadata.COMMAND_MODE, Bundle.EMPTY))
+                commands.add(SessionCommand(PlaybackEvidenceMetadata.COMMAND_POLICY, Bundle.EMPTY))
+            }
+            session.setAvailableCommands(controller, commands.build(), playerCommandsFor(controller))
+        }
     }
 
     private fun updateEqualizerEffects() {

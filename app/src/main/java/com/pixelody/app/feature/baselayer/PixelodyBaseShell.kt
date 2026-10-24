@@ -210,6 +210,10 @@ import com.pixelody.app.core.playback.SleepTimerState
 @Composable
 fun PixelodyBaseShell(
     data: BaseLayerData,
+    unskippableMixes: List<com.pixelody.app.data.storage.UnskippableMixRecord> = emptyList(),
+    unskippableDurationOf: (com.pixelody.app.data.storage.UnskippableMixRecord) -> Long = { 0L },
+    onMakeUnskippable: (() -> Unit)? = null,
+    onOpenUnskippable: (String) -> Unit = {},
     localTracks: List<Track> = emptyList(),
     sessionInsights: SessionSoundInsights = SessionSoundInsights(),
     dailyCapsule: DailySonicCapsule = DailySonicCapsule(),
@@ -1072,6 +1076,10 @@ fun PixelodyBaseShell(
                 }
 
                 pageDestination == BaseDestination.Library -> LibraryScreen(
+                    unskippableMixes = unskippableMixes,
+                    unskippableDurationOf = unskippableDurationOf,
+                    onMakeUnskippable = onMakeUnskippable,
+                    onOpenUnskippable = onOpenUnskippable,
                     jamSession = availableJamSession,
                     onStartJam = { send(BaseIntent.ShowOverlay(BaseOverlay.JamHub)) },
                     shuffleMode = shuffleMode,

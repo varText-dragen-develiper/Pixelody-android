@@ -130,6 +130,10 @@ internal fun matchesCollectionId(candidateId: String, selectedId: String): Boole
 @Composable
 internal fun LibraryScreen(
     snapshot: LibrarySnapshot?,
+    unskippableMixes: List<com.pixelody.app.data.storage.UnskippableMixRecord> = emptyList(),
+    unskippableDurationOf: (com.pixelody.app.data.storage.UnskippableMixRecord) -> Long = { 0L },
+    onMakeUnskippable: (() -> Unit)? = null,
+    onOpenUnskippable: (String) -> Unit = {},
     localTracks: List<Track> = emptyList(),
     selectedTrack: Track?,
     cachedTrackIds: Set<String> = emptySet(),
@@ -710,6 +714,17 @@ internal fun LibraryScreen(
                             label = { Text("${mode.badge} ${mode.label}", fontSize = 12.sp) }
                         )
                     }
+                }
+            }
+
+            if (browseMode == "Playlists" && selectedCollection.isBlank() && onMakeUnskippable != null) {
+                item(key = "unskippable_shelf") {
+                    com.pixelody.app.feature.unskippable.UnskippableShelf(
+                        mixes = unskippableMixes,
+                        durationOf = unskippableDurationOf,
+                        onMake = onMakeUnskippable,
+                        onOpen = onOpenUnskippable
+                    )
                 }
             }
 
