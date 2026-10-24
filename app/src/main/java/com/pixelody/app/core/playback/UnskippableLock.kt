@@ -25,6 +25,7 @@ object UnskippableLock {
     fun blocks(command: Int, ownApp: Boolean): Boolean =
         command in SKIP_AND_SEEK || (!ownApp && command in QUEUE_AND_MODES)
 
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
     fun lockedCommands(ownApp: Boolean): Player.Commands {
         val builder = MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS.buildUpon()
         SKIP_AND_SEEK.forEach { builder.remove(it) }
