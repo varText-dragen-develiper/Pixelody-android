@@ -4,7 +4,7 @@ Connect to [Pixelody for Windows](https://github.com/varText-dragen-develiper/Pi
 
 ## Choose source or a published build
 
-The [Android 0.2.1 preview](https://github.com/varText-dragen-develiper/Pixelody-android/releases/tag/v0.2.1) is available as a debug-signed APK for Android 8 or newer. Compare it with the release’s checksum file and read the update instructions. If Android reports a signing-key conflict, stop and report it before uninstalling; uninstalling can remove local data. The [website](https://pixelody-web.pixelody101.workers.dev/testing) has setup help and a listening checklist. The source-build steps below make a developer debug APK; they do not establish production signing or compatibility with every existing installation.
+The [Android 0.2.2 preview](https://github.com/varText-dragen-develiper/Pixelody-android/releases/tag/v0.2.2) is available as a debug-signed APK for Android 8 or newer. Compare it with the release’s checksum file and read the update instructions. If Android reports a signing-key conflict, stop and report it before uninstalling; uninstalling can remove local data. The [website](https://pixelody-web.pixelody101.workers.dev/testing) has setup help and a listening checklist. The source-build steps below make a developer debug APK; they do not establish production signing or compatibility with every existing installation.
 
 ## Build from source
 
