@@ -1,6 +1,8 @@
 # Pixelody for Android
 
-I’m building Pixelody for Android alongside the Windows app. Play music on your phone, or connect to your Windows library to browse, listen and join J.A.M. (Joined Audio Mesh) sessions. Keep the Windows host running for its library and session features; hosting that library from your phone is still planned.
+Pixelody for Android plays music on your phone, or connects to your Windows library to browse, listen, and join J.A.M. (Joined Audio Mesh) sessions.
+
+The phone app is being built to work on its own and alongside the desktop player. Local playback and a host connection serve different situations; keep the Windows host running when using its library or session features. Hosting that library from the phone is still planned.
 
 This repository is the open-source edition of the Android app. It is licensed under the GNU General Public License v3.0 only (see [LICENSE](LICENSE) and [NOTICE](NOTICE)). If you fork or redistribute it, read the name and logo guidance in [TRADEMARKS.md](TRADEMARKS.md). The Windows app is at [Pixelody](https://github.com/varText-dragen-develiper/Pixelody).
 
