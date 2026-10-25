@@ -470,7 +470,7 @@ private fun TurntablePerformanceConsole(frame: com.pixelody.app.data.model.Tacti
             }
 
             Text(
-                text = "Touch to engage slipmat friction, spinback deceleration, and needle drop dynamics.",
+                text = "Touch the platter to try dragging, spinback and needle drop.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -563,7 +563,7 @@ private fun PhosphorScopeConsole(frame: com.pixelody.app.data.model.TactileSound
             }
 
             Text(
-                text = "Green P31 phosphor persistence with real-time stereo phase correlation.",
+                text = "Green traces show the relationship between the stereo channels.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

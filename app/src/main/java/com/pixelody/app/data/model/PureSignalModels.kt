@@ -35,7 +35,7 @@ enum class AcousticTargetPreset(
 ) {
     StudioFlatReference(
         title = "Studio Flat Reference",
-        subtitle = "Zero-coloration unadulterated linear frequency response",
+        subtitle = "Flat tuning profile",
         tag = "FLAT",
         bandsDb = listOf(0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f),
         limiterCeilingDb = -0.1f,
@@ -44,7 +44,7 @@ enum class AcousticTargetPreset(
     ),
     IemHarmonicWarmth(
         title = "IEM Harmonic Warmth",
-        subtitle = "Harmon-curve target tuned for in-ear monitors & sealed drivers",
+        subtitle = "A target profile for in-ear and sealed headphones",
         tag = "IEM WARM",
         bandsDb = listOf(2.5f, 2.0f, 1.0f, 0.5f, 0f, 0f, 1.0f, 1.5f, 2.0f, 2.5f),
         limiterCeilingDb = -0.3f,
@@ -53,7 +53,7 @@ enum class AcousticTargetPreset(
     ),
     OpenBackAiry(
         title = "Open-Back Soundstage",
-        subtitle = "Expanded treble sparkle and dimensional stereo spread for planar headphones",
+        subtitle = "A brighter high end and wider stereo image for planar headphones",
         tag = "OPEN AIR",
         bandsDb = listOf(0.5f, 0.5f, 0f, 0f, 0.5f, 0.5f, 1.5f, 2.5f, 3.0f, 3.5f),
         limiterCeilingDb = -0.2f,
@@ -62,7 +62,7 @@ enum class AcousticTargetPreset(
     ),
     CarAudioPunch(
         title = "Car Acoustic Punch",
-        subtitle = "Road noise compensation with dynamic low-end punch and vocal clarity",
+        subtitle = "Bass and vocal emphasis for a noisier listening environment",
         tag = "CAR PUNCH",
         bandsDb = listOf(4.0f, 3.5f, 2.0f, 0.5f, 0f, 1.0f, 1.5f, 2.0f, 2.5f, 2.0f),
         limiterCeilingDb = -0.5f,
@@ -71,7 +71,7 @@ enum class AcousticTargetPreset(
     ),
     HiResDacDirect(
         title = "Bit-Perfect USB Passthrough",
-        subtitle = "Direct integer stream bypass routing directly to external DAC",
+        subtitle = "Request a direct DAC route where supported; actual output needs verification",
         tag = "BIT-PERFECT",
         bandsDb = listOf(0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f),
         limiterCeilingDb = 0.0f,

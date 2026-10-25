@@ -94,7 +94,7 @@ fun FeatureDocumentationSheet(
                 id = topicId,
                 title = topicId.replace("_", " ").replaceFirstChar { it.uppercase() },
                 category = "Field Guide",
-                summary = "Detailed operational documentation for this audio control.",
+                summary = "How this control works.",
                 sections = emptyList()
             )
     }

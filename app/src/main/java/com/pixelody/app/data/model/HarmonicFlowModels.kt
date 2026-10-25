@@ -14,7 +14,7 @@ enum class HarmonicFlowProfile(
 ) {
     ClubSetFlow(
         title = "Club / Set Flow",
-        subtitle = "High energy dancefloor progression with energy lifts & bass swaps",
+        subtitle = "Energy lifts and bass-swap transitions for a more energetic set",
         tag = "CLUB SET",
         energyMode = HarmonicEnergyMode.EnergyBoost2,
         defaultCurve = DjTransitionCurve.BassSwap,
@@ -23,7 +23,7 @@ enum class HarmonicFlowProfile(
     ),
     DeepListening(
         title = "Deep Listening",
-        subtitle = "Audiophile cohesion with strict harmonic locking & smooth equal power",
+        subtitle = "Closer key matches with equal-power fades",
         tag = "DEEP LISTEN",
         energyMode = HarmonicEnergyMode.HarmonicLock,
         defaultCurve = DjTransitionCurve.EqualPower,
@@ -32,7 +32,7 @@ enum class HarmonicFlowProfile(
     ),
     SunsetChill(
         title = "Sunset Chill",
-        subtitle = "Mellow melodic unwinding with sunset downshifts & echo/vinyl decays",
+        subtitle = "Lower-energy key changes with echo or vinyl-style endings",
         tag = "SUNSET CHILL",
         energyMode = HarmonicEnergyMode.SunsetDrift2,
         defaultCurve = DjTransitionCurve.EchoOut,
@@ -41,7 +41,7 @@ enum class HarmonicFlowProfile(
     ),
     CustomManual(
         title = "Custom Manual",
-        subtitle = "Tactile DJ console controls with personalized DSP curves",
+        subtitle = "DJ controls and adjustable processing curves",
         tag = "CUSTOM",
         energyMode = HarmonicEnergyMode.HarmonicLock,
         defaultCurve = DjTransitionCurve.EqualPower,
@@ -92,13 +92,13 @@ enum class EnergyContourPreset(
 ) {
     RampUp(
         title = "Ramp Up / Lift",
-        subtitle = "Ascending energy build up from mellow intro to peak climax",
+        subtitle = "Build from a quieter opening toward a peak",
         tag = "RAMP UP",
         targetEnergyFunction = { progress -> (0.25f + 0.70f * progress).coerceIn(0.1f, 1.0f) }
     ),
     PeakWave(
         title = "Peak Wave",
-        subtitle = "Natural DJ set dynamic with rise to peak at 60% followed by smooth resolution",
+        subtitle = "Build toward a peak at 60 percent, then wind down",
         tag = "PEAK WAVE",
         targetEnergyFunction = { progress ->
             (0.35f + 0.60f * kotlin.math.sin(progress * Math.PI.toFloat())).coerceIn(0.1f, 1.0f)
@@ -106,19 +106,19 @@ enum class EnergyContourPreset(
     ),
     SunsetDrift(
         title = "Sunset Drift",
-        subtitle = "Gradual descent into mellow, deep harmonic relaxation",
+        subtitle = "Gradually reduce the energy",
         tag = "SUNSET DRIFT",
         targetEnergyFunction = { progress -> (0.90f - 0.65f * progress).coerceIn(0.1f, 1.0f) }
     ),
     HarmonicPlateau(
         title = "Plateau Lock",
-        subtitle = "Even, steady energy with focused harmonic cohesion",
+        subtitle = "Keep energy steady while favoring related keys",
         tag = "PLATEAU",
         targetEnergyFunction = { 0.65f }
     ),
     CustomSculpt(
         title = "Custom Sculpt",
-        subtitle = "Manually sculpted energy contour points",
+        subtitle = "Draw the energy curve yourself",
         tag = "CUSTOM",
         targetEnergyFunction = { 0.5f }
     )

@@ -1,4 +1,4 @@
-# Bundled Android assets
+# Android asset sources and notices
 
 ## Geist Pixel Circle
 

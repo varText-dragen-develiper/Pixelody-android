@@ -12,9 +12,9 @@ import kotlin.math.sin
 
 enum class CrossfadeMode(val label: String, val durationSeconds: Int, val description: String) {
     Off("Off", 0, "No overlap between tracks"),
-    Smooth3s("3s Smooth", 3, "Subtle 3-second blend for general listening"),
-    EqualPower5s("5s Equal Power", 5, "Standard 5s psychoacoustic constant energy mix"),
-    ClubBlend8s("8s Club", 8, "Deep 8-second DJ transition for continuous flow"),
+    Smooth3s("3s Smooth", 3, "A short three-second overlap"),
+    EqualPower5s("5s Equal Power", 5, "A five-second equal-power overlap"),
+    ClubBlend8s("8s Club", 8, "A longer eight-second transition"),
     Extended12s("12s Extended", 12, "Long ambient morph between tracks")
 }
 

@@ -1,9 +1,7 @@
-# Android development notes
+# Android: recorded development
 
-This summarizes the Android plan and the device work recorded through July 21,
-2026. Later releases may have changed the app; start with the current README and
-release notes when installing or contributing. The full earlier development
-sequence remains in Git history.
+This record runs through July 21, 2026. Use the current README and release notes
+for setup; the device results here belong to their original builds.
 
 I want the phone app to be useful on its own and alongside the desktop player.
 The work recorded here concentrated on pairing with a Windows host, browsing
@@ -11,7 +9,7 @@ its library and playing authenticated streams through Android's media system.
 Portable hosting was a later idea, with battery, network and background limits
 to work out before treating a phone like an always-on server.
 
-## What was working at that checkpoint
+## The host connection
 
 By July 21, the Kotlin/Compose client had QR and short-code pairing, protected
 saved credentials, revision-aware paged browsing and polling, and Media3 playback
@@ -35,10 +33,9 @@ were also recorded.
 
 That run still wasn't closed. The final Android revoked-state capture and
 device UI/log inspection weren't recorded, and removal of the temporary Windows
-firewall rule still needed administrator verification. Those limits belong with
-the result rather than disappearing behind a completed-looking phase list.
+firewall rule still needed administrator verification. Those checks remained open.
 
-## Keeping the app understandable
+## Using it while listening
 
 Someone browsing music shouldn't have to work through a network dashboard.
 Keep the current track, source and queue easy to reach, with connection details
@@ -54,7 +51,7 @@ out of individual screens. Shared `/api/v1` models need to agree with the host.
 Don't expose host file paths or give a guest import, delete, metadata-edit,
 export or device-management access by accident.
 
-## What was still planned
+## Still to develop
 
 Room-backed offline storage/cache, WebSocket updates and production portable
 hosting were not complete at this checkpoint. Cached music would need explicit
@@ -67,7 +64,7 @@ Preserving `addedByDeviceId`, `sourceDeviceId` and `sourceLibraryId` in the
 single-host queue kept the source information available for that work; it didn't
 make federation an implemented feature.
 
-For contributors, use the Gradle checks and setup instructions in
+Use the Gradle checks in
 [Getting started](GETTING_STARTED.md). Code and fixture checks are useful before
 a device is connected, but they don't establish playback, notification, routing
 or recovery results on a phone. Keep the APK and device with any result you leave.

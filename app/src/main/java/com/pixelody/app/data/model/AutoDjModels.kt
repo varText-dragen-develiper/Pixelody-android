@@ -83,37 +83,37 @@ enum class HarmonicRelation(
     ExactMatch(
         title = "Exact Match",
         score = 1.0f,
-        advice = "Perfect harmonic cohesion with identical root scale and chords.",
+        advice = "Same key. The recordings can still differ in tuning, harmony and arrangement.",
         badgeColorHex = 0xFF4ADE80 // Green
     ),
     RelativeMajorMinor(
         title = "Relative Key",
         score = 0.95f,
-        advice = "Emotional modal shift sharing all 7 diatonic notes.",
+        advice = "Relative major/minor keys share the same diatonic notes.",
         badgeColorHex = 0xFF38BDF8 // Sky Blue
     ),
     AdjacentStep(
         title = "Adjacent Step (±1)",
         score = 0.90f,
-        advice = "Natural 5th interval harmonic progression (Dominant/Subdominant).",
+        advice = "Neighboring keys around the circle of fifths.",
         badgeColorHex = 0xFFA78BFA // Purple
     ),
     EnergyBoost(
         title = "Energy Boost (+2)",
         score = 0.75f,
-        advice = "Euphoric two-step key modulation lifting overall energy.",
+        advice = "A two-step key change to try for a lift.",
         badgeColorHex = 0xFFF59E0B // Amber
     ),
     EnergyDrop(
         title = "Energy Drop (-2)",
         score = 0.70f,
-        advice = "Moody two-step downward harmonic pivot.",
+        advice = "A two-step change in the other direction.",
         badgeColorHex = 0xFFFB923C // Orange
     ),
     DiagonalStep(
         title = "Diagonal Pivot",
         score = 0.65f,
-        advice = "Warm diagonal modal modulation across major/minor boundaries.",
+        advice = "A diagonal move between major and minor.",
         badgeColorHex = 0xFFEC4899 // Pink
     ),
     Unknown(
@@ -125,7 +125,7 @@ enum class HarmonicRelation(
     DissonantClash(
         title = "Harmonic Clash",
         score = 0.25f,
-        advice = "High harmonic dissonance. Recommended to use Bass Swap, Filter Sweep, or Vinyl Brake.",
+        advice = "The key tags suggest a less compatible pairing. Try a different transition and listen to the result.",
         badgeColorHex = 0xFFEF4444 // Red
     );
 
@@ -246,14 +246,14 @@ enum class HarmonicEnergyMode(
     ),
     EnergyBoost2(
         title = "Energy Boost (+2)",
-        subtitle = "+2 Camelot modulation to raise dancefloor energy",
+        subtitle = "Two clockwise Camelot steps",
         deltaCamelot = 2,
         tag = "ENERGY BOOST +2",
         colorHex = 0xFFE5A93C
     ),
     SunsetDrift2(
         title = "Sunset Drift (-2)",
-        subtitle = "-2 Camelot downshift for mellow harmonic unwinding",
+        subtitle = "Two counterclockwise Camelot steps",
         deltaCamelot = -2,
         tag = "SUNSET DRIFT -2",
         colorHex = 0xFF38BDF8

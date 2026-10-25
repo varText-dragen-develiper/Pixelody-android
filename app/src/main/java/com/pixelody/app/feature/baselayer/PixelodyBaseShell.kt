@@ -2127,7 +2127,7 @@ private fun BaseOverlayHost(
                     BaseOverlay.LensPicker -> {
                         BaseOverlayTitle(
                             title = "What you are looking at",
-                            subtitle = "One lens, used by every screen that lists music"
+                            subtitle = "Use the same music filter across browsing screens"
                         )
                         BaseLens.values().forEach { candidate ->
                             BaseOverlayItem(
@@ -2421,7 +2421,7 @@ private fun BaseOverlayHost(
                         }
                         BaseOverlayItem(
                             label = "Build Parametric Smart Crate",
-                            subtitle = "BPM match, Camelot harmonic key, & FLAC lossless rule builder",
+                            subtitle = "Build rules from tempo, key and source format",
                             trailing = "›"
                         ) {
                             send(BaseIntent.ShowOverlay(BaseOverlay.SmartCrateBuilder))
@@ -2642,9 +2642,9 @@ private fun BaseOverlayHost(
                         BaseOverlayTitle(
                             title = "Playback Speed & Pitch",
                             subtitle = if (pitchLocked) {
-                                "Time-stretch pitch lock active (speed changes without pitch shift)"
+                                "Pitch stays steady when speed changes"
                             } else {
-                                "Analog tape varispeed active (pitch changes naturally with speed)"
+                                "Pitch changes with playback speed"
                             },
                             onShowDoc = { send(BaseIntent.ShowOverlay(BaseOverlay.Documentation("varispeed"))) }
                         )
@@ -2705,15 +2705,15 @@ private fun BaseOverlayHost(
                     is BaseOverlay.LoudnessNormalization -> {
                         BaseOverlayTitle(
                             title = "Loudness Normalization",
-                            subtitle = "EBU R128 automatic gain targeting across all tracks",
+                            subtitle = "Adjust track gain using available loudness information",
                             onShowDoc = { send(BaseIntent.ShowOverlay(BaseOverlay.Documentation("loudness_normalization"))) }
                         )
                         LoudnessNormalizationMode.values().forEach { mode ->
                             val isSelected = loudnessMode == mode
                             val subtitle = when (mode) {
-                                LoudnessNormalizationMode.Off -> "Bit-perfect untouched original track dynamics"
-                                LoudnessNormalizationMode.StreamingStandard -> "Standard -14 LUFS (Balanced streaming volume)"
-                                LoudnessNormalizationMode.AudiophileDynamic -> "Audiophile -18 LUFS (Maximum headroom & dynamic range)"
+                                LoudnessNormalizationMode.Off -> "No loudness-normalization gain"
+                                LoudnessNormalizationMode.StreamingStandard -> "Standard · -14 LUFS target"
+                                LoudnessNormalizationMode.AudiophileDynamic -> "More headroom · -18 LUFS target"
                             }
                             BaseOverlayItem(
                                 label = mode.label,

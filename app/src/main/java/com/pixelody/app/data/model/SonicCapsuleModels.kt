@@ -15,7 +15,7 @@ enum class SonicMood(
     LateNightDrift("Late Night Drift", "Deep ambient soundscapes, spatial reverb, and sub-bass textures.", 0xFF8B5CF6), // Royal Purple
     HighEnergyWorkout("High-Octane Momentum", "Fast-tempo driving beats and peak dynamic energy.", 0xFFEF4444), // Crimson
     DeepStudyChill("Deep Study Calm", "Lo-fi textures, vinyl warmth, and low-tempo study frequencies.", 0xFF10B981), // Emerald
-    AudiophileDiscovery("Audiophile Masterclass", "Pristine Hi-Res FLAC/DSD recordings and wide dynamic range masters.", 0xFFE5A93C) // Gold
+    AudiophileDiscovery("Audiophile Masterclass", "High-resolution FLAC and DSD source recordings.", 0xFFE5A93C) // Gold
 }
 
 /**
@@ -30,9 +30,9 @@ enum class SonicArchetype(
     Unknown("Listening history", "Recorded on this device", "", "WaveformBars"),
     ElectronicExplorer("Electronic Explorer", "Synthesizers, driving 4/4 kicks, and futuristic textures", "EXP", "LightningCheck"),
     VinylPurist("Vinyl Purist", "Analog grooves, organic warmth, and classic mastering", "VINYL", "VinylDisc"),
-    DeepFlowArchitect("Deep Flow Architect", "High-retention extended focus and hypnotic ambient chords", "FLOW", "WaveformBars"),
-    HiResAudiophile("Hi-Res Audiophile", "Bit-perfect master tapes, wide dynamic range, and DSD purity", "HIRES", "DiamondLossless"),
-    EclecticNomad("Eclectic Nomad", "Multi-genre wanderer spanning diverse Camelot keys and tempos", "NOMAD", "OmniSource")
+    DeepFlowArchitect("Deep Flow Architect", "Longer listening sessions and ambient music", "FLOW", "WaveformBars"),
+    HiResAudiophile("Hi-Res Audiophile", "High-resolution and DSD source files", "HIRES", "DiamondLossless"),
+    EclecticNomad("Eclectic Nomad", "A mix of genres, keys and tempos", "NOMAD", "OmniSource")
 }
 
 /**

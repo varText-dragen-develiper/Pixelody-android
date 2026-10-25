@@ -210,7 +210,7 @@ fun JamSessionHubSheet(
                             text = if (session.active)
                                 "${session.participants.size} device${if (session.participants.size == 1) "" else "s"} connected • ${syncStatus.syncQuality}"
                             else
-                                "Collaborative multi-room synchronized audio",
+                                "Shared listening and queue controls",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -560,7 +560,7 @@ private fun JamQueueVotingPanel(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        "Add or suggest tracks from your Phone or PC library.",
+                        "Use the session controls and sources allowed by the host.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -952,7 +952,7 @@ private fun JamGovernancePanel(
 
         GovernanceToggleRow(
             label = "Allow Federated Local Media",
-            subtitle = "Guests can stream audio files from their own phone storage",
+            subtitle = "Allow phone-source contributions where the session supports them",
             checked = policy.federatedSourcesEnabled,
             enabled = isHost,
             onCheckedChange = {

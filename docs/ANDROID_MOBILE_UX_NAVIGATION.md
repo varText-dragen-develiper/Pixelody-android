@@ -1,10 +1,10 @@
 # Using Pixelody on a phone
 
-I want it to be easy to get to the music and stay with it while browsing or
-changing the queue. Sharing, tuning and host controls should be there when
-someone wants them, without taking over the screen just because they exist.
+The current track and queue should stay easy to reach while someone browses.
+Sharing, tuning and host controls need room when they're opened, without filling
+the player with connection details during ordinary listening.
 
-These notes keep the August 10, 2026 navigation review in view. At that point,
+The August 10, 2026 review recorded the navigation at that point. At that point,
 the Compose shell used Home, Search, Library and Create as its persistent
 destinations. Player, Queue, Profile, Files and Tools opened in context. An older
 proposal put Player in the bottom navigation instead of Create; that was an idea
@@ -44,6 +44,4 @@ help with a connection problem, and private tokens and paths shouldn't appear in
 ordinary status text.
 
 Familiar music apps are useful references for ergonomics. Their brand language,
-icons and commercial artwork aren't assets to copy into Pixelody. This is a
-summary of the design notes, with the older screen-by-screen proposal retained
-in Git history.
+icons and commercial artwork aren't assets to copy into Pixelody. The older screen-by-screen proposal remains in Git history.
