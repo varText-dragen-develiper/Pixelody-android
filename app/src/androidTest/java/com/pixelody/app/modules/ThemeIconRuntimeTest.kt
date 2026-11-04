@@ -71,7 +71,7 @@ class ThemeIconRuntimeTest {
         val keys = setOf(MobileSettingsStore.KEY_THEME, MobileSettingsStore.KEY_LOGO_COLOR, MobileSettingsStore.KEY_LOGO_FOLLOWS_THEME)
         val original = prefs.all.filterKeys { it in keys || it.startsWith("style_") }
         try {
-            PixelodyMobileTheme.entries.forEach { theme ->
+            PixelodyMobileTheme.selectableThemes.forEach { theme ->
                 finishActivities(); settings.resetAppearance(); settings.saveTheme(theme); settings.saveLogoFollowsTheme(true)
                 openProfile()
                 assertIcon(resolveLauncherIcon(settings.loadLogoPreferences(), theme, settings.loadAppearance()))

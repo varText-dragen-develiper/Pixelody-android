@@ -5,7 +5,6 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import com.pixelody.app.data.model.Track
 import java.io.BufferedInputStream
-import java.io.BufferedReader
 import java.io.OutputStream
 import java.io.OutputStreamWriter
 import java.io.PrintWriter
@@ -20,7 +19,6 @@ import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Locale
-import java.util.concurrent.Executors
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -38,7 +36,7 @@ data class AndroidHostStatus(
 
 class AndroidLibraryHost(private val appContext: Context) {
     private val random = SecureRandom()
-    private val executor = Executors.newCachedThreadPool()
+    private var clients: AndroidHostClients? = null
     private var serverSocket: ServerSocket? = null
     private var token: String = ""
     private var tracks: List<HostedTrack> = emptyList()
@@ -60,6 +58,8 @@ class AndroidLibraryHost(private val appContext: Context) {
         return try {
             val socket = ServerSocket(0, 50, InetAddress.getByName("0.0.0.0"))
             serverSocket = socket
+            val pool = AndroidHostClients()
+            clients = pool
             val port = socket.localPort
             status = AndroidHostStatus(
                 running = true,
@@ -70,9 +70,13 @@ class AndroidLibraryHost(private val appContext: Context) {
                 startedAt = System.currentTimeMillis().toString(),
                 lastError = ""
             )
-            executor.execute { acceptLoop(socket) }
+            Thread({ acceptLoop(socket, pool) }, "Pixelody-host-accept").apply { isDaemon = true }.start()
             status()
         } catch (error: Throwable) {
+            runCatching { serverSocket?.close() }
+            serverSocket = null
+            clients?.close()
+            clients = null
             status = AndroidHostStatus(lastError = error.message ?: "Android host could not start.")
             status()
         }
@@ -87,16 +91,18 @@ class AndroidLibraryHost(private val appContext: Context) {
     fun stop(): AndroidHostStatus {
         runCatching { serverSocket?.close() }
         serverSocket = null
+        clients?.close()
+        clients = null
         token = ""
         status = AndroidHostStatus()
         return status()
     }
 
-    private fun acceptLoop(socket: ServerSocket) {
+    private fun acceptLoop(socket: ServerSocket, pool: AndroidHostClients) {
         while (!socket.isClosed) {
             try {
                 val client = socket.accept()
-                executor.execute { handleClient(client) }
+                pool.submit(client, ::handleClient)
             } catch (_: SocketException) {
                 return
             } catch (error: Throwable) {
@@ -107,18 +113,10 @@ class AndroidLibraryHost(private val appContext: Context) {
 
     private fun handleClient(socket: Socket) {
         socket.use { client ->
-            val input = BufferedInputStream(client.getInputStream())
-            val reader = input.bufferedReader(StandardCharsets.UTF_8)
-            val requestLine = reader.readLine().orEmpty()
-            if (requestLine.isBlank()) return
-            val parts = requestLine.split(" ")
-            if (parts.size < 2) {
-                sendJson(client.getOutputStream(), 400, JSONObject().put("ok", false).put("message", "Bad request."))
-                return
-            }
-            val method = parts[0].uppercase(Locale.US)
-            val target = parts[1]
-            val headers = readHeaders(reader)
+            val request = readAndroidHostRequest(client)
+            val method = request.method
+            val target = request.target
+            val headers = request.headers
             if (method !in setOf("GET", "HEAD")) {
                 sendJson(client.getOutputStream(), 405, JSONObject().put("ok", false).put("message", "Method not allowed."))
                 return
@@ -266,18 +264,6 @@ class AndroidLibraryHost(private val appContext: Context) {
 
     private fun isAuthorized(headers: Map<String, String>, query: Map<String, String>): Boolean =
         isAuthorized(token, headers, query)
-
-    private fun readHeaders(reader: BufferedReader): Map<String, String> {
-        val headers = mutableMapOf<String, String>()
-        while (true) {
-            val line = reader.readLine() ?: break
-            if (line.isBlank()) break
-            val name = line.substringBefore(":").trim().lowercase(Locale.US)
-            val value = line.substringAfter(":", "").trim()
-            if (name.isNotBlank()) headers[name] = value
-        }
-        return headers
-    }
 
     private fun writeHeaders(output: OutputStream, statusCode: Int, headers: Map<String, String> = emptyMap()) {
         val reason = when (statusCode) {
