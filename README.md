@@ -9,7 +9,7 @@ This repository is the open-source edition of the Android app. It is licensed un
 ## Download or build it
 
 - [Getting started](docs/GETTING_STARTED.md): requirements, source build and first listening session.
-- [Android releases](https://github.com/varText-dragen-develiper/Pixelody-android/releases): the Android 0.2.3 debug-signed testing APK and its installation notes, under `v0.2.3`.
+- [Android releases](https://github.com/varText-dragen-develiper/Pixelody-android/releases): APKs and their release notes. Check the version, signing information and update instructions there before installing.
 - [Support](SUPPORT.md) and [shared discussions](https://github.com/varText-dragen-develiper/Pixelody/discussions): report problems or share listening ideas.
 - [Release preparation](docs/RELEASE_PREPARATION.md): what still needs verification before distributing a binary.
 
@@ -37,6 +37,10 @@ bash ./gradlew lintDebug
 Installing on a device or running the instrumented tests also needs a connected device or emulator (`adb devices`). Pairing needs a Pixelody for Windows host on the same network.
 
 The shared API fixtures that both apps test against are in [docs/api-contract-fixtures/](docs/api-contract-fixtures/).
+
+## Reading the source
+
+Start with the [code tour](docs/CODE_TOUR.md) if you're looking for the part behind a behavior. [Change notes](CHANGELOG.md) cover source updates; the release page describes the downloadable builds. Those can be at different points.
 
 ## Contributing and security
 

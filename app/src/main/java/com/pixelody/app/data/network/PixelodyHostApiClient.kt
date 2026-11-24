@@ -1,3 +1,8 @@
+/*
+ * These HTTP calls are blocking. Call them from the repository's IO context,
+ * not directly from a composable or the main thread. Keep request and response
+ * changes aligned with the shared host API fixtures.
+ */
 package com.pixelody.app.data.network
 
 import com.pixelody.app.data.model.HostConnectionState

@@ -1,3 +1,8 @@
+/*
+ * Playback lives in this service so it can outlast the screen. The notification,
+ * headset controls and Compose UI all need to reach the same player and queue.
+ * Changing a screen-local list alone will not change what those controls play.
+ */
 package com.pixelody.app.core.playback
 
 import android.app.PendingIntent

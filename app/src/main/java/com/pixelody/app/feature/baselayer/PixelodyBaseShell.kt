@@ -1,3 +1,8 @@
+/*
+ * The shell chooses which screen is visible and connects its actions to the host.
+ * Keep layout state here and playback behavior in the playback layer. A new screen
+ * should use the existing callbacks rather than starting another player.
+ */
 package com.pixelody.app.feature.baselayer
 
 import com.pixelody.app.feature.nowplaying.FlowListeningSheet

@@ -1,3 +1,8 @@
+/*
+ * This connects the Compose screens to playback, local storage and the host.
+ * Queue edits go through the player and are read back from it. Keep that direction:
+ * a second queue in UI state will eventually disagree with the notification.
+ */
 package com.pixelody.app.feature.baselayer
 
 import com.pixelody.app.BuildConfig

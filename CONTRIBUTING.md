@@ -4,6 +4,24 @@ Bug reports, documentation, design ideas and fixes are all welcome. If you're
 changing something substantial, open an issue first so we can work out what it
 needs before you spend a lot of time on it.
 
+## Working on a change
+
+The [code tour](docs/CODE_TOUR.md) points to screens, playback and host requests. With a JDK and Android SDK available, run these from the repository root:
+
+```sh
+bash ./gradlew assembleDebug
+bash ./gradlew testDebugUnitTest
+bash ./gradlew lintDebug
+```
+
+On Windows, use `gradlew.bat` with the same task names. For a manual test, record the APK, Android version and device. Check playback after leaving the app and returning, and distinguish phone-local tracks from host streams. Host tests also need a running Windows app. Use a disposable emulator or test profile for anything that deletes saved data.
+
+## Describing the change
+
+A useful title names the problem: “Keep queue order after reopening” tells us more than “Update source.” In the description, explain what happened before, what happens now and what you checked. Include a remaining failure if there is one; finding it later is not an improvement.
+
+Comments should explain a constraint or a surprising choice. There is no need to narrate an assignment or repeat the function name in a sentence. If the reason matters to the next person changing it, write that down.
+
 ## Contributor License Agreement
 
 pixelody-android is released under GPL-3.0-only. The owner also ships official free and

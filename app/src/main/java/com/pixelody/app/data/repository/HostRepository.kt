@@ -1,3 +1,8 @@
+/*
+ * The API client does blocking work; this repository moves network calls onto IO
+ * and tries the host's candidate addresses. Keep that work off the UI thread,
+ * including when adding a small-looking status request.
+ */
 package com.pixelody.app.data.repository
 
 import com.pixelody.app.data.api.toModel
